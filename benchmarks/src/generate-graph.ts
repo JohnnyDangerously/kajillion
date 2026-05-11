@@ -5,7 +5,10 @@
 function lcg (seed: number): () => number {
   let s = seed >>> 0
   return () => {
-    s = Math.imul(s, 1664525) + 1013904223 >>> 0
+    // Parenthesized for clarity — JS `+` binds tighter than `>>>` so the original
+    // `imul(...) + 1013904223 >>> 0` parses correctly, but the explicit parens
+    // make the unsigned 32-bit truncation visible without reading the precedence table.
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0
     return s / 0x100000000
   }
 }
@@ -46,9 +49,22 @@ export function generateBA (nodeCount: number, m = 3, seed = 42): GeneratedGraph
   // because each existing node appears (degree)-many times in the pool,
   // sampling uniformly from the pool is preferential-attachment sampling.
   const chosen = new Set<number>()
+  // Safety cap on the per-node target-selection loop. The seed graph has m+1
+  // distinct values so chosen.size < m always terminates today, but a future
+  // seed-graph refactor (e.g. star topology) could leave fewer distinct values
+  // available and spin the inner loop forever. The cap throws a clear error
+  // instead of hanging the page.
+  const maxRetriesPerNode = nodeCount * 10
   for (let i = m + 1; i < nodeCount; i += 1) {
     chosen.clear()
+    let retries = 0
     while (chosen.size < m) {
+      if (retries++ > maxRetriesPerNode) {
+        throw new Error(
+          `BA generator: failed to select ${m} distinct targets at node ${i} ` +
+          `after ${maxRetriesPerNode} retries. nodePool has too few distinct values.`
+        )
+      }
       const idx = Math.floor(rng() * nodePool.length)
       chosen.add(nodePool[idx] as number)
     }
