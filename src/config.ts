@@ -287,6 +287,22 @@ export interface GraphConfigInterface {
    */
   simulationDecay: number;
   /**
+   * Target rate (Hz) at which the physics simulation steps. Render continues to run
+   * at the native rAF rate (typically 60 Hz or higher); physics ticks are throttled
+   * to at most `physicsTickRate` per second. Between physics ticks, point positions
+   * are held — the GPU re-renders the last computed positions each frame.
+   *
+   * Lowering this from rAF rate (e.g. 30 instead of 60) roughly halves the per-second
+   * cost of force passes, but proportionally lengthens settle time in wall-clock seconds
+   * (alpha decay is per-tick, not per-second).
+   *
+   * Has no effect on user-triggered `step()` calls, which always execute regardless
+   * of the throttle.
+   *
+   * Default value: `30`
+   */
+  physicsTickRate: number;
+  /**
    * Alpha threshold at which the simulation is considered "settled" and stops running force passes.
    * When `alpha` drops below this value, `onSimulationEnd` fires and the six force passes
    * (gravity, center, repulsion, link-incoming, link-outgoing, cluster) are skipped each frame

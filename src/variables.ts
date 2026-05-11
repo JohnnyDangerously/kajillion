@@ -59,6 +59,7 @@ export const defaultConfigValues = {
   // Simulation
   simulationDecay: 1000,
   alphaStopThreshold: 0.05,
+  physicsTickRate: 30,
   simulationGravity: 0.25,
   simulationCenter: 0,
   simulationRepulsion: 1.0,

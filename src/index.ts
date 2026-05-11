@@ -61,6 +61,7 @@ export class Graph {
 
   private fpsMonitor: FPSMonitor | undefined
   private timerQueryPool: TimerQueryPool | undefined
+  private lastPhysicsTickMs = Number.NEGATIVE_INFINITY
 
   private currentEvent: D3ZoomEvent<HTMLCanvasElement, undefined> | D3DragEvent<HTMLCanvasElement, undefined, Hovered> | MouseEvent | undefined
   /**
@@ -1739,8 +1740,15 @@ export class Graph {
     }
 
     // Run simulation step (respects isSimulationRunning)
-    // When simulation ends, forces stop but rendering continues
-    this.runSimulationStep(false)
+    // When simulation ends, forces stop but rendering continues.
+    // Physics is throttled to `physicsTickRate`; between ticks, positions are held
+    // and only render runs. User-triggered `step()` bypasses this throttle.
+    const physicsInterval = 1000 / Math.max(1, this.config.physicsTickRate)
+    const nowMs = now ?? performance.now()
+    if (nowMs - this.lastPhysicsTickMs >= physicsInterval) {
+      this.lastPhysicsTickMs = nowMs
+      this.runSimulationStep(false)
+    }
 
     // Create a single render pass for drawing (points, lines, etc.)
     // Simulation will use separate render passes later
