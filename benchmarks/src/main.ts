@@ -10,6 +10,7 @@ interface BenchParams {
   pixelRatio: number | undefined;
   label: string | undefined;
   repeat: number;
+  zoomLevel: number | undefined;
 }
 
 interface PassStats {
@@ -34,6 +35,10 @@ function readParams (): BenchParams {
     pixelRatio: pr === null || pr === '' ? undefined : Number(pr),
     label: label === null || label === '' ? undefined : label,
     repeat: Math.max(1, Number(u.searchParams.get('repeat') ?? '1')),
+    zoomLevel: ((): number | undefined => {
+      const z = u.searchParams.get('zoomLevel')
+      return z === null || z === '' ? undefined : Number(z)
+    })(),
   }
 }
 
@@ -162,6 +167,10 @@ async function runOnce (
     enableGpuTimings: true,
   }
   if (params.pixelRatio !== undefined) config.pixelRatio = params.pixelRatio
+  if (params.zoomLevel !== undefined) {
+    config.fitViewOnInit = false
+    config.initialZoomLevel = params.zoomLevel
+  }
 
   const graph = new Graph(graphDiv, config)
   await graph.ready

@@ -131,6 +131,16 @@ void main() {
   #endif
   gl_Position = vec4(finalPosition.rg, 0, 1);
 
+  // Frustum cull: skip points whose sprite is entirely offscreen.
+  // maxPointSize is in "logical" (CSS) pixels; converting to NDC half-span
+  // gives us a conservative margin that covers any sprite at its maximum size.
+  vec2 cullMargin = 2.0 * vec2(maxPointSize) / screenSize;
+  if (abs(gl_Position.x) > 1.0 + cullMargin.x || abs(gl_Position.y) > 1.0 + cullMargin.y) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    gl_PointSize = 0.0;
+    return;
+  }
+
   // Calculate sizes for shape and image
   float shapeSizeValue = calculatePointSize(size * sizeScale);
   float imageSizeValue = calculatePointSize(imageSize * sizeScale);

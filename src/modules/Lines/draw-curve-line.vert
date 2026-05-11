@@ -143,7 +143,28 @@ void main() {
   vec4 pointPositionB = texture(positionsTexture, pointTexturePosB);
   vec2 a = pointPositionA.xy;
   vec2 b = pointPositionB.xy;
-  
+
+  // Frustum cull: if both endpoints sit off the same screen edge, the link cannot
+  // intersect the viewport even with curvature. Save the fragment work.
+  vec2 aNorm = (2.0 * a / spaceSize - 1.0) * (spaceSize / screenSize);
+  vec2 bNorm = (2.0 * b / spaceSize - 1.0) * (spaceSize / screenSize);
+  #ifdef USE_UNIFORM_BUFFERS
+  mat3 cullMat = mat3(transformationMatrix);
+  vec2 aNDC = (cullMat * vec3(aNorm, 1.0)).xy;
+  vec2 bNDC = (cullMat * vec3(bNorm, 1.0)).xy;
+  #else
+  vec2 aNDC = (transformationMatrix * vec3(aNorm, 1.0)).xy;
+  vec2 bNDC = (transformationMatrix * vec3(bNorm, 1.0)).xy;
+  #endif
+  const float linkCullMargin = 0.15;
+  if ((aNDC.x < -1.0 - linkCullMargin && bNDC.x < -1.0 - linkCullMargin) ||
+      (aNDC.x > 1.0 + linkCullMargin && bNDC.x > 1.0 + linkCullMargin) ||
+      (aNDC.y < -1.0 - linkCullMargin && bNDC.y < -1.0 - linkCullMargin) ||
+      (aNDC.y > 1.0 + linkCullMargin && bNDC.y > 1.0 + linkCullMargin)) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    return;
+  }
+
   // Calculate direction vector and its perpendicular
   vec2 xBasis = b - a;
   vec2 yBasis = normalize(vec2(-xBasis.y, xBasis.x));
