@@ -15,6 +15,7 @@ interface BenchParams {
   linkOpacity: number | undefined;
   pointMinPixelSize: number | undefined;
   linkMinPixelLength: number | undefined;
+  useWebGPU: boolean;
 }
 
 interface PassStats {
@@ -56,6 +57,7 @@ function readParams (): BenchParams {
       const v = u.searchParams.get('linkMinPixelLength')
       return v === null || v === '' ? undefined : Number(v)
     })(),
+    useWebGPU: u.searchParams.get('useWebGPU') === '1' || u.searchParams.get('useWebGPU') === 'true',
   }
 }
 
@@ -208,6 +210,7 @@ async function runOnce (
   if (params.linkOpacity !== undefined) config.linkOpacity = params.linkOpacity
   if (params.pointMinPixelSize !== undefined) config.pointMinPixelSize = params.pointMinPixelSize
   if (params.linkMinPixelLength !== undefined) config.linkMinPixelLength = params.linkMinPixelLength
+  if (params.useWebGPU) config.useWebGPU = true
 
   const graph = new Graph(graphDiv, config)
   await graph.ready
