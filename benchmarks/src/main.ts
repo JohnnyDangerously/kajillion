@@ -27,37 +27,45 @@ interface PassStats {
 
 type AggregateSnapshot = Record<string, PassStats>
 
+function parseNum (raw: string | null, fallback: number, paramName: string): number {
+  if (raw === null || raw === '') return fallback
+  const n = Number(raw)
+  if (!Number.isFinite(n)) {
+    console.warn(`[bench] '${paramName}=${raw}' is not a finite number; using default ${fallback}`)
+    return fallback
+  }
+  return n
+}
+
+function parseOptionalNum (raw: string | null, paramName: string): number | undefined {
+  if (raw === null || raw === '') return undefined
+  const n = Number(raw)
+  if (!Number.isFinite(n)) {
+    console.warn(`[bench] '${paramName}=${raw}' is not a finite number; ignoring`)
+    return undefined
+  }
+  return n
+}
+
 function readParams (): BenchParams {
   const u = new URL(window.location.href)
-  const pr = u.searchParams.get('pixelRatio')
-  const label = u.searchParams.get('label')
+  const p = u.searchParams
+  const label = p.get('label')
   return {
-    nodeCount: Number(u.searchParams.get('n') ?? '100000'),
-    edgesPerNode: Number(u.searchParams.get('m') ?? '3'),
-    seed: Number(u.searchParams.get('seed') ?? '42'),
-    warmupMs: Number(u.searchParams.get('warmup') ?? '2000'),
-    measureMs: Number(u.searchParams.get('measure') ?? '8000'),
-    pixelRatio: pr === null || pr === '' ? undefined : Number(pr),
+    nodeCount: parseNum(p.get('n'), 100000, 'n'),
+    edgesPerNode: parseNum(p.get('m'), 3, 'm'),
+    seed: parseNum(p.get('seed'), 42, 'seed'),
+    warmupMs: parseNum(p.get('warmup'), 2000, 'warmup'),
+    measureMs: parseNum(p.get('measure'), 8000, 'measure'),
+    pixelRatio: parseOptionalNum(p.get('pixelRatio'), 'pixelRatio'),
     label: label === null || label === '' ? undefined : label,
-    repeat: Math.max(1, Number(u.searchParams.get('repeat') ?? '1')),
-    zoomLevel: ((): number | undefined => {
-      const z = u.searchParams.get('zoomLevel')
-      return z === null || z === '' ? undefined : Number(z)
-    })(),
-    linkBlendMode: u.searchParams.get('linkBlendMode') === 'add' ? 'add' : 'normal',
-    linkOpacity: ((): number | undefined => {
-      const v = u.searchParams.get('linkOpacity')
-      return v === null || v === '' ? undefined : Number(v)
-    })(),
-    pointMinPixelSize: ((): number | undefined => {
-      const v = u.searchParams.get('pointMinPixelSize')
-      return v === null || v === '' ? undefined : Number(v)
-    })(),
-    linkMinPixelLength: ((): number | undefined => {
-      const v = u.searchParams.get('linkMinPixelLength')
-      return v === null || v === '' ? undefined : Number(v)
-    })(),
-    useWebGPU: u.searchParams.get('useWebGPU') === '1' || u.searchParams.get('useWebGPU') === 'true',
+    repeat: Math.max(1, parseNum(p.get('repeat'), 1, 'repeat')),
+    zoomLevel: parseOptionalNum(p.get('zoomLevel'), 'zoomLevel'),
+    linkBlendMode: p.get('linkBlendMode') === 'add' ? 'add' : 'normal',
+    linkOpacity: parseOptionalNum(p.get('linkOpacity'), 'linkOpacity'),
+    pointMinPixelSize: parseOptionalNum(p.get('pointMinPixelSize'), 'pointMinPixelSize'),
+    linkMinPixelLength: parseOptionalNum(p.get('linkMinPixelLength'), 'linkMinPixelLength'),
+    useWebGPU: p.get('useWebGPU') === '1' || p.get('useWebGPU') === 'true',
   }
 }
 
@@ -65,12 +73,22 @@ async function postResults (payload: unknown): Promise<void> {
   try {
     const headers = new Headers()
     headers.set('Content-Type', 'application/json')
-    const res = await fetch('/record-result', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) console.warn('record-result failed:', res.status)
+    // 5 s timeout: if the vite middleware stalls (disk full mid-write, etc.),
+    // the bench page would otherwise hang on "Done." forever and headless
+    // runners (Playwright/Puppeteer) wait on a never-resolving navigation idle.
+    const ctl = new AbortController()
+    const timeoutId = setTimeout(() => ctl.abort(), 5000)
+    try {
+      const res = await fetch('/record-result', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal: ctl.signal,
+      })
+      if (!res.ok) console.warn('record-result failed:', res.status)
+    } finally {
+      clearTimeout(timeoutId)
+    }
   } catch (err) {
     console.warn('record-result error:', err)
   }
@@ -100,10 +118,25 @@ function aggregate (snapshots: GpuTimingSnapshot[]): AggregateSnapshot {
       const t = s[label]
       if (t !== undefined) samples.push(t.avgMs)
     }
+    if (samples.length === 0) {
+      out[label] = { median: 0, min: 0, max: 0, samples }
+      continue
+    }
+    // Explicit loop instead of Math.min/max(...samples): (a) protects against the
+    // spread-arity ceiling on huge arrays, (b) avoids Infinity / -Infinity when
+    // samples is somehow empty after a future refactor (Math.min(...[]) = Infinity
+    // → JSON.stringify writes null → downstream tooling silently drops the field).
+    let lo = samples[0] as number
+    let hi = samples[0] as number
+    for (let i = 1; i < samples.length; i += 1) {
+      const v = samples[i] as number
+      if (v < lo) lo = v
+      if (v > hi) hi = v
+    }
     out[label] = {
       median: median(samples),
-      min: Math.min(...samples),
-      max: Math.max(...samples),
+      min: lo,
+      max: hi,
       samples,
     }
   }
