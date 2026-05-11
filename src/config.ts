@@ -279,6 +279,23 @@ export interface GraphConfigInterface {
    */
   linkVisibilityMinTransparency: number;
   /**
+   * Color-blend mode for link rendering.
+   *
+   * - `'normal'` (default): standard alpha blending. Each link is composited over the
+   *   background using its own alpha. Behaves like upstream cosmos.gl.
+   * - `'add'`: additive blending. Overlapping link fragments accumulate in brightness,
+   *   producing a density-field-style visualization at galaxy zoom — communities and
+   *   high-degree nodes appear as visibly brighter regions. Best paired with a higher
+   *   `linkMinPixelLength` (e.g. 0) so all the sub-pixel signal is preserved, and a
+   *   low per-link alpha (e.g. `linkOpacity: 0.05`) so the accumulation doesn't saturate.
+   *
+   * This setting is applied at engine initialization. Changing it via `setConfig` will
+   * not take effect until the line pipeline is recreated.
+   *
+   * Default value: `'normal'`
+   */
+  linkBlendMode: 'normal' | 'add';
+  /**
    * Hard-skip rendering of links whose on-screen length (in CSS pixels) falls below this threshold.
    * Unlike `linkVisibilityDistanceRange` which fades opacity, this discards the link's draw entirely,
    * saving fragment shader work. Useful at galaxy zoom where sub-pixel edges become invisible noise.
