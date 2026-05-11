@@ -1,4 +1,4 @@
-import { Graph, PointShape } from '@cosmos.gl/graph'
+import { Graph, PointShape } from '@kajillion/graph'
 
 export const allShapes = (): {div: HTMLDivElement; graph: Graph; destroy?: () => void } => {
   // Create container div

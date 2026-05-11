@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: !isUMD,
       lib: {
         entry: resolve(__dirname, 'src/index.ts'),
-        name: 'Cosmos',
+        name: 'Kajillion',
         formats: [isUMD ? 'umd' : 'es'],
         fileName: () => (isUMD ? 'index.min.js' : 'index.js'),
       },
@@ -33,7 +33,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@/graph': resolve(__dirname, 'src/'),
-        '@cosmos.gl/graph': resolve(__dirname, 'src/'),
+        '@kajillion/graph': resolve(__dirname, 'src/'),
       },
     },
   }

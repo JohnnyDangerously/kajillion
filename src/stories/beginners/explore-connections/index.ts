@@ -1,4 +1,4 @@
-import { Graph } from '@cosmos.gl/graph'
+import { Graph } from '@kajillion/graph'
 import { generateHierarchyData } from './data-gen'
 import './style.css'
 

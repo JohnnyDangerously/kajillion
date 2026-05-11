@@ -1,5 +1,5 @@
 
-import { Graph } from '@cosmos.gl/graph'
+import { Graph } from '@kajillion/graph'
 import { createCosmos } from '../create-cosmos'
 import { generateMeshData } from '../generate-mesh-data'
 

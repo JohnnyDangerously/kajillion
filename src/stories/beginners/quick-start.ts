@@ -1,4 +1,4 @@
-import { Graph, type GraphConfig } from '@cosmos.gl/graph'
+import { Graph, type GraphConfig } from '@kajillion/graph'
 
 export const quickStart = (): { graph: Graph; div: HTMLDivElement; destroy?: () => void } => {
   const div = document.createElement('div')

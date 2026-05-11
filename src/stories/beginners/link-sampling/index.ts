@@ -1,4 +1,4 @@
-import { Graph, type GraphConfig } from '@cosmos.gl/graph'
+import { Graph, type GraphConfig } from '@kajillion/graph'
 import { generateLinkSamplingDemoData } from './data'
 import { LinkSamplingLabels } from './labels'
 import './style.css'

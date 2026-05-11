@@ -1,6 +1,6 @@
 import { scaleLinear, scaleSequential } from 'd3-scale'
 import { interpolateWarm } from 'd3-scale-chromatic'
-import { getRgbaColor, defaultConfigValues } from '@cosmos.gl/graph'
+import { getRgbaColor, defaultConfigValues } from '@kajillion/graph'
 
 function getRandom (min: number, max: number): number {
   return Math.random() * (max - min) + min

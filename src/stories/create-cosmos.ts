@@ -1,4 +1,4 @@
-import { Graph, type GraphConfig, defaultConfigValues } from '@cosmos.gl/graph'
+import { Graph, type GraphConfig, defaultConfigValues } from '@kajillion/graph'
 
 export type CosmosStoryProps = GraphConfig & {
   pointPositions: Float32Array;

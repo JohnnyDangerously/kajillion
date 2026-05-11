@@ -1,4 +1,4 @@
-import { Graph } from '@cosmos.gl/graph'
+import { Graph } from '@kajillion/graph'
 import { CosmosLabels } from './labels'
 import { processPerformances, pointsToShowLabelsFor } from './data'
 import './style.css'

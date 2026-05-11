@@ -1,4 +1,4 @@
-import { Graph } from '@cosmos.gl/graph'
+import { Graph } from '@kajillion/graph'
 import { luma } from '@luma.gl/core'
 import { webgl2Adapter } from '@luma.gl/webgl'
 import { generateData } from './data-gen'

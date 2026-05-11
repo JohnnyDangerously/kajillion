@@ -1,4 +1,4 @@
-import { Graph, PointShape } from '@cosmos.gl/graph'
+import { Graph, PointShape } from '@kajillion/graph'
 
 // Import all PNG icons
 import boxUrl from './icons/box.png'

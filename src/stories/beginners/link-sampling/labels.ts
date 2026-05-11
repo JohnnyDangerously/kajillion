@@ -1,5 +1,5 @@
 import { LabelRenderer, LabelOptions } from '@interacta/css-labels'
-import { Graph } from '@cosmos.gl/graph'
+import { Graph } from '@kajillion/graph'
 
 const FONT_SIZE = 12
 const LINE_HEIGHT = 1.4

@@ -1,4 +1,4 @@
-import { Graph } from '@cosmos.gl/graph'
+import { Graph } from '@kajillion/graph'
 import { moscowMetroCoords } from './moscow-metro-coords'
 import { getPointColors } from './point-colors'
 import './style.css'
@@ -6,7 +6,7 @@ import './style.css'
 /**
  * This example demonstrates the importance of rescaling positions by Cosmos.
  * The Moscow Metro station coordinates are are normalized (0-1 range in both dimensions).
- * By default, cosmos.gl rescales these positions to fit the canvas.
+ * By default, Kajillion rescales these positions to fit the canvas.
  * When disabling rescaling (`rescalePositions: false`):
  * - Points render using raw coordinates
  * - The entire graph occupies a tiny 1x1 area in WebGL's clip space (-1 to 1)

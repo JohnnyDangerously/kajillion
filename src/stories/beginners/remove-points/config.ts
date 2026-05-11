@@ -1,4 +1,4 @@
-import { type GraphConfig } from '@cosmos.gl/graph'
+import { type GraphConfig } from '@kajillion/graph'
 
 export const config: GraphConfig = {
   spaceSize: 4096,

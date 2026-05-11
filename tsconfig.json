@@ -4,8 +4,8 @@
     "paths": {
       "@/graph": ["src/"],
       "@/graph/*": ["src/*"],
-      "@cosmos.gl/graph": ["src/"],
-      "@cosmos.gl/graph/*": ["src/*"],
+      "@kajillion/graph": ["src/"],
+      "@kajillion/graph/*": ["src/*"],
     },
     "target": "es2019",
     "module": "esnext",

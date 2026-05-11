@@ -1,6 +1,6 @@
 import { scaleSequential } from 'd3-scale'
 import { interpolateWarm } from 'd3-scale-chromatic'
-import { getRgbaColor } from '@cosmos.gl/graph'
+import { getRgbaColor } from '@kajillion/graph'
 
 export const getPointColors = (pointPositions: number[]): Float32Array => {
   const pointColorScale = scaleSequential(interpolateWarm)

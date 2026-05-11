@@ -1,4 +1,4 @@
-import { Graph } from '@cosmos.gl/graph'
+import { Graph } from '@kajillion/graph'
 import type { StoryObj } from '@storybook/html'
 import { CosmosStoryProps } from '@/graph/stories/create-cosmos'
 
