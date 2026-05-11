@@ -1,12 +1,12 @@
 {
-  "name": "@cosmos.gl/graph",
-  "version": "3.0.0-beta.8",
-  "description": "GPU-based force graph layout and rendering",
+  "name": "@kajillion/graph",
+  "version": "0.1.0-pre.0",
+  "description": "Render a kajillion nodes in your browser. GPU force graph engine. Fork of cosmos.gl.",
   "jsdelivr": "dist/index.min.js",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
-  "repository": "git://github.com/cosmosgl/graph.git",
+  "repository": "git://github.com/JohnnyDangerously/kajillion.git",
   "type": "module",
   "files": [
     "dist",
@@ -32,8 +32,8 @@
     "simulation",
     "visualization"
   ],
-  "homepage": "https://cosmosgl.github.io/graph",
-  "author": "cosmos.gl",
+  "homepage": "https://github.com/JohnnyDangerously/kajillion",
+  "author": "Kajillion Contributors",
   "devDependencies": {
     "@interacta/css-labels": "^0.6.0",
     "@jls-digital/storybook-addon-code": "^1.0.4",

@@ -1,6 +1,13 @@
 MIT License
 
 Copyright Contributors to the cosmos.gl project.
+Copyright (c) 2026 Kajillion Contributors.
+
+Kajillion is a fork of cosmos.gl (https://github.com/cosmosgl/graph),
+maintained as an independent project focused on extreme-scale graph
+rendering. The original cosmos.gl copyright and license are preserved
+above; modifications and additions by Kajillion Contributors are
+licensed under the same MIT terms.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
