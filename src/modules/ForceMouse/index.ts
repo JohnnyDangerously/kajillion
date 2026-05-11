@@ -3,6 +3,7 @@ import { Model } from '@luma.gl/engine'
 import { CoreModule } from '@/graph/modules/core-module'
 
 import forceFrag from '@/graph/modules/ForceMouse/force-mouse.frag?raw'
+import forceMouseWgsl from '@/graph/modules/ForceMouse/force-mouse.wgsl?raw'
 import updateVert from '@/graph/modules/Shared/quad.vert?raw'
 import { ensureVec2 } from '@/graph/modules/Shared/uniform-utils'
 
@@ -34,6 +35,7 @@ export class ForceMouse extends CoreModule {
     })
 
     this.runCommand ||= new Model(device, {
+      source: forceMouseWgsl,
       fs: forceFrag,
       vs: updateVert,
       topology: 'triangle-strip',

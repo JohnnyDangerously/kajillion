@@ -4,7 +4,9 @@ import { CoreModule } from '@/graph/modules/core-module'
 
 import calculateCentermassFrag from '@/graph/modules/ForceCenter/calculate-centermass.frag?raw'
 import calculateCentermassVert from '@/graph/modules/ForceCenter/calculate-centermass.vert?raw'
+import calculateCentermassWgsl from '@/graph/modules/ForceCenter/calculate-centermass.wgsl?raw'
 import forceFrag from '@/graph/modules/ForceCenter/force-center.frag?raw'
+import forceCenterWgsl from '@/graph/modules/ForceCenter/force-center.wgsl?raw'
 import { createIndexesForBuffer } from '@/graph/modules/Shared/buffer'
 import { getBytesPerRow } from '@/graph/modules/Shared/texture-utils'
 import updateVert from '@/graph/modules/Shared/quad.vert?raw'
@@ -104,6 +106,7 @@ export class ForceCenter extends CoreModule {
     })
 
     this.calculateCentermassCommand ||= new Model(device, {
+      source: calculateCentermassWgsl,
       fs: calculateCentermassFrag,
       vs: calculateCentermassVert,
       topology: 'point-list',
@@ -137,6 +140,7 @@ export class ForceCenter extends CoreModule {
     this.calculateCentermassCommand.setVertexCount(this.data.pointsNumber ?? 0)
 
     this.runCommand ||= new Model(device, {
+      source: forceCenterWgsl,
       fs: forceFrag,
       vs: updateVert,
       topology: 'triangle-strip',

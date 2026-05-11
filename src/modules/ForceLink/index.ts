@@ -3,6 +3,7 @@ import { Model } from '@luma.gl/engine'
 import { CoreModule } from '@/graph/modules/core-module'
 
 import { forceFrag } from '@/graph/modules/ForceLink/force-spring'
+import { forceSpringWgsl } from '@/graph/modules/ForceLink/force-spring.wgsl'
 import { getBytesPerRow } from '@/graph/modules/Shared/texture-utils'
 import { ensureVec2 } from '@/graph/modules/Shared/uniform-utils'
 import updateVert from '@/graph/modules/Shared/quad.vert?raw'
@@ -190,6 +191,7 @@ export class ForceLink extends CoreModule {
     })
 
     this.runCommand ||= new Model(device, {
+      source: forceSpringWgsl(this.maxPointDegree),
       fs: forceFrag(this.maxPointDegree),
       vs: updateVert,
       topology: 'triangle-strip',

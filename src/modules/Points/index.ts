@@ -8,20 +8,28 @@ import type { Mat4Array } from '@/graph/modules/Store'
 import { defaultConfigValues } from '@/graph/variables'
 import drawPointsFrag from '@/graph/modules/Points/draw-points.frag?raw'
 import drawPointsVert from '@/graph/modules/Points/draw-points.vert?raw'
+import drawPointsWgsl from '@/graph/modules/Points/draw-points.wgsl?raw'
 import findPointsInRectFrag from '@/graph/modules/Points/find-points-in-rect.frag?raw'
+import findPointsInRectWgsl from '@/graph/modules/Points/find-points-in-rect.wgsl?raw'
 import findPointsInPolygonFrag from '@/graph/modules/Points/find-points-in-polygon.frag?raw'
+import findPointsInPolygonWgsl from '@/graph/modules/Points/find-points-in-polygon.wgsl?raw'
 import drawHighlightedFrag from '@/graph/modules/Points/draw-highlighted.frag?raw'
 import drawHighlightedVert from '@/graph/modules/Points/draw-highlighted.vert?raw'
+import drawHighlightedWgsl from '@/graph/modules/Points/draw-highlighted.wgsl?raw'
 import findHoveredPointFrag from '@/graph/modules/Points/find-hovered-point.frag?raw'
 import findHoveredPointVert from '@/graph/modules/Points/find-hovered-point.vert?raw'
+import findHoveredPointWgsl from '@/graph/modules/Points/find-hovered-point.wgsl?raw'
 import fillGridWithSampledPointsFrag from '@/graph/modules/Points/fill-sampled-points.frag?raw'
 import fillGridWithSampledPointsVert from '@/graph/modules/Points/fill-sampled-points.vert?raw'
+import fillGridWithSampledPointsWgsl from '@/graph/modules/Points/fill-sampled-points.wgsl?raw'
 import updatePositionFrag from '@/graph/modules/Points/update-position.frag?raw'
 import updatePositionWgsl from '@/graph/modules/Points/update-position.wgsl?raw'
 import { createIndexesForBuffer } from '@/graph/modules/Shared/buffer'
 import { getBytesPerRow } from '@/graph/modules/Shared/texture-utils'
 import trackPositionsFrag from '@/graph/modules/Points/track-positions.frag?raw'
+import trackPositionsWgsl from '@/graph/modules/Points/track-positions.wgsl?raw'
 import dragPointFrag from '@/graph/modules/Points/drag-point.frag?raw'
+import dragPointWgsl from '@/graph/modules/Points/drag-point.wgsl?raw'
 import updateVert from '@/graph/modules/Shared/quad.vert?raw'
 import { readPixels } from '@/graph/helper'
 import { ensureVec2, ensureVec4 } from '@/graph/modules/Shared/uniform-utils'
@@ -546,6 +554,7 @@ export class Points extends CoreModule {
     })
 
     this.dragPointCommand ||= new Model(device, {
+      source: dragPointWgsl,
       fs: dragPointFrag,
       vs: updateVert,
       topology: 'triangle-strip',
@@ -641,6 +650,7 @@ export class Points extends CoreModule {
     })
 
     this.drawCommand ||= new Model(device, {
+      source: drawPointsWgsl,
       fs: drawPointsFrag,
       vs: drawPointsVert,
       topology: 'point-list',
@@ -719,6 +729,7 @@ export class Points extends CoreModule {
     })
 
     this.findPointsInRectCommand ||= new Model(device, {
+      source: findPointsInRectWgsl,
       fs: findPointsInRectFrag,
       vs: updateVert,
       topology: 'triangle-strip',
@@ -765,6 +776,7 @@ export class Points extends CoreModule {
     })
 
     this.findPointsInPolygonCommand ||= new Model(device, {
+      source: findPointsInPolygonWgsl,
       fs: findPointsInPolygonFrag,
       vs: updateVert,
       topology: 'triangle-strip',
@@ -821,6 +833,7 @@ export class Points extends CoreModule {
     })
 
     this.findHoveredPointCommand ||= new Model(device, {
+      source: findHoveredPointWgsl,
       fs: findHoveredPointFrag,
       vs: findHoveredPointVert,
       topology: 'point-list',
@@ -871,6 +884,7 @@ export class Points extends CoreModule {
     })
 
     this.fillSampledPointsFboCommand ||= new Model(device, {
+      source: fillGridWithSampledPointsWgsl,
       fs: fillGridWithSampledPointsFrag,
       vs: fillGridWithSampledPointsVert,
       topology: 'point-list',
@@ -946,6 +960,7 @@ export class Points extends CoreModule {
     })
 
     this.drawHighlightedCommand ||= new Model(device, {
+      source: drawHighlightedWgsl,
       fs: drawHighlightedFrag,
       vs: drawHighlightedVert,
       topology: 'triangle-strip',
@@ -997,6 +1012,7 @@ export class Points extends CoreModule {
     })
 
     this.trackPointsCommand ||= new Model(device, {
+      source: trackPositionsWgsl,
       fs: trackPositionsFrag,
       vs: updateVert,
       topology: 'triangle-strip',

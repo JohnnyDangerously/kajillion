@@ -3,6 +3,7 @@ import { Model } from '@luma.gl/engine'
 import { CoreModule } from '@/graph/modules/core-module'
 
 import forceFrag from '@/graph/modules/ForceGravity/force-gravity.frag?raw'
+import forceGravityWgsl from '@/graph/modules/ForceGravity/force-gravity.wgsl?raw'
 import updateVert from '@/graph/modules/Shared/quad.vert?raw'
 
 export class ForceGravity extends CoreModule {
@@ -35,6 +36,7 @@ export class ForceGravity extends CoreModule {
     })
 
     this.runCommand ||= new Model(device, {
+      source: forceGravityWgsl,
       fs: forceFrag,
       vs: updateVert,
       topology: 'triangle-strip',

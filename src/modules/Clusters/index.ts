@@ -4,7 +4,9 @@ import { CoreModule } from '@/graph/modules/core-module'
 
 import calculateCentermassFrag from '@/graph/modules/Clusters/calculate-centermass.frag?raw'
 import calculateCentermassVert from '@/graph/modules/Clusters/calculate-centermass.vert?raw'
+import calculateCentermassWgsl from '@/graph/modules/Clusters/calculate-centermass.wgsl?raw'
 import forceFrag from '@/graph/modules/Clusters/force-cluster.frag?raw'
+import forceClusterWgsl from '@/graph/modules/Clusters/force-cluster.wgsl?raw'
 import { readPixels } from '@/graph/helper'
 import { createIndexesForBuffer } from '@/graph/modules/Shared/buffer'
 import { getBytesPerRow } from '@/graph/modules/Shared/texture-utils'
@@ -275,6 +277,7 @@ export class Clusters extends CoreModule {
     })
 
     this.calculateCentermassCommand ||= new Model(device, {
+      source: calculateCentermassWgsl,
       fs: calculateCentermassFrag,
       vs: calculateCentermassVert,
       topology: 'point-list',
@@ -329,6 +332,7 @@ export class Clusters extends CoreModule {
     })
 
     this.applyForcesCommand ||= new Model(device, {
+      source: forceClusterWgsl,
       fs: forceFrag,
       vs: updateVert,
       topology: 'triangle-strip',

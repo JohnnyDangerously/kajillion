@@ -4,8 +4,11 @@ import { CoreModule } from '@/graph/modules/core-module'
 
 import calculateLevelFrag from '@/graph/modules/ForceManyBody/calculate-level.frag?raw'
 import calculateLevelVert from '@/graph/modules/ForceManyBody/calculate-level.vert?raw'
+import calculateLevelWgsl from '@/graph/modules/ForceManyBody/calculate-level.wgsl?raw'
 import forceFrag from '@/graph/modules/ForceManyBody/force-level.frag?raw'
+import forceLevelWgsl from '@/graph/modules/ForceManyBody/force-level.wgsl?raw'
 import forceCenterFrag from '@/graph/modules/ForceManyBody/force-centermass.frag?raw'
+import forceCentermassWgsl from '@/graph/modules/ForceManyBody/force-centermass.wgsl?raw'
 import { createIndexesForBuffer } from '@/graph/modules/Shared/buffer'
 import { getBytesPerRow } from '@/graph/modules/Shared/texture-utils'
 import updateVert from '@/graph/modules/Shared/quad.vert?raw'
@@ -194,6 +197,7 @@ export class ForceManyBody extends CoreModule {
     })
 
     this.calculateLevelsCommand ||= new Model(device, {
+      source: calculateLevelWgsl,
       fs: calculateLevelFrag,
       vs: calculateLevelVert,
       topology: 'point-list',
@@ -255,6 +259,7 @@ export class ForceManyBody extends CoreModule {
     })
 
     this.forceCommand ||= new Model(device, {
+      source: forceLevelWgsl,
       fs: forceFrag,
       vs: updateVert,
       topology: 'triangle-strip',
@@ -304,6 +309,7 @@ export class ForceManyBody extends CoreModule {
     })
 
     this.forceFromItsOwnCentermassCommand ||= new Model(device, {
+      source: forceCentermassWgsl,
       fs: forceCenterFrag,
       vs: updateVert,
       topology: 'triangle-strip',

@@ -5,10 +5,13 @@ import type { Mat4Array } from '@/graph/modules/Store'
 import { conicParametricCurveModule } from '@/graph/modules/Lines/conic-curve-module'
 import drawLineFrag from '@/graph/modules/Lines/draw-curve-line.frag?raw'
 import drawLineVert from '@/graph/modules/Lines/draw-curve-line.vert?raw'
+import drawLineWgsl from '@/graph/modules/Lines/draw-curve-line.wgsl?raw'
 import fillGridWithSampledLinksFrag from '@/graph/modules/Lines/fill-sampled-links.frag?raw'
 import fillGridWithSampledLinksVert from '@/graph/modules/Lines/fill-sampled-links.vert?raw'
+import fillGridWithSampledLinksWgsl from '@/graph/modules/Lines/fill-sampled-links.wgsl?raw'
 import hoveredLineIndexFrag from '@/graph/modules/Lines/hovered-line-index.frag?raw'
 import hoveredLineIndexVert from '@/graph/modules/Lines/hovered-line-index.vert?raw'
+import hoveredLineIndexWgsl from '@/graph/modules/Lines/hovered-line-index.wgsl?raw'
 import { defaultConfigValues } from '@/graph/variables'
 import { getCurveLineGeometry } from '@/graph/modules/Lines/geometry'
 import { getBytesPerRow } from '@/graph/modules/Shared/texture-utils'
@@ -207,6 +210,7 @@ export class Lines extends CoreModule {
 
     this.drawCurveCommand ||= new Model(device, {
       vs: drawLineVert,
+      source: drawLineWgsl,
       fs: drawLineFrag,
       modules: [conicParametricCurveModule],
       topology: 'triangle-strip',
@@ -282,6 +286,7 @@ export class Lines extends CoreModule {
     })
 
     this.hoveredLineIndexCommand ||= new Model(device, {
+      source: hoveredLineIndexWgsl,
       vs: hoveredLineIndexVert,
       fs: hoveredLineIndexFrag,
       topology: 'triangle-strip',
@@ -328,6 +333,7 @@ export class Lines extends CoreModule {
     })
 
     this.fillSampledLinksFboCommand ||= new Model(device, {
+      source: fillGridWithSampledLinksWgsl,
       fs: fillGridWithSampledLinksFrag,
       vs: fillGridWithSampledLinksVert,
       modules: [conicParametricCurveModule],
