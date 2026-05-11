@@ -7,3 +7,4 @@ yarn.lock
 *storybook.log
 storybook-static
 benchmarks/results/
+benchmarks/screenshots/
