@@ -57,7 +57,13 @@ export class TimerQueryPool {
     const webglDevice = device as WebGLDevice
     const rawGl = webglDevice.gl as WebGL2RenderingContext | null
     if (!rawGl) return
-    const ext = rawGl.getExtension('EXT_disjoint_timer_query_webgl2') as Record<string, number> | null
+    interface TimerQueryExtension {
+      TIME_ELAPSED_EXT?: number;
+      GPU_DISJOINT_EXT?: number;
+      QUERY_RESULT_AVAILABLE?: number;
+      QUERY_RESULT?: number;
+    }
+    const ext = rawGl.getExtension('EXT_disjoint_timer_query_webgl2') as TimerQueryExtension | null
     if (!ext) {
       console.warn(
         '[kajillion] EXT_disjoint_timer_query_webgl2 unavailable in this browser; ' +
