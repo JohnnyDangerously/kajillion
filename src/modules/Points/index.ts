@@ -1,5 +1,6 @@
 import { Framebuffer, Buffer, Texture, UniformStore, RenderPass } from '@luma.gl/core'
 import { Model } from '@luma.gl/engine'
+import { WebGLDevice } from '@luma.gl/webgl'
 // import { scaleLinear } from 'd3-scale'
 // import { extent } from 'd3-array'
 import { CoreModule } from '@/graph/modules/core-module'
@@ -1314,6 +1315,14 @@ export class Points extends CoreModule {
       width: atlasSize,
       height: atlasSize,
       format: 'rgba8unorm',
+      mipmaps: true,
+      sampler: {
+        minFilter: 'linear',
+        magFilter: 'linear',
+        mipmapFilter: 'linear',
+        addressModeU: 'clamp-to-edge',
+        addressModeV: 'clamp-to-edge',
+      },
     })
     this.imageAtlasTexture.copyImageData({
       data: atlasData,
@@ -1323,6 +1332,18 @@ export class Points extends CoreModule {
       x: 0,
       y: 0,
     })
+    // Generate mip chain so deep-zoom (small sprite) sampling uses lower-LOD instead of
+    // aliasing the base texture. Avoids the "fuzzy avatar" effect at far zoom.
+    {
+      const webglDevice = device as WebGLDevice
+      const rawGl = webglDevice.gl as WebGL2RenderingContext | null
+      const handle = (this.imageAtlasTexture as { handle?: WebGLTexture }).handle
+      if (rawGl && handle) {
+        rawGl.bindTexture(rawGl.TEXTURE_2D, handle)
+        rawGl.generateMipmap(rawGl.TEXTURE_2D)
+        rawGl.bindTexture(rawGl.TEXTURE_2D, null)
+      }
+    }
 
     // Recreate coords texture
     if (this.imageAtlasCoordsTexture && !this.imageAtlasCoordsTexture.destroyed) {
