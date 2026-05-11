@@ -25,6 +25,7 @@ export class Lines extends CoreModule {
   public linkStatusTexture: Texture | undefined
   private linkStatusTextureSize = 0
   private drawCurveCommand: Model | undefined
+  private drawCurveIndexCommand: Model | undefined
   private hoveredLineIndexCommand: Model | undefined
   private fillSampledLinksFboCommand: Model | undefined
   private pointABuffer: Buffer | undefined
@@ -263,6 +264,50 @@ export class Lines extends CoreModule {
         blendAlphaOperation: 'add',
         blendAlphaSrcFactor: 'one',
         blendAlphaDstFactor: config.linkBlendMode === 'add' ? 'one' : 'one-minus-src-alpha',
+        depthWriteEnabled: false,
+        depthCompare: 'always',
+      },
+    })
+
+    // Picking pass needs OPAQUE writes to the link-index framebuffer regardless of
+    // the user-configured linkBlendMode. Additive blending here would sum link indices
+    // across overlapping links and produce garbage IDs on hover/click. We use a separate
+    // Model with `blend: false` so this stays correct when the visible pass uses 'add'.
+    this.drawCurveIndexCommand ||= new Model(device, {
+      vs: drawLineVert,
+      source: drawLineWgsl,
+      fs: drawLineFrag,
+      modules: [conicParametricCurveModule],
+      topology: 'triangle-strip',
+      vertexCount: this.curveLineGeometry?.length ?? 0,
+      attributes: {
+        ...this.curveLineBuffer && { position: this.curveLineBuffer },
+        ...this.pointABuffer && { pointA: this.pointABuffer },
+        ...this.pointBBuffer && { pointB: this.pointBBuffer },
+        ...this.colorBuffer && { color: this.colorBuffer },
+        ...this.widthBuffer && { width: this.widthBuffer },
+        ...this.arrowBuffer && { arrow: this.arrowBuffer },
+        ...this.linkIndexBuffer && { linkIndices: this.linkIndexBuffer },
+      },
+      bufferLayout: [
+        { name: 'position', format: 'float32x2' },
+        { name: 'pointA', format: 'float32x2', stepMode: 'instance' },
+        { name: 'pointB', format: 'float32x2', stepMode: 'instance' },
+        { name: 'color', format: 'float32x4', stepMode: 'instance' },
+        { name: 'width', format: 'float32', stepMode: 'instance' },
+        { name: 'arrow', format: 'float32', stepMode: 'instance' },
+        { name: 'linkIndices', format: 'float32', stepMode: 'instance' },
+      ],
+      defines: {
+        USE_UNIFORM_BUFFERS: true,
+      },
+      bindings: {
+        drawLineUniforms: this.drawLineUniformStore.getManagedUniformBuffer(device, 'drawLineUniforms'),
+        drawLineFragmentUniforms: this.drawLineUniformStore.getManagedUniformBuffer(device, 'drawLineFragmentUniforms'),
+      },
+      parameters: {
+        cullMode: 'back',
+        blend: false,
         depthWriteEnabled: false,
         depthCompare: 'always',
       },
@@ -573,6 +618,11 @@ export class Lines extends CoreModule {
         linkIndices: this.linkIndexBuffer,
       })
     }
+    this.drawCurveIndexCommand?.setAttributes({
+      pointA: this.pointABuffer,
+      pointB: this.pointBBuffer,
+      linkIndices: this.linkIndexBuffer,
+    })
     if (this.fillSampledLinksFboCommand) {
       this.fillSampledLinksFboCommand.setAttributes({
         pointA: this.pointABuffer,
@@ -615,6 +665,9 @@ export class Lines extends CoreModule {
         color: this.colorBuffer,
       })
     }
+    this.drawCurveIndexCommand?.setAttributes({
+      color: this.colorBuffer,
+    })
   }
 
   public updateWidth (): void {
@@ -647,6 +700,9 @@ export class Lines extends CoreModule {
         width: this.widthBuffer,
       })
     }
+    this.drawCurveIndexCommand?.setAttributes({
+      width: this.widthBuffer,
+    })
   }
 
   public updateArrow (): void {
@@ -683,6 +739,9 @@ export class Lines extends CoreModule {
         arrow: this.arrowBuffer,
       })
     }
+    this.drawCurveIndexCommand?.setAttributes({
+      arrow: this.arrowBuffer,
+    })
   }
 
   public updateLinkStatus (): void {
@@ -779,6 +838,12 @@ export class Lines extends CoreModule {
         position: this.curveLineBuffer,
       })
       this.drawCurveCommand.setVertexCount(this.curveLineGeometry.length)
+    }
+    if (this.drawCurveIndexCommand) {
+      this.drawCurveIndexCommand.setAttributes({
+        position: this.curveLineBuffer,
+      })
+      this.drawCurveIndexCommand.setVertexCount(this.curveLineGeometry.length)
     }
   }
 
@@ -881,7 +946,7 @@ export class Lines extends CoreModule {
     if (!points) return
     if (!points.currentPositionTexture || points.currentPositionTexture.destroyed) return
     if (!this.data.linksNumber || !this.store.isLinkHoveringEnabled) return
-    if (!this.linkIndexFbo || !this.drawCurveCommand || !this.drawLineUniformStore || !this.linkStatusTexture) return
+    if (!this.linkIndexFbo || !this.drawCurveCommand || !this.drawCurveIndexCommand || !this.drawLineUniformStore || !this.linkStatusTexture) return
     if (!this.linkIndexTexture || this.linkIndexTexture.destroyed) return
 
     const hasHighlighting = config.highlightedLinkIndices !== undefined
@@ -919,14 +984,15 @@ export class Lines extends CoreModule {
       },
     })
 
-    // Update texture bindings dynamically
-    this.drawCurveCommand.setBindings({
+    // Update texture bindings dynamically — uniforms are shared, but we draw via
+    // the index-specific Model which has blend: false so picking IDs aren't
+    // corrupted by linkBlendMode='add'.
+    this.drawCurveIndexCommand.setBindings({
       positionsTexture: points.currentPositionTexture,
       linkStatus: this.linkStatusTexture,
     })
 
-    // Update instance count
-    this.drawCurveCommand.setInstanceCount(this.data.linksNumber ?? 0)
+    this.drawCurveIndexCommand.setInstanceCount(this.data.linksNumber ?? 0)
 
     // Render to index buffer for picking/hover detection
     const indexPass = this.device.beginRenderPass({
@@ -934,7 +1000,7 @@ export class Lines extends CoreModule {
       // Clear framebuffer to transparent black (luma.gl default would be opaque black)
       clearColor: [0, 0, 0, 0],
     })
-    this.drawCurveCommand.draw(indexPass)
+    this.drawCurveIndexCommand.draw(indexPass)
     indexPass.end()
 
     if (this.hoveredLineIndexCommand && this.hoveredLineIndexFbo && this.hoveredLineIndexUniformStore) {
@@ -965,6 +1031,7 @@ export class Lines extends CoreModule {
   public destroy (): void {
     // 1. Destroy Models FIRST (they destroy _gpuGeometry if exists, and _uniformStore)
     this.drawCurveCommand?.destroy()
+    this.drawCurveIndexCommand?.destroy()
     this.drawCurveCommand = undefined
     this.hoveredLineIndexCommand?.destroy()
     this.hoveredLineIndexCommand = undefined
