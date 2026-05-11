@@ -5,7 +5,9 @@ import { D3ZoomEvent } from 'd3-zoom'
 import { D3DragEvent } from 'd3-drag'
 import { Device, Framebuffer, luma } from '@luma.gl/core'
 import { webgl2Adapter } from '@luma.gl/webgl'
-import { webgpuAdapter } from '@luma.gl/webgpu'
+// webgpuAdapter is dynamically imported inside createDevice() when useWebGPU is set.
+// Keeps it out of the WebGL2-only bundle (~50 KB min savings); zero cost when the
+// flag is off, which is the default.
 
 import { applyConfig, createDefaultConfig, resetConfigToDefaults, GraphConfigInterface, type GraphConfig } from '@/graph/config'
 import { getRgbaColor, getMaxPointSize, readPixels, extractIndicesFromPixels, sanitizeHtml } from '@/graph/helper'
@@ -1581,9 +1583,13 @@ export class Graph {
       )
     }
     try {
+      // Dynamic import keeps the WebGPU adapter out of the default WebGL2 bundle.
+      const adapters = useWebGPU
+        ? [(await import('@luma.gl/webgpu')).webgpuAdapter]
+        : [webgl2Adapter]
       return await luma.createDevice({
         type: useWebGPU ? 'webgpu' : 'webgl',
-        adapters: useWebGPU ? [webgpuAdapter] : [webgl2Adapter],
+        adapters,
         createCanvasContext: {
           canvas,
           useDevicePixels: this.config.pixelRatio,

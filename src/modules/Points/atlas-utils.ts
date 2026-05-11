@@ -48,9 +48,14 @@ export function createAtlasDataFromImageData (
 
   const originalMaxDimension = maxDimension
 
-  // Step 4: Calculate optimal atlas grid size
+  // Step 4: Calculate optimal atlas grid size, then pad to a multiple of 64.
+  // WebGPU requires bytesPerRow to be a multiple of 256 bytes; for rgba8unorm
+  // (4 B/px) that means atlasSize must be a multiple of 64 pixels. WebGL2
+  // ignores the alignment but cross-backend (WebGPU) safety wins out.
   const atlasCoordsSize = Math.ceil(Math.sqrt(imageDataArray.length))
-  let atlasSize = atlasCoordsSize * maxDimension
+  const rawSize = atlasCoordsSize * maxDimension
+  const ALIGN = 64
+  let atlasSize = Math.ceil(rawSize / ALIGN) * ALIGN
 
   // Step 5: Apply WebGL size limit scaling if necessary
   let scalingFactor = 1.0
