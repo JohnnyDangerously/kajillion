@@ -280,9 +280,14 @@ export interface GraphConfigInterface {
   linkVisibilityMinTransparency: number;
 
   /**
-   * Decay coefficient. Use smaller values if you want the simulation to "cool down" slower.
-   * Higher values keep the simulation warm for longer (better final layout, more GPU cost over time);
-   * lower values settle faster (snappier feel, less GPU cost once stable).
+   * Decay coefficient. Lower = the simulation cools down faster after each interaction.
+   *
+   * Settle time is wall-clock based: at the default 60 Hz reference frame rate, alpha decays
+   * from 1 to `alphaStopThreshold` in approximately `decay × ln(stopThreshold) / -3` ticks
+   * (≈ 432 ticks ≈ 7.2 seconds at `decay=1000`, `alphaStopThreshold=0.05`). At lower actual
+   * frame rates the per-tick decay is scaled up so the wall-clock settle time stays roughly
+   * constant — a slow GPU does not prevent the simulation from settling.
+   *
    * Default value: `1000`
    */
   simulationDecay: number;

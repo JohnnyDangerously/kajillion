@@ -62,6 +62,7 @@ export class Graph {
   private fpsMonitor: FPSMonitor | undefined
   private timerQueryPool: TimerQueryPool | undefined
   private lastPhysicsTickMs = Number.NEGATIVE_INFINITY
+  private lastSimTickMs = 0
 
   private currentEvent: D3ZoomEvent<HTMLCanvasElement, undefined> | D3DragEvent<HTMLCanvasElement, undefined, Hovered> | MouseEvent | undefined
   /**
@@ -1184,6 +1185,7 @@ export class Graph {
     this.store.isSimulationRunning = true
     this.store.simulationProgress = 0
     this.store.alpha = alpha
+    this.lastSimTickMs = 0
     this.config.onSimulationStart?.()
 
     // Note: Does NOT start frames - that's handled separately
@@ -1668,8 +1670,17 @@ export class Graph {
         this.timerQueryPool?.end()
       }
 
-      // Alpha decay and progress
-      this.store.alpha += this.store.addAlpha(this.config.simulationDecay)
+      // Time-based alpha decay: scale by actual frame dt so settle time in wall-clock
+      // seconds is FPS-invariant. Without this, a slow GPU would never let alpha drop
+      // below alphaStopThreshold because per-tick decay × low ticks/sec = no progress.
+      // Reference rate is 60 Hz (16.67 ms); cap dtScale to keep the decay math sane.
+      const tickNowMs = performance.now()
+      let dtScale = 1.0
+      if (this.lastSimTickMs > 0) {
+        dtScale = Math.min(10, Math.max(0.1, (tickNowMs - this.lastSimTickMs) / (1000 / 60)))
+      }
+      this.lastSimTickMs = tickNowMs
+      this.store.alpha += this.store.addAlpha(this.config.simulationDecay) * dtScale
       if (this.isRightClickMouse && this.config.enableRightClickRepulsion) {
         this.store.alpha = Math.max(this.store.alpha, 0.1)
       }
@@ -1825,6 +1836,7 @@ export class Graph {
   private end (): void {
     this.store.isSimulationRunning = false
     this.store.simulationProgress = 1
+    this.lastSimTickMs = 0
     this.config.onSimulationEnd?.()
     // Force hover detection on next frame since points may have moved under stationary mouse
     this._shouldForceHoverDetection = true
