@@ -1601,13 +1601,16 @@ export class Graph {
     } catch (e) {
       if (useWebGPU) {
         // Improve the error so users know why a working WebGL2 setup just stopped
-        // working after they flipped the flag.
-        throw new Error(
+        // working after they flipped the flag. `cause` chained manually for
+        // compatibility with the project's lib target.
+        const wrapped = new Error(
           'kajillion: WebGPU device requested via config.useWebGPU but creation failed. ' +
           'Browser may not support WebGPU (Firefox: enable dom.webgpu.enabled; Safari: ' +
-          'requires 26+ on iOS). Set useWebGPU: false to use the WebGL2 path.',
-          { cause: e }
+          'requires 26+ on iOS). Set useWebGPU: false to use the WebGL2 path. ' +
+          `Underlying error: ${(e as Error).message}`
         )
+        ;(wrapped as Error & { cause?: unknown }).cause = e
+        throw wrapped
       }
       throw e
     }
