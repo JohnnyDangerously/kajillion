@@ -2,7 +2,7 @@
 // One file, both entry points, used when useWebGPU = true.
 
 struct DragPointUniforms {
-  mousePos: vec2f,
+  mousePos: vec2<f32>,
   index: f32,
 };
 
@@ -11,25 +11,25 @@ struct DragPointUniforms {
 @group(0) @binding(2) var positionsTextureSampler: sampler;
 
 struct VertexInput {
-  @location(0) vertexCoord: vec2f,
+  @location(0) vertexCoord: vec2<f32>,
 };
 
 struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) textureCoords: vec2f,
+  @builtin(position) position: vec4<f32>,
+  @location(0) textureCoords: vec2<f32>,
 };
 
 @vertex
 fn vertexMain(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
   // [-1, 1] NDC -> [0, 1] texture coords
-  output.textureCoords = (input.vertexCoord + vec2f(1.0)) * 0.5;
-  output.position = vec4f(input.vertexCoord, 0.0, 1.0);
+  output.textureCoords = (input.vertexCoord + vec2<f32>(1.0)) * 0.5;
+  output.position = vec4<f32>(input.vertexCoord, 0.0, 1.0);
   return output;
 }
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   var pointPosition = textureSample(positionsTexture, positionsTextureSampler, input.textureCoords);
 
   // Check if a point is being dragged

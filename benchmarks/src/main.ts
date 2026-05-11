@@ -245,21 +245,44 @@ async function runOnce (
   if (params.linkMinPixelLength !== undefined) config.linkMinPixelLength = params.linkMinPixelLength
   if (params.useWebGPU) config.useWebGPU = true
 
-  const graph = new Graph(graphDiv, config)
-  await graph.ready
-  graph.setPointPositions(data.positions)
-  graph.setLinks(data.links)
-  graph.render()
+  /* eslint-disable no-console */
+  let stage = 'construct'
+  try {
+    const graph = new Graph(graphDiv, config)
+    stage = 'ready'
+    await graph.ready
+    console.log('[bench] graph ready, device.type =', (graph as unknown as {
+      device?: { info?: { type?: string } };
+    }).device?.info?.type)
+    stage = 'setPointPositions'
+    graph.setPointPositions(data.positions)
+    stage = 'setLinks'
+    graph.setLinks(data.links)
+    stage = 'render'
+    graph.render()
+    console.log('[bench] render succeeded, entering warmup')
 
-  const tag = params.repeat > 1 ? ` [run ${runIdx + 1}/${params.repeat}]` : ''
-  status.textContent = `Engine ready${tag}. Warmup (${params.warmupMs} ms)…`
-  await delay(params.warmupMs)
-  graph.resetGpuTimings()
-  status.textContent = `Measuring${tag} (${params.measureMs} ms)…`
-  await delay(params.measureMs)
-  const snapshot = graph.getGpuTimings() ?? {}
-  graph.destroy()
-  return snapshot
+    const tag = params.repeat > 1 ? ` [run ${runIdx + 1}/${params.repeat}]` : ''
+    status.textContent = `Engine ready${tag}. Warmup (${params.warmupMs} ms)…`
+    await delay(params.warmupMs)
+    graph.resetGpuTimings()
+    status.textContent = `Measuring${tag} (${params.measureMs} ms)…`
+    await delay(params.measureMs)
+    const snapshot = graph.getGpuTimings() ?? {}
+    graph.destroy()
+    return snapshot
+  } catch (err) {
+    console.error(`[bench] failed at stage='${stage}':`, err)
+    if (err instanceof Error) {
+      console.error('[bench] full stack:')
+      console.error(err.stack ?? '<no stack>')
+      if ((err as Error & { cause?: unknown }).cause !== undefined) {
+        console.error('[bench] cause:', (err as Error & { cause?: unknown }).cause)
+      }
+    }
+    throw err
+  }
+  /* eslint-enable no-console */
 }
 
 async function run (): Promise<void> {

@@ -16,12 +16,12 @@ struct CalculateLevelsUniforms {
 @group(0) @binding(2) var positionsSampler: sampler;
 
 struct VertexInput {
-  @location(0) pointIndices: vec2f,
+  @location(0) pointIndices: vec2<f32>,
 };
 
 struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) vColor: vec4f,
+  @builtin(position) position: vec4<f32>,
+  @location(0) vColor: vec4<f32>,
 };
 
 @vertex
@@ -34,19 +34,19 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
     input.pointIndices / calculateLevels.pointsTextureSize,
     0.0,
   );
-  output.vColor = vec4f(pointPosition.rg, 1.0, 0.0);
+  output.vColor = vec4<f32>(pointPosition.rg, 1.0, 0.0);
 
   let n = floor(pointPosition.x / calculateLevels.cellSize);
   let m = floor(pointPosition.y / calculateLevels.cellSize);
 
-  let levelPosition = 2.0 * (vec2f(n, m) + 0.5) / calculateLevels.levelTextureSize - 1.0;
+  let levelPosition = 2.0 * (vec2<f32>(n, m) + 0.5) / calculateLevels.levelTextureSize - 1.0;
 
-  output.position = vec4f(levelPosition, 0.0, 1.0);
+  output.position = vec4<f32>(levelPosition, 0.0, 1.0);
   // NOTE: GLSL sets gl_PointSize = 1.0; WebGPU point primitives are always size 1.
   return output;
 }
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   return input.vColor;
 }

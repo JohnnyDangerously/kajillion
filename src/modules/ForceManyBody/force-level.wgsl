@@ -18,27 +18,27 @@ struct ForceUniforms {
 @group(0) @binding(4) var levelFboSampler: sampler;
 
 struct VertexInput {
-  @location(0) vertexCoord: vec2f,
+  @location(0) vertexCoord: vec2<f32>,
 };
 
 struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) textureCoords: vec2f,
+  @builtin(position) position: vec4<f32>,
+  @location(0) textureCoords: vec2<f32>,
 };
 
 @vertex
 fn vertexMain(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
   // [-1, 1] NDC -> [0, 1] texture coords
-  output.textureCoords = (input.vertexCoord + vec2f(1.0)) * 0.5;
-  output.position = vec4f(input.vertexCoord, 0.0, 1.0);
+  output.textureCoords = (input.vertexCoord + vec2<f32>(1.0)) * 0.5;
+  output.position = vec4<f32>(input.vertexCoord, 0.0, 1.0);
   return output;
 }
 
 const MAX_LEVELS_NUM: f32 = 14.0;
 
-fn calculateAdditionalVelocity(ij: vec2f, pp: vec2f) -> vec2f {
-  var add = vec2f(0.0);
+fn calculateAdditionalVelocity(ij: vec2<f32>, pp: vec2<f32>) -> vec2<f32> {
+  var add = vec2<f32>(0.0);
   let centermass = textureSample(levelFbo, levelFboSampler, ij);
   if (centermass.r > 0.0 && centermass.g > 0.0 && centermass.b > 0.0) {
     let centermassPosition = centermass.rg / centermass.b;
@@ -60,7 +60,7 @@ fn calculateAdditionalVelocity(ij: vec2f, pp: vec2f) -> vec2f {
 }
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   let pointPosition = textureSample(positionsTexture, positionsSampler, input.textureCoords);
   let x = pointPosition.x;
   let y = pointPosition.y;
@@ -101,7 +101,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     }
   }
 
-  var velocity = vec4f(0.0, 0.0, 1.0, 0.0);
+  var velocity = vec4<f32>(0.0, 0.0, 1.0, 0.0);
 
   // Calculate the additional velocity based on neighboring cells
   for (var i: f32 = 0.0; i < 12.0; i = i + 1.0) {
@@ -110,8 +110,8 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
       var m = top + cellSize * n_top + cellSize * i;
 
       if (n < (left + n_left * cellSize) && m < bottom) {
-        velocity = vec4f(
-          velocity.xy + calculateAdditionalVelocity(vec2f(n / cellSize, m / cellSize) / force.levelTextureSize, pointPosition.xy),
+        velocity = vec4<f32>(
+          velocity.xy + calculateAdditionalVelocity(vec2<f32>(n / cellSize, m / cellSize) / force.levelTextureSize, pointPosition.xy),
           velocity.zw,
         );
       }
@@ -120,8 +120,8 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
       m = top + cellSize * j;
 
       if (n < (right - n_right * cellSize) && m < (top + n_top * cellSize)) {
-        velocity = vec4f(
-          velocity.xy + calculateAdditionalVelocity(vec2f(n / cellSize, m / cellSize) / force.levelTextureSize, pointPosition.xy),
+        velocity = vec4<f32>(
+          velocity.xy + calculateAdditionalVelocity(vec2<f32>(n / cellSize, m / cellSize) / force.levelTextureSize, pointPosition.xy),
           velocity.zw,
         );
       }
@@ -130,8 +130,8 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
       m = top + cellSize * i;
 
       if (n < right && m < (bottom - n_bottom * cellSize)) {
-        velocity = vec4f(
-          velocity.xy + calculateAdditionalVelocity(vec2f(n / cellSize, m / cellSize) / force.levelTextureSize, pointPosition.xy),
+        velocity = vec4<f32>(
+          velocity.xy + calculateAdditionalVelocity(vec2<f32>(n / cellSize, m / cellSize) / force.levelTextureSize, pointPosition.xy),
           velocity.zw,
         );
       }
@@ -140,8 +140,8 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
       m = bottom - n_bottom * cellSize + cellSize * j;
 
       if (n < right && m < bottom) {
-        velocity = vec4f(
-          velocity.xy + calculateAdditionalVelocity(vec2f(n / cellSize, m / cellSize) / force.levelTextureSize, pointPosition.xy),
+        velocity = vec4<f32>(
+          velocity.xy + calculateAdditionalVelocity(vec2<f32>(n / cellSize, m / cellSize) / force.levelTextureSize, pointPosition.xy),
           velocity.zw,
         );
       }

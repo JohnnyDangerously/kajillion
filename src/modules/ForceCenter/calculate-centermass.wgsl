@@ -14,12 +14,12 @@ struct CalculateCentermassUniforms {
 @group(0) @binding(2) var positionsSampler: sampler;
 
 struct VertexInput {
-  @location(0) pointIndices: vec2f,
+  @location(0) pointIndices: vec2<f32>,
 };
 
 struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) rgba: vec4f,
+  @builtin(position) position: vec4<f32>,
+  @location(0) rgba: vec4<f32>,
 };
 
 @vertex
@@ -32,14 +32,14 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
     input.pointIndices / calculateCentermass.pointsTextureSize,
     0.0,
   );
-  output.rgba = vec4f(pointPosition.xy, 1.0, 0.0);
+  output.rgba = vec4<f32>(pointPosition.xy, 1.0, 0.0);
 
-  output.position = vec4f(0.0, 0.0, 0.0, 1.0);
+  output.position = vec4<f32>(0.0, 0.0, 0.0, 1.0);
   // NOTE: GLSL sets gl_PointSize = 1.0; WebGPU point primitives are always size 1.
   return output;
 }
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   return input.rgba;
 }

@@ -4,11 +4,11 @@
 struct FindPointsInRectUniforms {
   sizeScale: f32,
   spaceSize: f32,
-  screenSize: vec2f,
+  screenSize: vec2<f32>,
   ratio: f32,
   transformationMatrix: mat4x4<f32>,
-  rect0: vec2f,
-  rect1: vec2f,
+  rect0: vec2<f32>,
+  rect1: vec2<f32>,
   scalePointsOnZoom: f32,
   maxPointSize: f32,
 };
@@ -20,20 +20,20 @@ struct FindPointsInRectUniforms {
 @group(0) @binding(4) var pointSizeSampler: sampler;
 
 struct VertexInput {
-  @location(0) vertexCoord: vec2f,
+  @location(0) vertexCoord: vec2<f32>,
 };
 
 struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) textureCoords: vec2f,
+  @builtin(position) position: vec4<f32>,
+  @location(0) textureCoords: vec2<f32>,
 };
 
 @vertex
 fn vertexMain(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
   // [-1, 1] NDC -> [0, 1] texture coords
-  output.textureCoords = (input.vertexCoord + vec2f(1.0)) * 0.5;
-  output.position = vec4f(input.vertexCoord, 0.0, 1.0);
+  output.textureCoords = (input.vertexCoord + vec2<f32>(1.0)) * 0.5;
+  output.position = vec4<f32>(input.vertexCoord, 0.0, 1.0);
   return output;
 }
 
@@ -50,11 +50,11 @@ fn pointSizeF(size: f32) -> f32 {
 }
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   let pointPosition = textureSample(positionsTexture, positionsTextureSampler, input.textureCoords);
-  var p = 2.0 * pointPosition.rg / findPointsInRect.spaceSize - vec2f(1.0);
+  var p = 2.0 * pointPosition.rg / findPointsInRect.spaceSize - vec2<f32>(1.0);
   p = p * (findPointsInRect.spaceSize / findPointsInRect.screenSize);
-  let final = findPointsInRect.transformationMatrix * vec4f(p, 1.0, 1.0);
+  let final = findPointsInRect.transformationMatrix * vec4<f32>(p, 1.0, 1.0);
 
   let pSize = textureSample(pointSize, pointSizeSampler, input.textureCoords);
   let size = pSize.r * findPointsInRect.sizeScale;
@@ -64,7 +64,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let top = 2.0 * (findPointsInRect.rect0.y - 0.5 * pointSizeF(size)) / findPointsInRect.screenSize.y - 1.0;
   let bottom = 2.0 * (findPointsInRect.rect1.y + 0.5 * pointSizeF(size)) / findPointsInRect.screenSize.y - 1.0;
 
-  var fragColor = vec4f(0.0, 0.0, pointPosition.r, pointPosition.g);
+  var fragColor = vec4<f32>(0.0, 0.0, pointPosition.r, pointPosition.g);
   if (final.x >= left && final.x <= right && final.y >= top && final.y <= bottom) {
     fragColor.r = 1.0;
   }

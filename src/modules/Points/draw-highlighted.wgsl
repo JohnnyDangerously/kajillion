@@ -12,16 +12,16 @@ struct DrawHighlightedUniforms {
   pointsTextureSize: f32,
   sizeScale: f32,
   spaceSize: f32,
-  screenSize: vec2f,
+  screenSize: vec2<f32>,
   scalePointsOnZoom: f32,
   pointIndex: f32,
   maxPointSize: f32,
-  color: vec4f,
+  color: vec4<f32>,
   universalPointOpacity: f32,
   greyoutOpacity: f32,
   isDarkenGreyout: f32,
-  backgroundColor: vec4f,
-  greyoutColor: vec4f,
+  backgroundColor: vec4<f32>,
+  greyoutColor: vec4<f32>,
   width: f32,
 };
 
@@ -32,14 +32,14 @@ struct DrawHighlightedUniforms {
 @group(0) @binding(4) var pointStatusSampler: sampler;
 
 struct VertexInput {
-  @location(0) vertexCoord: vec2f,
+  @location(0) vertexCoord: vec2<f32>,
 };
 
 struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) vertexPosition: vec2f,
+  @builtin(position) position: vec4<f32>,
+  @location(0) vertexPosition: vec2<f32>,
   @location(1) pointOpacity: f32,
-  @location(2) rgbColor: vec3f,
+  @location(2) rgbColor: vec3<f32>,
 };
 
 fn calculatePointSize(pointSize: f32) -> f32 {
@@ -64,7 +64,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   let pointIndex = drawHighlighted.pointIndex;
   let texX = pointIndex - pointsTexSize * floor(pointIndex / pointsTexSize);
   let texY = floor(pointIndex / pointsTexSize);
-  let textureCoordinates = vec2f(texX, texY) + vec2f(0.5);
+  let textureCoordinates = vec2<f32>(texX, texY) + vec2<f32>(0.5);
 
   let pointPosition = textureSampleLevel(
     positionsTexture,
@@ -88,9 +88,9 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
     } else {
       let blendFactor: f32 = 0.65;
       if (drawHighlighted.isDarkenGreyout > 0.0) {
-        rgbColor = mix(rgbColor, vec3f(0.2), blendFactor);
+        rgbColor = mix(rgbColor, vec3<f32>(0.2), blendFactor);
       } else {
-        rgbColor = mix(rgbColor, max(drawHighlighted.backgroundColor.rgb, vec3f(0.8)), blendFactor);
+        rgbColor = mix(rgbColor, max(drawHighlighted.backgroundColor.rgb, vec3<f32>(0.8)), blendFactor);
       }
     }
 
@@ -109,17 +109,17 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 
   // Calculate point position in screen space
   let a = pointPosition.xy;
-  let b = pointPosition.xy + vec2f(0.0, radius);
+  let b = pointPosition.xy + vec2<f32>(0.0, radius);
   let xBasis = b - a;
-  let yBasis = normalize(vec2f(-xBasis.y, xBasis.x));
+  let yBasis = normalize(vec2<f32>(-xBasis.y, xBasis.x));
   let pointPositionInScreenSpace = a + xBasis * input.vertexCoord.x + yBasis * radius * input.vertexCoord.y;
 
   // Transform point position to normalized device coordinates
-  var p = 2.0 * pointPositionInScreenSpace / drawHighlighted.spaceSize - vec2f(1.0);
+  var p = 2.0 * pointPositionInScreenSpace / drawHighlighted.spaceSize - vec2<f32>(1.0);
   p = p * (drawHighlighted.spaceSize / drawHighlighted.screenSize);
-  let finalPosition = drawHighlighted.transformationMatrix * vec4f(p, 1.0, 1.0);
+  let finalPosition = drawHighlighted.transformationMatrix * vec4<f32>(p, 1.0, 1.0);
 
-  output.position = vec4f(finalPosition.xy, 0.0, 1.0);
+  output.position = vec4<f32>(finalPosition.xy, 0.0, 1.0);
   return output;
 }
 
@@ -128,9 +128,9 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 const ringSmoothing: f32 = 1.05;
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   let r = dot(input.vertexPosition, input.vertexPosition);
   let opacity = smoothstep(r, r * ringSmoothing, 1.0);
   let stroke = smoothstep(drawHighlighted.width, drawHighlighted.width * ringSmoothing, r);
-  return vec4f(input.rgbColor, opacity * stroke * input.pointOpacity);
+  return vec4<f32>(input.rgbColor, opacity * stroke * input.pointOpacity);
 }

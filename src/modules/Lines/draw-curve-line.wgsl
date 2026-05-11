@@ -12,7 +12,7 @@
 
 // Rational quadratic Bezier (conic parametric curve), inlined from
 // conic-curve-module.ts since WGSL has no shadertools-style module include.
-fn conicParametricCurve(A: vec2f, B: vec2f, ControlPoint: vec2f, t: f32, w: f32) -> vec2f {
+fn conicParametricCurve(A: vec2<f32>, B: vec2<f32>, ControlPoint: vec2<f32>, t: f32, w: f32) -> vec2<f32> {
   let oneMinusT = 1.0 - t;
   let divident = oneMinusT * oneMinusT * A + 2.0 * oneMinusT * t * w * ControlPoint + t * t * B;
   let divisor = oneMinusT * oneMinusT + 2.0 * oneMinusT * t * w + t * t;
@@ -25,8 +25,8 @@ struct DrawLineUniforms {
   widthScale: f32,
   linkArrowsSizeScale: f32,
   spaceSize: f32,
-  screenSize: vec2f,
-  linkVisibilityDistanceRange: vec2f,
+  screenSize: vec2<f32>,
+  linkVisibilityDistanceRange: vec2<f32>,
   linkVisibilityMinTransparency: f32,
   linkOpacity: f32,
   greyoutOpacity: f32,
@@ -37,7 +37,7 @@ struct DrawLineUniforms {
   maxPointSize: f32,
   renderMode: f32,
   hoveredLinkIndex: f32,
-  hoveredLinkColor: vec4f,
+  hoveredLinkColor: vec4<f32>,
   hoveredLinkWidthIncrease: f32,
   isLinkHighlightingActive: f32,
   linkStatusTextureSize: f32,
@@ -58,19 +58,19 @@ struct DrawLineFragmentUniforms {
 @group(0) @binding(5) var linkStatusSampler: sampler;
 
 struct VertexInput {
-  @location(0) position: vec2f,
-  @location(1) pointA: vec2f,
-  @location(2) pointB: vec2f,
-  @location(3) color: vec4f,
+  @location(0) position: vec2<f32>,
+  @location(1) pointA: vec2<f32>,
+  @location(2) pointB: vec2<f32>,
+  @location(3) color: vec4<f32>,
   @location(4) width: f32,
   @location(5) arrow: f32,
   @location(6) linkIndices: f32,
 };
 
 struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) rgbaColor: vec4f,
-  @location(1) pos: vec2f,
+  @builtin(position) position: vec4<f32>,
+  @location(0) rgbaColor: vec4<f32>,
+  @location(1) pos: vec2<f32>,
   @location(2) arrowLength: f32,
   @location(3) useArrow: f32,
   @location(4) smoothing: f32,
@@ -114,14 +114,14 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
   output.pos = input.position;
   output.linkIndex = input.linkIndices;
-  output.rgbaColor = vec4f(0.0);
+  output.rgbaColor = vec4<f32>(0.0);
   output.arrowLength = 0.0;
   output.useArrow = 0.0;
   output.smoothing = 0.0;
   output.arrowWidthFactor = 0.0;
 
-  let pointTexturePosA = (input.pointA + vec2f(0.5)) / drawLine.pointsTextureSize;
-  let pointTexturePosB = (input.pointB + vec2f(0.5)) / drawLine.pointsTextureSize;
+  let pointTexturePosA = (input.pointA + vec2<f32>(0.5)) / drawLine.pointsTextureSize;
+  let pointTexturePosB = (input.pointB + vec2<f32>(0.5)) / drawLine.pointsTextureSize;
 
   let pointPositionA = textureSampleLevel(positionsTexture, positionsSampler, pointTexturePosA, 0.0);
   let pointPositionB = textureSampleLevel(positionsTexture, positionsSampler, pointTexturePosB, 0.0);
@@ -129,22 +129,22 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   let b = pointPositionB.xy;
 
   // Frustum cull: if both endpoints sit off the same screen edge, skip.
-  let aNorm = (2.0 * a / drawLine.spaceSize - vec2f(1.0)) * (drawLine.spaceSize / drawLine.screenSize);
-  let bNorm = (2.0 * b / drawLine.spaceSize - vec2f(1.0)) * (drawLine.spaceSize / drawLine.screenSize);
-  let aNDC = (drawLine.transformationMatrix * vec4f(aNorm, 1.0, 1.0)).xy;
-  let bNDC = (drawLine.transformationMatrix * vec4f(bNorm, 1.0, 1.0)).xy;
+  let aNorm = (2.0 * a / drawLine.spaceSize - vec2<f32>(1.0)) * (drawLine.spaceSize / drawLine.screenSize);
+  let bNorm = (2.0 * b / drawLine.spaceSize - vec2<f32>(1.0)) * (drawLine.spaceSize / drawLine.screenSize);
+  let aNDC = (drawLine.transformationMatrix * vec4<f32>(aNorm, 1.0, 1.0)).xy;
+  let bNDC = (drawLine.transformationMatrix * vec4<f32>(bNorm, 1.0, 1.0)).xy;
   let linkCullMargin: f32 = 0.15;
   if ((aNDC.x < -1.0 - linkCullMargin && bNDC.x < -1.0 - linkCullMargin) ||
       (aNDC.x > 1.0 + linkCullMargin && bNDC.x > 1.0 + linkCullMargin) ||
       (aNDC.y < -1.0 - linkCullMargin && bNDC.y < -1.0 - linkCullMargin) ||
       (aNDC.y > 1.0 + linkCullMargin && bNDC.y > 1.0 + linkCullMargin)) {
-    output.position = vec4f(2.0, 2.0, 2.0, 1.0);
+    output.position = vec4<f32>(2.0, 2.0, 2.0, 1.0);
     return output;
   }
 
   // Calculate direction vector and its perpendicular
   let xBasis = b - a;
-  let yBasis = normalize(vec2f(-xBasis.y, xBasis.x));
+  let yBasis = normalize(vec2<f32>(-xBasis.y, xBasis.x));
 
   // Calculate link distance and control point for curved link
   let linkDist = length(xBasis);
@@ -158,7 +158,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 
   // Hard-skip rendering when the link's screen length falls below the threshold.
   if (drawLine.linkMinPixelLength > 0.0 && linkDistPx < drawLine.linkMinPixelLength) {
-    output.position = vec4f(2.0, 2.0, 2.0, 1.0);
+    output.position = vec4<f32>(2.0, 2.0, 2.0, 1.0);
     return output;
   }
 
@@ -225,7 +225,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
     let statusTexSize = drawLine.linkStatusTextureSize;
     let texX = input.linkIndices - statusTexSize * floor(input.linkIndices / statusTexSize);
     let texY = floor(input.linkIndices / statusTexSize);
-    let linkStatusCoord = (vec2f(texX, texY) + vec2f(0.5)) / statusTexSize;
+    let linkStatusCoord = (vec2<f32>(texX, texY) + vec2<f32>(0.5)) / statusTexSize;
     let linkStatusValue = textureSampleLevel(linkStatus, linkStatusSampler, linkStatusCoord, 0.0);
     if (linkStatusValue.r > 0.0) {
       opacity = opacity * drawLine.greyoutOpacity;
@@ -233,11 +233,11 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   }
 
   // Pass final color to fragment shader
-  var rgbaColor = vec4f(rgbColor, opacity);
+  var rgbaColor = vec4<f32>(rgbColor, opacity);
 
   // Apply hover color if this is the hovered link and hover color is defined
   if (drawLine.hoveredLinkIndex == output.linkIndex && drawLine.hoveredLinkColor.a > -0.5) {
-    rgbaColor = vec4f(drawLine.hoveredLinkColor.rgb, rgbaColor.a * drawLine.hoveredLinkColor.a);
+    rgbaColor = vec4<f32>(drawLine.hoveredLinkColor.rgb, rgbaColor.a * drawLine.hoveredLinkColor.a);
   }
   output.rgbaColor = rgbaColor;
 
@@ -254,23 +254,23 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   let pointNext = conicParametricCurve(a, b, controlPoint, min(tNext, 1.0), w);
 
   let xBasisCurved = pointNext - pointPrev;
-  let yBasisCurved = normalize(vec2f(-xBasisCurved.y, xBasisCurved.x));
+  let yBasisCurved = normalize(vec2<f32>(-xBasisCurved.y, xBasisCurved.x));
 
   pointCurr = pointCurr + yBasisCurved * linkWidthPx * input.position.y;
 
   // Transform to clip space coordinates
-  var p = 2.0 * pointCurr / drawLine.spaceSize - vec2f(1.0);
+  var p = 2.0 * pointCurr / drawLine.spaceSize - vec2<f32>(1.0);
   p = p * (drawLine.spaceSize / drawLine.screenSize);
 
-  let finalPosition = drawLine.transformationMatrix * vec4f(p, 1.0, 1.0);
-  output.position = vec4f(finalPosition.xy, 0.0, 1.0);
+  let finalPosition = drawLine.transformationMatrix * vec4<f32>(p, 1.0, 1.0);
+  output.position = vec4<f32>(finalPosition.xy, 0.0, 1.0);
   return output;
 }
 
 // ---------- Fragment shader ----------
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   var opacity: f32 = 1.0;
   let color = input.rgbaColor.rgb;
 
@@ -302,10 +302,10 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 
   if (drawLineFrag.renderMode > 0.0) {
     if (opacity > 0.0) {
-      return vec4f(input.linkIndex, 0.0, 0.0, 1.0);
+      return vec4<f32>(input.linkIndex, 0.0, 0.0, 1.0);
     } else {
-      return vec4f(-1.0, 0.0, 0.0, 0.0);
+      return vec4<f32>(-1.0, 0.0, 0.0, 0.0);
     }
   }
-  return vec4f(color, opacity);
+  return vec4<f32>(color, opacity);
 }

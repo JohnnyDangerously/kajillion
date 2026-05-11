@@ -12,25 +12,25 @@ struct TrackPointsUniforms {
 @group(0) @binding(4) var trackedIndicesSampler: sampler;
 
 struct VertexInput {
-  @location(0) vertexCoord: vec2f,
+  @location(0) vertexCoord: vec2<f32>,
 };
 
 struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) textureCoords: vec2f,
+  @builtin(position) position: vec4<f32>,
+  @location(0) textureCoords: vec2<f32>,
 };
 
 @vertex
 fn vertexMain(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
   // [-1, 1] NDC -> [0, 1] texture coords
-  output.textureCoords = (input.vertexCoord + vec2f(1.0)) * 0.5;
-  output.position = vec4f(input.vertexCoord, 0.0, 1.0);
+  output.textureCoords = (input.vertexCoord + vec2<f32>(1.0)) * 0.5;
+  output.position = vec4<f32>(input.vertexCoord, 0.0, 1.0);
   return output;
 }
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   let trackedPointIndices = textureSample(trackedIndices, trackedIndicesSampler, input.textureCoords);
   if (trackedPointIndices.r < 0.0) {
     discard;
@@ -41,5 +41,5 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     (trackedPointIndices.rg + 0.5) / trackPoints.pointsTextureSize,
   );
 
-  return vec4f(pointPosition.rg, 1.0, 1.0);
+  return vec4<f32>(pointPosition.rg, 1.0, 1.0);
 }

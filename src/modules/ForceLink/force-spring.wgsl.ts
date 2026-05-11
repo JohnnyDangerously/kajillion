@@ -5,7 +5,7 @@ export function forceSpringWgsl (maxLinks: number): string {
 struct ForceLinkUniforms {
   linkSpring: f32,
   linkDistance: f32,
-  linkDistRandomVariationRange: vec2f,
+  linkDistRandomVariationRange: vec2<f32>,
   pointsTextureSize: f32,
   linksTextureSize: f32,
   alpha: f32,
@@ -24,29 +24,29 @@ struct ForceLinkUniforms {
 @group(0) @binding(10) var linkRandomDistanceSampler: sampler;
 
 struct VertexInput {
-  @location(0) vertexCoord: vec2f,
+  @location(0) vertexCoord: vec2<f32>,
 };
 
 struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) textureCoords: vec2f,
+  @builtin(position) position: vec4<f32>,
+  @location(0) textureCoords: vec2<f32>,
 };
 
 @vertex
 fn vertexMain(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
   // [-1, 1] NDC -> [0, 1] texture coords
-  output.textureCoords = (input.vertexCoord + vec2f(1.0)) * 0.5;
-  output.position = vec4f(input.vertexCoord, 0.0, 1.0);
+  output.textureCoords = (input.vertexCoord + vec2<f32>(1.0)) * 0.5;
+  output.position = vec4<f32>(input.vertexCoord, 0.0, 1.0);
   return output;
 }
 
 const MAX_LINKS: f32 = ${maxLinks}.0;
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   let pointPosition = textureSample(positionsTexture, positionsSampler, input.textureCoords);
-  var velocity = vec4f(0.0);
+  var velocity = vec4<f32>(0.0);
 
   let linkInfo = textureSample(linkInfoTexture, linkInfoSampler, input.textureCoords);
   var iCount: f32 = linkInfo.r;
@@ -60,7 +60,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
           iCount = 0.0;
           jCount = jCount + 1.0;
         }
-        let linkTextureIndex = (vec2f(iCount, jCount) + 0.5) / forceLink.linksTextureSize;
+        let linkTextureIndex = (vec2<f32>(iCount, jCount) + 0.5) / forceLink.linksTextureSize;
         let connectedPointIndex = textureSample(linkIndicesTexture, linkIndicesSampler, linkTextureIndex);
         let biasAndStrength = textureSample(linkPropertiesTexture, linkPropertiesSampler, linkTextureIndex);
         let randomMinDistance = textureSample(linkRandomDistanceTexture, linkRandomDistanceSampler, linkTextureIndex);
@@ -84,12 +84,12 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
         l = l * bias;
         x = x * l;
         y = y * l;
-        velocity = vec4f(velocity.x + x, velocity.y + y, velocity.z, velocity.w);
+        velocity = vec4<f32>(velocity.x + x, velocity.y + y, velocity.z, velocity.w);
       }
     }
   }
 
-  return vec4f(velocity.rg, 0.0, 0.0);
+  return vec4<f32>(velocity.rg, 0.0, 0.0);
 }
 `
 }

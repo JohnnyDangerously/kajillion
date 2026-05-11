@@ -18,12 +18,12 @@ struct CalculateCentermassUniforms {
 @group(0) @binding(4) var clusterTextureSampler: sampler;
 
 struct VertexInput {
-  @location(0) pointIndices: vec2f,
+  @location(0) pointIndices: vec2<f32>,
 };
 
 struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) rgba: vec4f,
+  @builtin(position) position: vec4<f32>,
+  @location(0) rgba: vec4<f32>,
 };
 
 @vertex
@@ -33,20 +33,20 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   let uv = input.pointIndices / calculateCentermass.pointsTextureSize;
 
   let pointPosition = textureSampleLevel(positionsTexture, positionsSampler, uv, 0.0);
-  output.rgba = vec4f(pointPosition.xy, 1.0, 0.0);
+  output.rgba = vec4<f32>(pointPosition.xy, 1.0, 0.0);
 
   let pointClusterIndices = textureSampleLevel(clusterTexture, clusterTextureSampler, uv, 0.0);
-  var xy = vec2f(0.0);
+  var xy = vec2<f32>(0.0);
   if (pointClusterIndices.x >= 0.0 && pointClusterIndices.y >= 0.0) {
     xy = 2.0 * (pointClusterIndices.xy + 0.5) / calculateCentermass.clustersTextureSize - 1.0;
   }
 
-  output.position = vec4f(xy, 0.0, 1.0);
+  output.position = vec4<f32>(xy, 0.0, 1.0);
   // NOTE: GLSL sets gl_PointSize = 1.0; WebGPU point primitives are always size 1.
   return output;
 }
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   return input.rgba;
 }

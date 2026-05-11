@@ -3,7 +3,7 @@
 
 struct ForceMouseUniforms {
   repulsion: f32,
-  mousePos: vec2f,
+  mousePos: vec2<f32>,
 };
 
 @group(0) @binding(0) var<uniform> forceMouse: ForceMouseUniforms;
@@ -11,27 +11,27 @@ struct ForceMouseUniforms {
 @group(0) @binding(2) var positionsSampler: sampler;
 
 struct VertexInput {
-  @location(0) vertexCoord: vec2f,
+  @location(0) vertexCoord: vec2<f32>,
 };
 
 struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) textureCoords: vec2f,
+  @builtin(position) position: vec4<f32>,
+  @location(0) textureCoords: vec2<f32>,
 };
 
 @vertex
 fn vertexMain(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
   // [-1, 1] NDC -> [0, 1] texture coords
-  output.textureCoords = (input.vertexCoord + vec2f(1.0)) * 0.5;
-  output.position = vec4f(input.vertexCoord, 0.0, 1.0);
+  output.textureCoords = (input.vertexCoord + vec2<f32>(1.0)) * 0.5;
+  output.position = vec4<f32>(input.vertexCoord, 0.0, 1.0);
   return output;
 }
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   let pointPosition = textureSample(positionsTexture, positionsSampler, input.textureCoords);
-  var velocity = vec4f(0.0);
+  var velocity = vec4<f32>(0.0);
   let mouse = forceMouse.mousePos;
 
   // Move particles away from the mouse position using a repulsive force
@@ -40,7 +40,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   dist = max(dist, 10.0);
   let angle = atan2(distVector.y, distVector.x);
   let addV = 100.0 * forceMouse.repulsion / (dist * dist);
-  velocity = vec4f(velocity.rg - addV * vec2f(cos(angle), sin(angle)), velocity.ba);
+  velocity = vec4<f32>(velocity.rg - addV * vec2<f32>(cos(angle), sin(angle)), velocity.ba);
 
   return velocity;
 }
