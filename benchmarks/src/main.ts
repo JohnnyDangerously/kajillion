@@ -11,6 +11,10 @@ interface BenchParams {
   label: string | undefined;
   repeat: number;
   zoomLevel: number | undefined;
+  linkBlendMode: 'normal' | 'add';
+  linkOpacity: number | undefined;
+  pointMinPixelSize: number | undefined;
+  linkMinPixelLength: number | undefined;
 }
 
 interface PassStats {
@@ -38,6 +42,19 @@ function readParams (): BenchParams {
     zoomLevel: ((): number | undefined => {
       const z = u.searchParams.get('zoomLevel')
       return z === null || z === '' ? undefined : Number(z)
+    })(),
+    linkBlendMode: u.searchParams.get('linkBlendMode') === 'add' ? 'add' : 'normal',
+    linkOpacity: ((): number | undefined => {
+      const v = u.searchParams.get('linkOpacity')
+      return v === null || v === '' ? undefined : Number(v)
+    })(),
+    pointMinPixelSize: ((): number | undefined => {
+      const v = u.searchParams.get('pointMinPixelSize')
+      return v === null || v === '' ? undefined : Number(v)
+    })(),
+    linkMinPixelLength: ((): number | undefined => {
+      const v = u.searchParams.get('linkMinPixelLength')
+      return v === null || v === '' ? undefined : Number(v)
     })(),
   }
 }
@@ -187,6 +204,10 @@ async function runOnce (
     config.fitViewOnInit = false
     config.initialZoomLevel = params.zoomLevel
   }
+  config.linkBlendMode = params.linkBlendMode
+  if (params.linkOpacity !== undefined) config.linkOpacity = params.linkOpacity
+  if (params.pointMinPixelSize !== undefined) config.pointMinPixelSize = params.pointMinPixelSize
+  if (params.linkMinPixelLength !== undefined) config.linkMinPixelLength = params.linkMinPixelLength
 
   const graph = new Graph(graphDiv, config)
   await graph.ready
