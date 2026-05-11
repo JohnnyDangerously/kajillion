@@ -5,6 +5,7 @@ import { D3ZoomEvent } from 'd3-zoom'
 import { D3DragEvent } from 'd3-drag'
 import { Device, Framebuffer, luma } from '@luma.gl/core'
 import { webgl2Adapter } from '@luma.gl/webgl'
+import { webgpuAdapter } from '@luma.gl/webgpu'
 
 import { applyConfig, createDefaultConfig, resetConfigToDefaults, GraphConfigInterface, type GraphConfig } from '@/graph/config'
 import { getRgbaColor, getMaxPointSize, readPixels, extractIndicesFromPixels, sanitizeHtml } from '@/graph/helper'
@@ -1563,9 +1564,10 @@ export class Graph {
   private async createDevice (
     canvas: HTMLCanvasElement
   ): Promise<Device> {
+    const useWebGPU = this.config.useWebGPU === true
     return await luma.createDevice({
-      type: 'webgl',
-      adapters: [webgl2Adapter],
+      type: useWebGPU ? 'webgpu' : 'webgl',
+      adapters: useWebGPU ? [webgpuAdapter] : [webgl2Adapter],
       createCanvasContext: {
         canvas, // Provide existing canvas
         useDevicePixels: this.config.pixelRatio, // Use config pixelRatio value

@@ -660,6 +660,23 @@ export interface GraphConfigInterface {
    */
   showFPSMonitor: boolean;
   /**
+   * Use the WebGPU device backend instead of WebGL2.
+   *
+   * When `true` and WebGPU is available in the host browser, the engine creates a
+   * `webgpu` luma.gl device; otherwise it falls back to `webgl`. WebGPU unlocks
+   * compute shaders, storage buffers, indirect draw, and significantly lower
+   * driver overhead — the substrate Phase 4 (compute-shader Barnes-Hut, MRT-fused
+   * forces) is built on.
+   *
+   * **This is currently a foundation step** — the WebGPU device boots, but shaders
+   * still ship as GLSL targeting WebGL2. Until shader port (Phase 3.2) lands,
+   * setting this to `true` will fail at pipeline creation. Use at your own risk
+   * and watch the changelog.
+   *
+   * Default value: `false`
+   */
+  useWebGPU: boolean;
+  /**
    * Enable per-pass GPU timing collection via `EXT_disjoint_timer_query_webgl2`.
    * When enabled, `graph.getGpuTimings()` returns a snapshot of average and last-sample
    * GPU time (ms) for each instrumented pass. Has near-zero overhead when the extension
