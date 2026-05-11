@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kajillion · Baseline benchmark</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #0f1115; color: #cfd6e6; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    #app { display: grid; grid-template-rows: auto 60vh auto; height: 100%; }
+    header { padding: 12px 20px; border-bottom: 1px solid #1e2330; display: flex; justify-content: space-between; align-items: baseline; }
+    header h1 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 0.02em; }
+    header .meta { color: #8893ab; font-size: 12px; }
+    #graph { background: #0f1115; }
+    #panel { padding: 20px; overflow: auto; border-top: 1px solid #1e2330; }
+    #status { color: #8893ab; font-size: 12px; margin-bottom: 12px; }
+    table { border-collapse: collapse; margin-top: 8px; }
+    th, td { padding: 4px 12px; border-bottom: 1px solid #1e2330; font-variant-numeric: tabular-nums; }
+    th { text-align: left; color: #8893ab; font-weight: 500; font-size: 12px; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, monospace; color: #cfd6e6; }
+    pre { background: #1a1f2c; padding: 12px; border-radius: 6px; overflow: auto; font-size: 12px; }
+    a { color: #7fb3ff; }
+    details summary { cursor: pointer; color: #8893ab; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Kajillion · baseline benchmark</h1>
+      <span class="meta">Query params: <code>?n=100000&amp;m=3&amp;seed=42&amp;warmup=2000&amp;measure=8000</code></span>
+    </header>
+    <div id="graph"></div>
+    <div id="panel">
+      <div id="status">Loading…</div>
+      <div id="results"></div>
+    </div>
+  </div>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

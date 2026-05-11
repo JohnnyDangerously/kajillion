@@ -14,9 +14,9 @@
   ],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
-    "project": ["./tsconfig.json", "./src/stories/tsconfig.json"]
+    "project": ["./tsconfig.json", "./src/stories/tsconfig.json", "./benchmarks/tsconfig.json"]
   },
-  "ignorePatterns": ["vite.config.ts"],
+  "ignorePatterns": ["vite.config.ts", "benchmarks/vite.config.ts"],
   "rules": {
     "object-curly-spacing": ["error", "always"],
     "prefer-template": "error",
@@ -140,6 +140,12 @@
   "overrides": [
     {
       "files": ["src/stories/**/*.ts"],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["benchmarks/**/*.ts"],
       "rules": {
         "no-console": "off"
       }

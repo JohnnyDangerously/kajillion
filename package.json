@@ -19,6 +19,8 @@
     "lint:staged": "npx lint-staged",
     "storybook": "storybook dev -p 6006",
     "build:storybook": "storybook build",
+    "bench:dev": "vite --config benchmarks/vite.config.ts",
+    "bench:build": "vite build --config benchmarks/vite.config.ts",
     "prepublishOnly": "npm run build"
   },
   "engines": {
