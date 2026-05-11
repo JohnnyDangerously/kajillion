@@ -292,14 +292,21 @@ export interface GraphConfigInterface {
    * to at most `physicsTickRate` per second. Between physics ticks, point positions
    * are held — the GPU re-renders the last computed positions each frame.
    *
-   * Lowering this from rAF rate (e.g. 30 instead of 60) roughly halves the per-second
-   * cost of force passes, but proportionally lengthens settle time in wall-clock seconds
-   * (alpha decay is per-tick, not per-second).
+   * `0` means "uncapped" (one physics tick per render frame; matches upstream behavior).
+   *
+   * Lowering this below the rAF rate (e.g. 30 instead of 60) approximately halves the
+   * per-second cost of force passes and reduces GPU energy/power draw, but proportionally
+   * lengthens settle time in wall-clock seconds (alpha decay is per-tick, not per-second)
+   * and visually steps the layout animation at the chosen rate. Without render-side
+   * position interpolation, the layout appears to update at the lower rate even though
+   * render and camera move at full rAF rate. Useful for battery-powered devices, very
+   * large graphs, or background tabs where energy and load matter more than animation
+   * fluidity.
    *
    * Has no effect on user-triggered `step()` calls, which always execute regardless
    * of the throttle.
    *
-   * Default value: `30`
+   * Default value: `0`
    */
   physicsTickRate: number;
   /**

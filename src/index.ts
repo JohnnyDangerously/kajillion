@@ -1739,15 +1739,20 @@ export class Graph {
       this.findHoveredItem()
     }
 
-    // Run simulation step (respects isSimulationRunning)
+    // Run simulation step (respects isSimulationRunning).
     // When simulation ends, forces stop but rendering continues.
-    // Physics is throttled to `physicsTickRate`; between ticks, positions are held
-    // and only render runs. User-triggered `step()` bypasses this throttle.
-    const physicsInterval = 1000 / Math.max(1, this.config.physicsTickRate)
-    const nowMs = now ?? performance.now()
-    if (nowMs - this.lastPhysicsTickMs >= physicsInterval) {
-      this.lastPhysicsTickMs = nowMs
+    // When physicsTickRate > 0, physics is throttled to that rate; between ticks,
+    // positions are held and only render runs. User-triggered `step()` bypasses this.
+    const tickRate = this.config.physicsTickRate
+    if (tickRate <= 0) {
       this.runSimulationStep(false)
+    } else {
+      const nowMs = now ?? performance.now()
+      const physicsInterval = 1000 / tickRate
+      if (nowMs - this.lastPhysicsTickMs >= physicsInterval) {
+        this.lastPhysicsTickMs = nowMs
+        this.runSimulationStep(false)
+      }
     }
 
     // Create a single render pass for drawing (points, lines, etc.)
