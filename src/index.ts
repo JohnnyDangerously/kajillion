@@ -1591,9 +1591,11 @@ export class Graph {
 
     // Right-click repulsion (runs regardless of isSimulationRunning)
     if (this.isRightClickMouse && this.config.enableRightClickRepulsion) {
+      this.timerQueryPool?.begin('force.mouse')
       this.points?.swapFbo()
       this.forceMouse?.run()
       this.points?.updatePosition()
+      this.timerQueryPool?.end()
     }
 
     // Main simulation forces gate:
@@ -1610,34 +1612,46 @@ export class Graph {
     // trackPoints and the next frame all read from `current`.
     if (shouldRunSimulation) {
       if (simulationGravity) {
+        this.timerQueryPool?.begin('force.gravity')
         this.points?.swapFbo()
         this.forceGravity?.run()
         this.points?.updatePosition()
+        this.timerQueryPool?.end()
       }
 
       if (simulationCenter) {
+        this.timerQueryPool?.begin('force.center')
         this.points?.swapFbo()
         this.forceCenter?.run()
         this.points?.updatePosition()
+        this.timerQueryPool?.end()
       }
 
+      this.timerQueryPool?.begin('force.repulsion')
       this.points?.swapFbo()
       this.forceManyBody?.run()
       this.points?.updatePosition()
+      this.timerQueryPool?.end()
 
       if (this.store.linksTextureSize) {
+        this.timerQueryPool?.begin('force.link.incoming')
         this.points?.swapFbo()
         this.forceLinkIncoming?.run()
         this.points?.updatePosition()
+        this.timerQueryPool?.end()
+        this.timerQueryPool?.begin('force.link.outgoing')
         this.points?.swapFbo()
         this.forceLinkOutgoing?.run()
         this.points?.updatePosition()
+        this.timerQueryPool?.end()
       }
 
       if (this.graph.pointClusters || this.graph.clusterPositions) {
+        this.timerQueryPool?.begin('force.cluster')
         this.points?.swapFbo()
         this.clusters?.run()
         this.points?.updatePosition()
+        this.timerQueryPool?.end()
       }
 
       // Alpha decay and progress
@@ -1731,10 +1745,14 @@ export class Graph {
         this.graph.linksNumber > 0
 
       if (shouldDrawLinks) {
+        this.timerQueryPool?.begin('render.lines')
         this.lines?.draw(drawRenderPass)
+        this.timerQueryPool?.end()
       }
 
+      this.timerQueryPool?.begin('render.points')
       this.points?.draw(drawRenderPass)
+      this.timerQueryPool?.end()
 
       if (this.dragInstance.isActive) {
         // Swap-before-write: after the swap, `previous` holds the freshest positions so drag()
