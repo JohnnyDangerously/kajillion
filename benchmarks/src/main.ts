@@ -7,16 +7,37 @@ interface BenchParams {
   seed: number;
   warmupMs: number;
   measureMs: number;
+  pixelRatio: number | undefined;
+  label: string | undefined;
 }
 
 function readParams (): BenchParams {
   const u = new URL(window.location.href)
+  const pr = u.searchParams.get('pixelRatio')
+  const label = u.searchParams.get('label')
   return {
     nodeCount: Number(u.searchParams.get('n') ?? '100000'),
     edgesPerNode: Number(u.searchParams.get('m') ?? '3'),
     seed: Number(u.searchParams.get('seed') ?? '42'),
     warmupMs: Number(u.searchParams.get('warmup') ?? '2000'),
     measureMs: Number(u.searchParams.get('measure') ?? '8000'),
+    pixelRatio: pr === null || pr === '' ? undefined : Number(pr),
+    label: label === null || label === '' ? undefined : label,
+  }
+}
+
+async function postResults (payload: unknown): Promise<void> {
+  try {
+    const headers = new Headers()
+    headers.set('Content-Type', 'application/json')
+    const res = await fetch('/record-result', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) console.warn('record-result failed:', res.status)
+  } catch (err) {
+    console.warn('record-result error:', err)
   }
 }
 
@@ -99,6 +120,7 @@ async function run (): Promise<void> {
     simulationGravity: 0.1,
     enableGpuTimings: true,
   }
+  if (params.pixelRatio !== undefined) config.pixelRatio = params.pixelRatio
   const graph = new Graph(graphDiv, config)
   await graph.ready
   graph.setPointPositions(data.positions)
@@ -114,6 +136,15 @@ async function run (): Promise<void> {
   status.textContent = 'Done.'
   renderResults(snapshot, resultsDiv, params, data)
   console.log('[kajillion-bench] snapshot', snapshot)
+  await postResults({
+    timestamp: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+    devicePixelRatio: window.devicePixelRatio,
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    params,
+    dataset: { nodeCount: data.nodeCount, edgeCount: data.edgeCount },
+    snapshot,
+  })
 }
 
 run().catch(err => {
