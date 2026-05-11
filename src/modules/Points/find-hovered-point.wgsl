@@ -22,7 +22,7 @@ struct FindHoveredPointUniforms {
 
 @group(0) @binding(0) var<uniform> findHoveredPoint: FindHoveredPointUniforms;
 @group(0) @binding(1) var positionsTexture: texture_2d<f32>;
-@group(0) @binding(2) var positionsSampler: sampler;
+@group(0) @binding(2) var positionsTextureSampler: sampler;
 @group(0) @binding(3) var pointStatus: texture_2d<f32>;
 @group(0) @binding(4) var pointStatusSampler: sampler;
 
@@ -77,7 +77,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
     return output;
   }
 
-  let pointPosition = textureSampleLevel(positionsTexture, positionsSampler, uv, 0.0);
+  let pointPosition = textureSampleLevel(positionsTexture, positionsTextureSampler, uv, 0.0);
   let point = pointPosition.rg;
 
   var normalizedPosition = 2.0 * point / findHoveredPoint.spaceSize - vec2<f32>(1.0);

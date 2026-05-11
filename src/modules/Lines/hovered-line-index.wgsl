@@ -35,7 +35,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   let texCoord = hoveredLine.mousePosition / hoveredLine.screenSize;
 
   // Read the link index from the linkIndexFbo texture at mouse position
-  let linkIndexData = textureSample(linkIndexTexture, linkIndexTextureSampler, texCoord);
+  let linkIndexData = textureSampleLevel(linkIndexTexture, linkIndexTextureSampler, texCoord, 0.0);
 
   // Extract the link index (stored in the red channel)
   let linkIndex = linkIndexData.r;

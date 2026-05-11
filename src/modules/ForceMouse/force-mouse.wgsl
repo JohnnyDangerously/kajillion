@@ -8,7 +8,7 @@ struct ForceMouseUniforms {
 
 @group(0) @binding(0) var<uniform> forceMouse: ForceMouseUniforms;
 @group(0) @binding(1) var positionsTexture: texture_2d<f32>;
-@group(0) @binding(2) var positionsSampler: sampler;
+@group(0) @binding(2) var positionsTextureSampler: sampler;
 
 struct VertexInput {
   @location(0) vertexCoord: vec2<f32>,
@@ -30,7 +30,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
-  let pointPosition = textureSample(positionsTexture, positionsSampler, input.textureCoords);
+  let pointPosition = textureSampleLevel(positionsTexture, positionsTextureSampler, input.textureCoords, 0.0);
   var velocity = vec4<f32>(0.0);
   let mouse = forceMouse.mousePos;
 

@@ -856,8 +856,20 @@ export class Graph {
     if (this._isDestroyed || !this.device || !this.points) return []
     if (this.graph.pointsNumber === undefined) return []
     const positions: number[] = []
-    const pointPositionsPixels = readPixels(this.device, this.points.currentPositionFbo as Framebuffer)
     positions.length = this.graph.pointsNumber * 2
+    // WebGPU has no sync pixel-readback; fall back to the last-set CPU positions.
+    // Accurate before the simulation runs (e.g. for fitViewOnInit) and degrades
+    // gracefully as the sim moves things — proper async readback is a follow-up.
+    if (this.device.info?.type === 'webgpu') {
+      const cached = this.graph.inputPointPositions
+      if (!cached) return positions
+      for (let i = 0; i < this.graph.pointsNumber; i += 1) {
+        positions[i * 2] = cached[i * 2] ?? 0
+        positions[i * 2 + 1] = cached[i * 2 + 1] ?? 0
+      }
+      return positions
+    }
+    const pointPositionsPixels = readPixels(this.device, this.points.currentPositionFbo as Framebuffer)
     for (let i = 0; i < this.graph.pointsNumber; i += 1) {
       const posX = pointPositionsPixels[i * 4 + 0]
       const posY = pointPositionsPixels[i * 4 + 1]
@@ -1837,7 +1849,11 @@ export class Graph {
     // Simulation will use separate render passes later
     if (this.device) {
       const backgroundColor = this.store.backgroundColor ?? [0, 0, 0, 1]
+      // 2D-only pass: drop the canvas's default depth attachment so the pipelines
+      // (no depthWriteEnabled) match the render pass attachment state.
+      const canvasFramebuffer = this.device.canvasContext?.getCurrentFramebuffer({ depthStencilFormat: false })
       const drawRenderPass = this.device.beginRenderPass({
+        framebuffer: canvasFramebuffer,
         clearColor: backgroundColor,
         clearDepth: 1,
         clearStencil: 0,
@@ -2090,6 +2106,8 @@ export class Graph {
   /** Detect hovered point and update store state. Returns flags for deferred callback firing. */
   private findHoveredPoint (): { mouseover: boolean; mouseout: boolean } {
     if (this._isDestroyed || !this.device || !this.points) return { mouseover: false, mouseout: false }
+    // Pixel readback isn't wired for WebGPU yet; skip until async readback lands.
+    if (this.device.info?.type === 'webgpu') return { mouseover: false, mouseout: false }
     this.points.findHoveredPoint()
     let isMouseover = false
     let isMouseout = false

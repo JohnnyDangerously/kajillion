@@ -51,12 +51,12 @@ fn pointSizeF(size: f32) -> f32 {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
-  let pointPosition = textureSample(positionsTexture, positionsTextureSampler, input.textureCoords);
+  let pointPosition = textureSampleLevel(positionsTexture, positionsTextureSampler, input.textureCoords, 0.0);
   var p = 2.0 * pointPosition.rg / findPointsInRect.spaceSize - vec2<f32>(1.0);
   p = p * (findPointsInRect.spaceSize / findPointsInRect.screenSize);
-  let final = findPointsInRect.transformationMatrix * vec4<f32>(p, 1.0, 1.0);
+  let finalPos = findPointsInRect.transformationMatrix * vec4<f32>(p, 1.0, 1.0);
 
-  let pSize = textureSample(pointSize, pointSizeSampler, input.textureCoords);
+  let pSize = textureSampleLevel(pointSize, pointSizeSampler, input.textureCoords, 0.0);
   let size = pSize.r * findPointsInRect.sizeScale;
 
   let left = 2.0 * (findPointsInRect.rect0.x - 0.5 * pointSizeF(size)) / findPointsInRect.screenSize.x - 1.0;
@@ -65,7 +65,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   let bottom = 2.0 * (findPointsInRect.rect1.y + 0.5 * pointSizeF(size)) / findPointsInRect.screenSize.y - 1.0;
 
   var fragColor = vec4<f32>(0.0, 0.0, pointPosition.r, pointPosition.g);
-  if (final.x >= left && final.x <= right && final.y >= top && final.y <= bottom) {
+  if (finalPos.x >= left && finalPos.x <= right && finalPos.y >= top && finalPos.y <= bottom) {
     fragColor.r = 1.0;
   }
   return fragColor;

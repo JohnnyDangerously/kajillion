@@ -195,6 +195,7 @@ export class ForceLink extends CoreModule {
       fs: forceFrag(this.maxPointDegree),
       vs: updateVert,
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: 4,
       attributes: {
         vertexCoord: this.vertexCoordBuffer,
@@ -213,7 +214,6 @@ export class ForceLink extends CoreModule {
       },
       parameters: {
         depthWriteEnabled: false,
-        depthCompare: 'always',
       },
     })
   }

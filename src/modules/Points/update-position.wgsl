@@ -8,11 +8,11 @@ struct UpdatePositionUniforms {
 
 @group(0) @binding(0) var<uniform> updatePosition: UpdatePositionUniforms;
 @group(0) @binding(1) var positionsTexture: texture_2d<f32>;
-@group(0) @binding(2) var positionsSampler: sampler;
+@group(0) @binding(2) var positionsTextureSampler: sampler;
 @group(0) @binding(3) var velocity: texture_2d<f32>;
 @group(0) @binding(4) var velocitySampler: sampler;
 @group(0) @binding(5) var pinnedStatusTexture: texture_2d<f32>;
-@group(0) @binding(6) var pinnedStatusSampler: sampler;
+@group(0) @binding(6) var pinnedStatusTextureSampler: sampler;
 
 struct VertexInput {
   @location(0) vertexCoord: vec2<f32>,
@@ -34,9 +34,9 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
-  var pointPosition = textureSample(positionsTexture, positionsSampler, input.textureCoords);
-  let pointVelocity = textureSample(velocity, velocitySampler, input.textureCoords);
-  let pinnedStatus = textureSample(pinnedStatusTexture, pinnedStatusSampler, input.textureCoords);
+  var pointPosition = textureSampleLevel(positionsTexture, positionsTextureSampler, input.textureCoords, 0.0);
+  let pointVelocity = textureSampleLevel(velocity, velocitySampler, input.textureCoords, 0.0);
+  let pinnedStatus = textureSampleLevel(pinnedStatusTexture, pinnedStatusTextureSampler, input.textureCoords, 0.0);
 
   // Pinned points don't update
   if (pinnedStatus.r > 0.5) {

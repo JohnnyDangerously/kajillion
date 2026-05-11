@@ -13,7 +13,7 @@ struct CalculateCentermassUniforms {
 
 @group(0) @binding(0) var<uniform> calculateCentermass: CalculateCentermassUniforms;
 @group(0) @binding(1) var positionsTexture: texture_2d<f32>;
-@group(0) @binding(2) var positionsSampler: sampler;
+@group(0) @binding(2) var positionsTextureSampler: sampler;
 @group(0) @binding(3) var clusterTexture: texture_2d<f32>;
 @group(0) @binding(4) var clusterTextureSampler: sampler;
 
@@ -32,7 +32,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 
   let uv = input.pointIndices / calculateCentermass.pointsTextureSize;
 
-  let pointPosition = textureSampleLevel(positionsTexture, positionsSampler, uv, 0.0);
+  let pointPosition = textureSampleLevel(positionsTexture, positionsTextureSampler, uv, 0.0);
   output.rgba = vec4<f32>(pointPosition.xy, 1.0, 0.0);
 
   let pointClusterIndices = textureSampleLevel(clusterTexture, clusterTextureSampler, uv, 0.0);

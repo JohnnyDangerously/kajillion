@@ -13,15 +13,15 @@ struct ForceLinkUniforms {
 
 @group(0) @binding(0) var<uniform> forceLink: ForceLinkUniforms;
 @group(0) @binding(1) var positionsTexture: texture_2d<f32>;
-@group(0) @binding(2) var positionsSampler: sampler;
+@group(0) @binding(2) var positionsTextureSampler: sampler;
 @group(0) @binding(3) var linkInfoTexture: texture_2d<f32>;
-@group(0) @binding(4) var linkInfoSampler: sampler;
+@group(0) @binding(4) var linkInfoTextureSampler: sampler;
 @group(0) @binding(5) var linkIndicesTexture: texture_2d<f32>;
-@group(0) @binding(6) var linkIndicesSampler: sampler;
+@group(0) @binding(6) var linkIndicesTextureSampler: sampler;
 @group(0) @binding(7) var linkPropertiesTexture: texture_2d<f32>;
-@group(0) @binding(8) var linkPropertiesSampler: sampler;
+@group(0) @binding(8) var linkPropertiesTextureSampler: sampler;
 @group(0) @binding(9) var linkRandomDistanceTexture: texture_2d<f32>;
-@group(0) @binding(10) var linkRandomDistanceSampler: sampler;
+@group(0) @binding(10) var linkRandomDistanceTextureSampler: sampler;
 
 struct VertexInput {
   @location(0) vertexCoord: vec2<f32>,
@@ -45,10 +45,10 @@ const MAX_LINKS: f32 = ${maxLinks}.0;
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
-  let pointPosition = textureSample(positionsTexture, positionsSampler, input.textureCoords);
+  let pointPosition = textureSampleLevel(positionsTexture, positionsTextureSampler, input.textureCoords, 0.0);
   var velocity = vec4<f32>(0.0);
 
-  let linkInfo = textureSample(linkInfoTexture, linkInfoSampler, input.textureCoords);
+  let linkInfo = textureSampleLevel(linkInfoTexture, linkInfoTextureSampler, input.textureCoords, 0.0);
   var iCount: f32 = linkInfo.r;
   var jCount: f32 = linkInfo.g;
   let linkAmount: f32 = linkInfo.b;
@@ -61,9 +61,9 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
           jCount = jCount + 1.0;
         }
         let linkTextureIndex = (vec2<f32>(iCount, jCount) + 0.5) / forceLink.linksTextureSize;
-        let connectedPointIndex = textureSample(linkIndicesTexture, linkIndicesSampler, linkTextureIndex);
-        let biasAndStrength = textureSample(linkPropertiesTexture, linkPropertiesSampler, linkTextureIndex);
-        let randomMinDistance = textureSample(linkRandomDistanceTexture, linkRandomDistanceSampler, linkTextureIndex);
+        let connectedPointIndex = textureSampleLevel(linkIndicesTexture, linkIndicesTextureSampler, linkTextureIndex, 0.0);
+        let biasAndStrength = textureSampleLevel(linkPropertiesTexture, linkPropertiesTextureSampler, linkTextureIndex, 0.0);
+        let randomMinDistance = textureSampleLevel(linkRandomDistanceTexture, linkRandomDistanceTextureSampler, linkTextureIndex, 0.0);
         let bias = biasAndStrength.r;
         let strength = biasAndStrength.g;
         var randomMinLinkDist = randomMinDistance.r * (forceLink.linkDistRandomVariationRange.g - forceLink.linkDistRandomVariationRange.r) + forceLink.linkDistRandomVariationRange.r;
@@ -71,7 +71,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
 
         iCount = iCount + 1.0;
 
-        let connectedPointPosition = textureSample(positionsTexture, positionsSampler, (connectedPointIndex.rg + 0.5) / forceLink.pointsTextureSize);
+        let connectedPointPosition = textureSampleLevel(positionsTexture, positionsTextureSampler, (connectedPointIndex.rg + 0.5) / forceLink.pointsTextureSize, 0.0);
         var x = connectedPointPosition.x - (pointPosition.x + velocity.x);
         var y = connectedPointPosition.y - (pointPosition.y + velocity.y);
         var l = sqrt(x * x + y * y);

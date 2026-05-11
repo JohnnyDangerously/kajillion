@@ -79,8 +79,10 @@ export function rgbToBrightness (r: number, g: number, b: number): number {
  * @note Cosmos currently supports WebGL only; support for other device types will be added later.
  */
 export function readPixels (device: Device, fbo: Framebuffer, sourceX = 0, sourceY = 0, sourceWidth?: number, sourceHeight?: number): Float32Array {
-  // Let luma.gl auto-allocate based on texture format
-  // It will use Float32Array for rgba32float textures
+  // WebGPU has no sync readback. Callers either have their own WebGPU fallback
+  // (e.g. getPointPositions reads cached input data) or degrade gracefully on an
+  // empty array. Proper async readback via copyTextureToBuffer is a follow-up.
+  if (device.info?.type === 'webgpu') return new Float32Array(0)
   return device.readPixelsToArrayWebGL(fbo, {
     sourceX,
     sourceY,

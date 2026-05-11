@@ -31,14 +31,15 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
-  let trackedPointIndices = textureSample(trackedIndices, trackedIndicesSampler, input.textureCoords);
+  let trackedPointIndices = textureSampleLevel(trackedIndices, trackedIndicesSampler, input.textureCoords, 0.0);
   if (trackedPointIndices.r < 0.0) {
     discard;
   }
-  let pointPosition = textureSample(
+  let pointPosition = textureSampleLevel(
     positionsTexture,
     positionsTextureSampler,
     (trackedPointIndices.rg + 0.5) / trackPoints.pointsTextureSize,
+    0.0,
   );
 
   return vec4<f32>(pointPosition.rg, 1.0, 1.0);

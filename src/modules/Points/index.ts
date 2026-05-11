@@ -84,6 +84,7 @@ export class Points extends CoreModule {
   private findPointsInRectVertexCoordBuffer: Buffer | undefined
   private findPointsInPolygonVertexCoordBuffer: Buffer | undefined
   private drawHighlightedVertexCoordBuffer: Buffer | undefined
+  private drawQuadVertexBuffer: Buffer | undefined
   private trackPointsVertexCoordBuffer: Buffer | undefined
   private trackedIndices: number[] | undefined
   private searchTexture: Texture | undefined
@@ -514,6 +515,7 @@ export class Points extends CoreModule {
         fs: updatePositionFrag,
         vs: updateVert,
         topology: 'triangle-strip',
+        colorAttachmentFormats: ['rgba32float'],
         vertexCount: 4,
         attributes: {
           vertexCoord: this.updatePositionVertexCoordBuffer,
@@ -558,6 +560,7 @@ export class Points extends CoreModule {
       fs: dragPointFrag,
       vs: updateVert,
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: 4,
       attributes: {
         vertexCoord: this.dragPointVertexCoordBuffer,
@@ -649,13 +652,22 @@ export class Points extends CoreModule {
       },
     })
 
+    const isWebGPU = device.info?.type === 'webgpu'
+    if (isWebGPU) {
+      this.drawQuadVertexBuffer ||= device.createBuffer({
+        data: new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+      })
+    }
     this.drawCommand ||= new Model(device, {
       source: drawPointsWgsl,
       fs: drawPointsFrag,
       vs: drawPointsVert,
-      topology: 'point-list',
-      vertexCount: data.pointsNumber ?? 0,
+      topology: isWebGPU ? 'triangle-strip' : 'point-list',
+      colorAttachmentFormats: ['bgra8unorm'],
+      vertexCount: isWebGPU ? 4 : (data.pointsNumber ?? 0),
+      instanceCount: isWebGPU ? (data.pointsNumber ?? 0) : undefined,
       attributes: {
+        ...(isWebGPU && this.drawQuadVertexBuffer && { quadCorner: this.drawQuadVertexBuffer }),
         ...(this.drawPointIndices && { pointIndices: this.drawPointIndices }),
         ...(this.sizeBuffer && { size: this.sizeBuffer }),
         ...(this.colorBuffer && { color: this.colorBuffer }),
@@ -663,14 +675,24 @@ export class Points extends CoreModule {
         ...(this.imageIndicesBuffer && { imageIndex: this.imageIndicesBuffer }),
         ...(this.imageSizesBuffer && { imageSize: this.imageSizesBuffer }),
       },
-      bufferLayout: [
-        { name: 'pointIndices', format: 'float32x2' },
-        { name: 'size', format: 'float32' },
-        { name: 'color', format: 'float32x4' },
-        { name: 'shape', format: 'float32' },
-        { name: 'imageIndex', format: 'float32' },
-        { name: 'imageSize', format: 'float32' },
-      ],
+      bufferLayout: isWebGPU
+        ? [
+          { name: 'quadCorner', format: 'float32x2' },
+          { name: 'pointIndices', format: 'float32x2', stepMode: 'instance' },
+          { name: 'size', format: 'float32', stepMode: 'instance' },
+          { name: 'color', format: 'float32x4', stepMode: 'instance' },
+          { name: 'shape', format: 'float32', stepMode: 'instance' },
+          { name: 'imageIndex', format: 'float32', stepMode: 'instance' },
+          { name: 'imageSize', format: 'float32', stepMode: 'instance' },
+        ]
+        : [
+          { name: 'pointIndices', format: 'float32x2' },
+          { name: 'size', format: 'float32' },
+          { name: 'color', format: 'float32x4' },
+          { name: 'shape', format: 'float32' },
+          { name: 'imageIndex', format: 'float32' },
+          { name: 'imageSize', format: 'float32' },
+        ],
       defines: {
         USE_UNIFORM_BUFFERS: true,
       },
@@ -690,7 +712,6 @@ export class Points extends CoreModule {
         blendAlphaSrcFactor: 'one',
         blendAlphaDstFactor: 'one-minus-src-alpha',
         depthWriteEnabled: false,
-        depthCompare: 'always',
       },
     })
 
@@ -733,6 +754,7 @@ export class Points extends CoreModule {
       fs: findPointsInRectFrag,
       vs: updateVert,
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: 4,
       attributes: {
         vertexCoord: this.findPointsInRectVertexCoordBuffer,
@@ -780,6 +802,7 @@ export class Points extends CoreModule {
       fs: findPointsInPolygonFrag,
       vs: updateVert,
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: 4,
       attributes: {
         vertexCoord: this.findPointsInPolygonVertexCoordBuffer,
@@ -837,6 +860,7 @@ export class Points extends CoreModule {
       fs: findHoveredPointFrag,
       vs: findHoveredPointVert,
       topology: 'point-list',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: data.pointsNumber ?? 0,
       attributes: {
         ...(this.hoveredPointIndices && { pointIndices: this.hoveredPointIndices }),
@@ -859,7 +883,6 @@ export class Points extends CoreModule {
       },
       parameters: {
         depthWriteEnabled: false,
-        depthCompare: 'always',
         blend: false, // Disable blending - we want to overwrite, not blend
       },
     })
@@ -888,6 +911,7 @@ export class Points extends CoreModule {
       fs: fillGridWithSampledPointsFrag,
       vs: fillGridWithSampledPointsVert,
       topology: 'point-list',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: data.pointsNumber ?? 0,
       attributes: {
         ...(this.sampledPointIndices && { pointIndices: this.sampledPointIndices }),
@@ -906,7 +930,6 @@ export class Points extends CoreModule {
       },
       parameters: {
         depthWriteEnabled: false,
-        depthCompare: 'always',
       },
     })
 
@@ -964,6 +987,7 @@ export class Points extends CoreModule {
       fs: drawHighlightedFrag,
       vs: drawHighlightedVert,
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['bgra8unorm'],
       vertexCount: 4,
       attributes: {
         vertexCoord: this.drawHighlightedVertexCoordBuffer,
@@ -989,7 +1013,6 @@ export class Points extends CoreModule {
         blendAlphaSrcFactor: 'one',
         blendAlphaDstFactor: 'one-minus-src-alpha',
         depthWriteEnabled: false,
-        depthCompare: 'always',
       },
     })
 
@@ -1016,6 +1039,7 @@ export class Points extends CoreModule {
       fs: trackPositionsFrag,
       vs: updateVert,
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: 4,
       attributes: {
         vertexCoord: this.trackPointsVertexCoordBuffer,
@@ -1463,8 +1487,13 @@ export class Points extends CoreModule {
       return
     }
 
-    // Update vertex count dynamically
-    this.drawCommand.setVertexCount(data.pointsNumber)
+    // Update draw count dynamically. WebGL uses point-list (one vertex per point);
+    // WebGPU uses an instanced quad (4 vertices, N instances).
+    if (this.device.info?.type === 'webgpu') {
+      this.drawCommand.setInstanceCount(data.pointsNumber)
+    } else {
+      this.drawCommand.setVertexCount(data.pointsNumber)
+    }
 
     // Base uniforms that don't change between layers
     // Convert booleans to floats (1.0 or 0.0) since uniform type is 'f32'

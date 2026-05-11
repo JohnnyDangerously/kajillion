@@ -110,6 +110,7 @@ export class ForceCenter extends CoreModule {
       fs: calculateCentermassFrag,
       vs: calculateCentermassVert,
       topology: 'point-list',
+      colorAttachmentFormats: ['rgba32float'],
       attributes: {
         ...this.pointIndices && { pointIndices: this.pointIndices },
       },
@@ -134,7 +135,6 @@ export class ForceCenter extends CoreModule {
         blendAlphaSrcFactor: 'one',
         blendAlphaDstFactor: 'one',
         depthWriteEnabled: false,
-        depthCompare: 'always',
       },
     })
     this.calculateCentermassCommand.setVertexCount(this.data.pointsNumber ?? 0)
@@ -144,6 +144,7 @@ export class ForceCenter extends CoreModule {
       fs: forceFrag,
       vs: updateVert,
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: 4,
       attributes: {
         vertexCoord: this.forceVertexCoordBuffer,
@@ -162,7 +163,6 @@ export class ForceCenter extends CoreModule {
       },
       parameters: {
         depthWriteEnabled: false,
-        depthCompare: 'always',
       },
     })
   }

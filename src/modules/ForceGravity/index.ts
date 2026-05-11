@@ -40,6 +40,7 @@ export class ForceGravity extends CoreModule {
       fs: forceFrag,
       vs: updateVert,
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: 4,
       attributes: {
         vertexCoord: this.vertexCoordBuffer,
@@ -58,7 +59,6 @@ export class ForceGravity extends CoreModule {
       },
       parameters: {
         depthWriteEnabled: false,
-        depthCompare: 'always',
       },
     })
   }

@@ -201,6 +201,7 @@ export class ForceManyBody extends CoreModule {
       fs: calculateLevelFrag,
       vs: calculateLevelVert,
       topology: 'point-list',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: data.pointsNumber,
       attributes: {
         ...this.pointIndices && { pointIndices: this.pointIndices },
@@ -226,7 +227,6 @@ export class ForceManyBody extends CoreModule {
         blendAlphaSrcFactor: 'one',
         blendAlphaDstFactor: 'one',
         depthWriteEnabled: false,
-        depthCompare: 'always',
       },
     })
 
@@ -263,6 +263,7 @@ export class ForceManyBody extends CoreModule {
       fs: forceFrag,
       vs: updateVert,
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: 4,
       attributes: {
         vertexCoord: this.forceVertexCoordBuffer,
@@ -288,7 +289,6 @@ export class ForceManyBody extends CoreModule {
         blendAlphaSrcFactor: 'one',
         blendAlphaDstFactor: 'one',
         depthWriteEnabled: false,
-        depthCompare: 'always',
       },
     })
 
@@ -313,6 +313,7 @@ export class ForceManyBody extends CoreModule {
       fs: forceCenterFrag,
       vs: updateVert,
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: 4,
       attributes: {
         vertexCoord: this.forceVertexCoordBuffer,
@@ -338,7 +339,6 @@ export class ForceManyBody extends CoreModule {
         blendAlphaSrcFactor: 'one',
         blendAlphaDstFactor: 'one',
         depthWriteEnabled: false,
-        depthCompare: 'always',
       },
     })
   }

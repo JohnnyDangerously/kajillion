@@ -1,21 +1,9 @@
 // WGSL counterpart to draw-points.vert + draw-points.frag.
 // One file, both entry points, used when useWebGPU = true.
 //
-// Custom vertex shader: one vertex per point (topology: 'point-list').
-// Renders point sprites with multiple SDF shape variants (circle, square,
-// triangle, diamond, pentagon, hexagon, star, cross) plus optional image
-// atlas sampling and an outline ring.
-//
-// WebGPU porting notes:
-//   * WGSL has no `gl_PointSize` — WebGPU point primitives are always 1px.
-//     Every assignment of `gl_PointSize` in the GLSL is preserved as a
-//     `// TODO WebGPU: gl_PointSize` comment. The engine will need instanced
-//     quad emulation to render sprites at non-unit size; this file is written
-//     so the pipeline compiles and runs at point-size 1 in the meantime.
-//   * WGSL has no `gl_PointCoord` either. The fragment shader receives a
-//     single pixel per point, so the SDF coordinate `pointCoord` is forced
-//     to vec2<f32>(0.0) (the centre of a point sprite). This is also blocked
-//     on instanced-quad emulation.
+// WebGPU has no gl_PointSize / gl_PointCoord, so each point is rendered as a
+// 4-vertex triangle-strip instance. `quadCorner` covers [-1,1]^2 and doubles
+// as the SDF coordinate the fragment shader needs.
 
 struct DrawVertexUniforms {
   ratio: f32,
@@ -49,21 +37,22 @@ struct DrawFragmentUniforms {
 @group(0) @binding(0) var<uniform> drawVertex: DrawVertexUniforms;
 @group(0) @binding(1) var<uniform> drawFragment: DrawFragmentUniforms;
 @group(0) @binding(2) var positionsTexture: texture_2d<f32>;
-@group(0) @binding(3) var positionsSampler: sampler;
+@group(0) @binding(3) var positionsTextureSampler: sampler;
 @group(0) @binding(4) var pointStatus: texture_2d<f32>;
 @group(0) @binding(5) var pointStatusSampler: sampler;
 @group(0) @binding(6) var imageAtlasTexture: texture_2d<f32>;
-@group(0) @binding(7) var imageAtlasSampler: sampler;
+@group(0) @binding(7) var imageAtlasTextureSampler: sampler;
 @group(0) @binding(8) var imageAtlasCoords: texture_2d<f32>;
 @group(0) @binding(9) var imageAtlasCoordsSampler: sampler;
 
 struct VertexInput {
-  @location(0) pointIndices: vec2<f32>,
-  @location(1) size: f32,
-  @location(2) color: vec4<f32>,
-  @location(3) shape: f32,
-  @location(4) imageIndex: f32,
-  @location(5) imageSize: f32,
+  @location(0) quadCorner: vec2<f32>,
+  @location(1) pointIndices: vec2<f32>,
+  @location(2) size: f32,
+  @location(3) color: vec4<f32>,
+  @location(4) shape: f32,
+  @location(5) imageIndex: f32,
+  @location(6) imageSize: f32,
 };
 
 struct VertexOutput {
@@ -76,6 +65,7 @@ struct VertexOutput {
   @location(5) shapeSize: f32,
   @location(6) imageSizeVarying: f32,
   @location(7) overallSize: f32,
+  @location(8) pointCoord: vec2<f32>,
 };
 
 fn calculatePointSize(pointSize: f32) -> f32 {
@@ -117,17 +107,15 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   // Discard point based on rendering mode
   if (drawVertex.skipHighlighted > 0.0 && isHighlighted > 0.0) {
     output.position = vec4<f32>(2.0, 2.0, 2.0, 1.0);
-    // TODO WebGPU: gl_PointSize = 0.0;
     return output;
   }
   if (drawVertex.skipGreyed > 0.0 && isHighlighted <= 0.0) {
     output.position = vec4<f32>(2.0, 2.0, 2.0, 1.0);
-    // TODO WebGPU: gl_PointSize = 0.0;
     return output;
   }
 
   // Position
-  let pointPosition = textureSampleLevel(positionsTexture, positionsSampler, uv, 0.0);
+  let pointPosition = textureSampleLevel(positionsTexture, positionsTextureSampler, uv, 0.0);
   let point = pointPosition.rg;
 
   // Transform point position to normalized device coordinates
@@ -136,13 +124,12 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 
   // Equivalent to mat3(transformationMatrix) * vec3(normalizedPosition, 1)
   let finalPosition = drawVertex.transformationMatrix * vec4<f32>(normalizedPosition, 1.0, 1.0);
-  output.position = vec4<f32>(finalPosition.xy, 0.0, 1.0);
+  let centerClip = vec2<f32>(finalPosition.xy);
 
   // Frustum cull: skip points whose sprite is entirely offscreen.
   let cullMargin = 2.0 * vec2<f32>(drawVertex.maxPointSize) / drawVertex.screenSize;
-  if (abs(output.position.x) > 1.0 + cullMargin.x || abs(output.position.y) > 1.0 + cullMargin.y) {
+  if (abs(centerClip.x) > 1.0 + cullMargin.x || abs(centerClip.y) > 1.0 + cullMargin.y) {
     output.position = vec4<f32>(2.0, 2.0, 2.0, 1.0);
-    // TODO WebGPU: gl_PointSize = 0.0;
     return output;
   }
 
@@ -162,16 +149,18 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   // Hard-skip rendering when the final sprite size is below the configured threshold.
   if (drawVertex.pointMinPixelSize > 0.0 && overallSizeValue < drawVertex.pointMinPixelSize) {
     output.position = vec4<f32>(2.0, 2.0, 2.0, 1.0);
-    // TODO WebGPU: gl_PointSize = 0.0;
     return output;
   }
 
-  // TODO WebGPU: gl_PointSize = overallSizeValue;
-  // WGSL has no gl_PointSize; WebGPU point primitives render at 1px.
-  // Engine fix: emulate via instanced quads. Until then we still pass the
-  // intended size to the fragment shader so SDF maths remains consistent
-  // once point-coords are real (the fragment shader will currently sample at
-  // the centre of a 1px point — see fragment notes).
+  // Expand the instance into a screen-aligned quad. quadCorner is [-1,1]^2;
+  // half-extent in clip space is sizePx / framebufferSize, and framebufferSize
+  // = screenSize * ratio (screenSize is CSS pixels, sizes are device pixels).
+  let halfExtentClip = vec2<f32>(
+    overallSizeValue / (drawVertex.screenSize.x * drawVertex.ratio),
+    overallSizeValue / (drawVertex.screenSize.y * drawVertex.ratio),
+  );
+  output.position = vec4<f32>(centerClip + input.quadCorner * halfExtentClip, 0.0, 1.0);
+  output.pointCoord = input.quadCorner;
 
   // Pass size information to fragment shader
   output.shapeSize = shapeSizeValue;
@@ -352,6 +341,12 @@ fn getShapeDistance(p: vec2<f32>, shape: f32) -> f32 {
   else { return circleDistance(p); }
 }
 
+// LOD 0: textureSample isn't allowed under the non-uniform control flow we
+// enter via shape/image branches; textureSampleLevel sidesteps that rule.
+fn sampleAtlas(uv: vec2<f32>) -> vec4<f32> {
+  return textureSampleLevel(imageAtlasTexture, imageAtlasTextureSampler, uv, 0.0);
+}
+
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   // Discard the fragment if the point is fully transparent and has no image
@@ -364,14 +359,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
     discard;
   }
 
-  // TODO WebGPU: gl_PointCoord has no WGSL equivalent. WebGPU point-list
-  // primitives are 1px so a real point-coord would always be ~(0.5, 0.5)
-  // and the SDF coordinate `pointCoord` below would always be vec2<f32>(0.0).
-  // Engine fix: render via instanced quads and pass a real (u,v) varying.
-  // Until then we draw a single centred sample of every shape/image, which
-  // is enough to keep the pipeline alive and the colour valid.
-  let pointCoordCenter = vec2<f32>(0.5);
-  let pointCoord = 2.0 * pointCoordCenter - vec2<f32>(1.0); // = vec2<f32>(0.0)
+  let pointCoord = input.pointCoord;
 
   var finalShapeColor = vec4<f32>(0.0);
   var finalImageColor = vec4<f32>(0.0);
@@ -408,13 +396,11 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
         finalImageColor = vec4<f32>(0.0);
       } else {
         let atlasUV = mix(input.imageAtlasUV.xy, input.imageAtlasUV.zw, (imageCoord + vec2<f32>(1.0)) * 0.5);
-        let imageColor = textureSample(imageAtlasTexture, imageAtlasSampler, atlasUV);
-        finalImageColor = applyGreyoutToImage(imageColor, input.isGreyedOut);
+        finalImageColor = applyGreyoutToImage(sampleAtlas(atlasUV), input.isGreyedOut);
       }
     } else {
       let atlasUV = mix(input.imageAtlasUV.xy, input.imageAtlasUV.zw, (imageCoord + vec2<f32>(1.0)) * 0.5);
-      let imageColor = textureSample(imageAtlasTexture, imageAtlasSampler, atlasUV);
-      finalImageColor = applyGreyoutToImage(imageColor, input.isGreyedOut);
+      finalImageColor = applyGreyoutToImage(sampleAtlas(atlasUV), input.isGreyedOut);
     }
   }
 

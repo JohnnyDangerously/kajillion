@@ -217,6 +217,7 @@ export class Lines extends CoreModule {
       fs: drawLineFrag,
       modules: [conicParametricCurveModule],
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['bgra8unorm'],
       vertexCount: this.curveLineGeometry?.length ?? 0,
       attributes: {
         ...this.curveLineBuffer && { position: this.curveLineBuffer },
@@ -265,7 +266,6 @@ export class Lines extends CoreModule {
         blendAlphaSrcFactor: 'one',
         blendAlphaDstFactor: config.linkBlendMode === 'add' ? 'one' : 'one-minus-src-alpha',
         depthWriteEnabled: false,
-        depthCompare: 'always',
       },
     })
 
@@ -279,6 +279,7 @@ export class Lines extends CoreModule {
       fs: drawLineFrag,
       modules: [conicParametricCurveModule],
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: this.curveLineGeometry?.length ?? 0,
       attributes: {
         ...this.curveLineBuffer && { position: this.curveLineBuffer },
@@ -309,7 +310,6 @@ export class Lines extends CoreModule {
         cullMode: 'back',
         blend: false,
         depthWriteEnabled: false,
-        depthCompare: 'always',
       },
     })
 
@@ -337,6 +337,7 @@ export class Lines extends CoreModule {
       vs: hoveredLineIndexVert,
       fs: hoveredLineIndexFrag,
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: 4,
       attributes: {
         vertexCoord: this.quadBuffer,
@@ -385,6 +386,7 @@ export class Lines extends CoreModule {
       vs: fillGridWithSampledLinksVert,
       modules: [conicParametricCurveModule],
       topology: 'point-list',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: data.linksNumber ?? 0,
       attributes: {
         ...(this.pointABuffer && { pointA: this.pointABuffer }),
@@ -404,7 +406,6 @@ export class Lines extends CoreModule {
       },
       parameters: {
         depthWriteEnabled: false,
-        depthCompare: 'always',
         blend: false,
       },
     })

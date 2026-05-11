@@ -30,7 +30,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
-  var pointPosition = textureSample(positionsTexture, positionsTextureSampler, input.textureCoords);
+  var pointPosition = textureSampleLevel(positionsTexture, positionsTextureSampler, input.textureCoords, 0.0);
 
   // Check if a point is being dragged
   if (dragPoint.index >= 0.0 && dragPoint.index == pointPosition.b) {

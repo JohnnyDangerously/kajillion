@@ -28,7 +28,7 @@ struct FillSampledLinksUniforms {
 
 @group(0) @binding(0) var<uniform> fillSampledLinks: FillSampledLinksUniforms;
 @group(0) @binding(1) var positionsTexture: texture_2d<f32>;
-@group(0) @binding(2) var positionsSampler: sampler;
+@group(0) @binding(2) var positionsTextureSampler: sampler;
 
 struct VertexInput {
   @location(0) pointA: vec2<f32>,
@@ -47,13 +47,13 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 
   let posA = textureSampleLevel(
     positionsTexture,
-    positionsSampler,
+    positionsTextureSampler,
     (input.pointA + vec2<f32>(0.5)) / fillSampledLinks.pointsTextureSize,
     0.0,
   );
   let posB = textureSampleLevel(
     positionsTexture,
-    positionsSampler,
+    positionsTextureSampler,
     (input.pointB + vec2<f32>(0.5)) / fillSampledLinks.pointsTextureSize,
     0.0,
   );
@@ -81,9 +81,9 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   p = p * (fillSampledLinks.spaceSize / fillSampledLinks.screenSize);
 
   // Equivalent to mat3(transformationMatrix) * vec3(p, 1)
-  let final = fillSampledLinks.transformationMatrix * vec4<f32>(p, 1.0, 1.0);
+  let finalPos = fillSampledLinks.transformationMatrix * vec4<f32>(p, 1.0, 1.0);
 
-  let pointScreenPosition = (final.xy + vec2<f32>(1.0)) * fillSampledLinks.screenSize / 2.0;
+  let pointScreenPosition = (finalPos.xy + vec2<f32>(1.0)) * fillSampledLinks.screenSize / 2.0;
   output.rgba = vec4<f32>(input.linkIndices, mid.x, mid.y, angle);
 
   let i = (pointScreenPosition.x + 0.5) / fillSampledLinks.screenSize.x;

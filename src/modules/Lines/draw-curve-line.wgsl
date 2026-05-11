@@ -51,9 +51,9 @@ struct DrawLineFragmentUniforms {
 };
 
 @group(0) @binding(0) var<uniform> drawLine: DrawLineUniforms;
-@group(0) @binding(1) var<uniform> drawLineFrag: DrawLineFragmentUniforms;
+@group(0) @binding(1) var<uniform> drawLineFragment: DrawLineFragmentUniforms;
 @group(0) @binding(2) var positionsTexture: texture_2d<f32>;
-@group(0) @binding(3) var positionsSampler: sampler;
+@group(0) @binding(3) var positionsTextureSampler: sampler;
 @group(0) @binding(4) var linkStatus: texture_2d<f32>;
 @group(0) @binding(5) var linkStatusSampler: sampler;
 
@@ -123,8 +123,8 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   let pointTexturePosA = (input.pointA + vec2<f32>(0.5)) / drawLine.pointsTextureSize;
   let pointTexturePosB = (input.pointB + vec2<f32>(0.5)) / drawLine.pointsTextureSize;
 
-  let pointPositionA = textureSampleLevel(positionsTexture, positionsSampler, pointTexturePosA, 0.0);
-  let pointPositionB = textureSampleLevel(positionsTexture, positionsSampler, pointTexturePosB, 0.0);
+  let pointPositionA = textureSampleLevel(positionsTexture, positionsTextureSampler, pointTexturePosA, 0.0);
+  let pointPositionB = textureSampleLevel(positionsTexture, positionsTextureSampler, pointTexturePosB, 0.0);
   let a = pointPositionA.xy;
   let b = pointPositionB.xy;
 
@@ -300,7 +300,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
     opacity = input.rgbaColor.a * smoothstep(0.5, 0.5 - input.smoothing, abs(input.pos.y));
   }
 
-  if (drawLineFrag.renderMode > 0.0) {
+  if (drawLineFragment.renderMode > 0.0) {
     if (opacity > 0.0) {
       return vec4<f32>(input.linkIndex, 0.0, 0.0, 1.0);
     } else {

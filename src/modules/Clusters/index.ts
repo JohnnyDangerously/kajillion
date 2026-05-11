@@ -281,6 +281,7 @@ export class Clusters extends CoreModule {
       fs: calculateCentermassFrag,
       vs: calculateCentermassVert,
       topology: 'point-list',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: data.pointsNumber ?? 0,
       attributes: {
         ...this.pointIndices && { pointIndices: this.pointIndices },
@@ -306,7 +307,6 @@ export class Clusters extends CoreModule {
         blendAlphaSrcFactor: 'one',
         blendAlphaDstFactor: 'one',
         depthWriteEnabled: false,
-        depthCompare: 'always',
       },
     })
 
@@ -336,6 +336,7 @@ export class Clusters extends CoreModule {
       fs: forceFrag,
       vs: updateVert,
       topology: 'triangle-strip',
+      colorAttachmentFormats: ['rgba32float'],
       vertexCount: 4,
       attributes: {
         vertexCoord: this.applyForcesVertexCoordBuffer,

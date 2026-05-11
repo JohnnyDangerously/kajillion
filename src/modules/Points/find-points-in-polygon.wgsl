@@ -44,7 +44,7 @@ fn getPolygonPoint(index: i32, pathLength: i32) -> vec2<f32> {
   let y = index / textureSize;
 
   let texCoord = (vec2<f32>(f32(x), f32(y)) + 0.5) / f32(textureSize);
-  let pathData = textureSample(polygonPathTexture, polygonPathTextureSampler, texCoord);
+  let pathData = textureSampleLevel(polygonPathTexture, polygonPathTextureSampler, texCoord, 0.0);
 
   return pathData.xy;
 }
@@ -77,13 +77,13 @@ fn pointInPolygon(point: vec2<f32>, pathLength: i32) -> bool {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
-  let pointPosition = textureSample(positionsTexture, positionsTextureSampler, input.textureCoords);
+  let pointPosition = textureSampleLevel(positionsTexture, positionsTextureSampler, input.textureCoords, 0.0);
   var p = 2.0 * pointPosition.rg / findPointsInPolygon.spaceSize - vec2<f32>(1.0);
   p = p * (findPointsInPolygon.spaceSize / findPointsInPolygon.screenSize);
-  let final = findPointsInPolygon.transformationMatrix * vec4<f32>(p, 1.0, 1.0);
+  let finalPos = findPointsInPolygon.transformationMatrix * vec4<f32>(p, 1.0, 1.0);
 
   // Convert to screen coordinates for polygon check
-  let screenPos = (final.xy + vec2<f32>(1.0)) * findPointsInPolygon.screenSize / 2.0;
+  let screenPos = (finalPos.xy + vec2<f32>(1.0)) * findPointsInPolygon.screenSize / 2.0;
 
   var fragColor = vec4<f32>(0.0, 0.0, pointPosition.r, pointPosition.g);
 

@@ -9,13 +9,13 @@ struct ApplyForcesUniforms {
 
 @group(0) @binding(0) var<uniform> applyForces: ApplyForcesUniforms;
 @group(0) @binding(1) var positionsTexture: texture_2d<f32>;
-@group(0) @binding(2) var positionsSampler: sampler;
+@group(0) @binding(2) var positionsTextureSampler: sampler;
 @group(0) @binding(3) var centermassTexture: texture_2d<f32>;
-@group(0) @binding(4) var centermassSampler: sampler;
+@group(0) @binding(4) var centermassTextureSampler: sampler;
 @group(0) @binding(5) var clusterTexture: texture_2d<f32>;
-@group(0) @binding(6) var clusterSampler: sampler;
+@group(0) @binding(6) var clusterTextureSampler: sampler;
 @group(0) @binding(7) var clusterPositionsTexture: texture_2d<f32>;
-@group(0) @binding(8) var clusterPositionsSampler: sampler;
+@group(0) @binding(8) var clusterPositionsTextureSampler: sampler;
 @group(0) @binding(9) var clusterForceCoefficient: texture_2d<f32>;
 @group(0) @binding(10) var clusterForceCoefficientSampler: sampler;
 
@@ -39,19 +39,19 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
-  let pointPosition = textureSample(positionsTexture, positionsSampler, input.textureCoords);
+  let pointPosition = textureSampleLevel(positionsTexture, positionsTextureSampler, input.textureCoords, 0.0);
   var velocity = vec4<f32>(0.0);
-  let pointClusterIndices = textureSample(clusterTexture, clusterSampler, input.textureCoords);
+  let pointClusterIndices = textureSampleLevel(clusterTexture, clusterTextureSampler, input.textureCoords, 0.0);
 
   // no cluster, so no forces
   if (pointClusterIndices.x >= 0.0 && pointClusterIndices.y >= 0.0) {
     // positioning points to custom cluster position or either to the center of mass
-    var clusterPositions = textureSample(clusterPositionsTexture, clusterPositionsSampler, pointClusterIndices.xy / applyForces.clustersTextureSize).xy;
+    var clusterPositions = textureSampleLevel(clusterPositionsTexture, clusterPositionsTextureSampler, pointClusterIndices.xy / applyForces.clustersTextureSize, 0.0).xy;
     if (clusterPositions.x < 0.0 || clusterPositions.y < 0.0) {
-      let centermassValues = textureSample(centermassTexture, centermassSampler, pointClusterIndices.xy / applyForces.clustersTextureSize);
+      let centermassValues = textureSampleLevel(centermassTexture, centermassTextureSampler, pointClusterIndices.xy / applyForces.clustersTextureSize, 0.0);
       clusterPositions = centermassValues.xy / centermassValues.b;
     }
-    let clusterCustomCoeff = textureSample(clusterForceCoefficient, clusterForceCoefficientSampler, input.textureCoords);
+    let clusterCustomCoeff = textureSampleLevel(clusterForceCoefficient, clusterForceCoefficientSampler, input.textureCoords, 0.0);
     let distVector = clusterPositions.xy - pointPosition.xy;
     let dist = length(distVector);
     if (dist > 0.0) {

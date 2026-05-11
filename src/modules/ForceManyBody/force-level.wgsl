@@ -13,7 +13,7 @@ struct ForceUniforms {
 
 @group(0) @binding(0) var<uniform> force: ForceUniforms;
 @group(0) @binding(1) var positionsTexture: texture_2d<f32>;
-@group(0) @binding(2) var positionsSampler: sampler;
+@group(0) @binding(2) var positionsTextureSampler: sampler;
 @group(0) @binding(3) var levelFbo: texture_2d<f32>;
 @group(0) @binding(4) var levelFboSampler: sampler;
 
@@ -39,7 +39,7 @@ const MAX_LEVELS_NUM: f32 = 14.0;
 
 fn calculateAdditionalVelocity(ij: vec2<f32>, pp: vec2<f32>) -> vec2<f32> {
   var add = vec2<f32>(0.0);
-  let centermass = textureSample(levelFbo, levelFboSampler, ij);
+  let centermass = textureSampleLevel(levelFbo, levelFboSampler, ij, 0.0);
   if (centermass.r > 0.0 && centermass.g > 0.0 && centermass.b > 0.0) {
     let centermassPosition = centermass.rg / centermass.b;
     let distVector = pp - centermassPosition;
@@ -61,7 +61,7 @@ fn calculateAdditionalVelocity(ij: vec2<f32>, pp: vec2<f32>) -> vec2<f32> {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
-  let pointPosition = textureSample(positionsTexture, positionsSampler, input.textureCoords);
+  let pointPosition = textureSampleLevel(positionsTexture, positionsTextureSampler, input.textureCoords, 0.0);
   let x = pointPosition.x;
   let y = pointPosition.y;
 
