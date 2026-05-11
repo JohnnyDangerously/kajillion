@@ -1,3 +1,4 @@
+/// <reference types="@webgpu/types" />
 declare module '*.frag';
 declare module '*.vert';
 declare module '*.wgsl';

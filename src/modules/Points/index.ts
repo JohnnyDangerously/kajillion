@@ -1330,11 +1330,13 @@ export class Points extends CoreModule {
     if (this.imageAtlasTexture && !this.imageAtlasTexture.destroyed) {
       this.imageAtlasTexture.destroy()
     }
+    // Note: luma.gl 9.2 `TextureProps` doesn't expose a `mipmaps` flag; the mip chain
+    // is generated via raw gl.generateMipmap below. The sampler block sets the filter
+    // mode so the generated mips are actually used by the fragment shader.
     this.imageAtlasTexture = device.createTexture({
       width: atlasSize,
       height: atlasSize,
       format: 'rgba8unorm',
-      mipmaps: true,
       sampler: {
         minFilter: 'linear',
         magFilter: 'linear',
