@@ -135,8 +135,11 @@ void main() {
   gl_Position = vec4(finalPosition.rg, 0, 1);
 
   // Frustum cull: skip points whose sprite is entirely offscreen.
-  // maxPointSize is in "logical" (CSS) pixels; converting to NDC half-span
-  // gives us a conservative margin that covers any sprite at its maximum size.
+  // Sprite half-extent in NDC = (gl_PointSize_device) / (canvas_device_width).
+  // gl_PointSize is at most maxPointSize*ratio device pixels; canvas width is
+  // screenSize*ratio device pixels, so the ratios cancel and the NDC half-span
+  // simplifies to maxPointSize / screenSize. We use 2x that as a conservative
+  // margin (the *2 covers worst-case outlined-ring scaling).
   vec2 cullMargin = 2.0 * vec2(maxPointSize) / screenSize;
   if (abs(gl_Position.x) > 1.0 + cullMargin.x || abs(gl_Position.y) > 1.0 + cullMargin.y) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
@@ -151,19 +154,19 @@ void main() {
   // Use the larger of the two sizes for the overall point size
   float overallSizeValue = max(shapeSizeValue, imageSizeValue);
 
+  // Sub-pixel cull BEFORE outline scaling so outlined and non-outlined points
+  // share the same cull threshold (prevents popping when hover changes outline).
+  if (pointMinPixelSize > 0.0 && overallSizeValue < pointMinPixelSize) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    gl_PointSize = 0.0;
+    return;
+  }
+
   // Scale up point sprite to fit outline ring; clamp to hardware gl_PointSize limit so the
   // sprite never gets silently clipped — the point body is unaffected, only the ring narrows.
   if (isOutlined > 0.0) {
     overallSizeValue *= outlineRingScale;
     overallSizeValue = min(overallSizeValue, maxPointSize * ratio);
-  }
-
-  // Hard-skip rendering when the final sprite size is below the configured threshold.
-  // Saves fragment shader work for sub-pixel sprites at far zoom levels.
-  if (pointMinPixelSize > 0.0 && overallSizeValue < pointMinPixelSize) {
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-    gl_PointSize = 0.0;
-    return;
   }
 
   gl_PointSize = overallSizeValue;

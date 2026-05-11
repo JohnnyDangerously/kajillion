@@ -78,7 +78,7 @@ uniform float greyoutOpacity;
 uniform float curvedWeight;
 uniform float curvedLinkControlPointDistance;
 uniform float curvedLinkSegments;
-uniform bool scaleLinksOnZoom;
+uniform float scaleLinksOnZoom;
 uniform float maxPointSize;
 // renderMode: 0.0 = normal rendering, 1.0 = index buffer rendering for picking
 uniform float renderMode;
@@ -149,6 +149,8 @@ void main() {
 
   // Frustum cull: if both endpoints sit off the same screen edge, the link cannot
   // intersect the viewport even with curvature. Save the fragment work.
+  // Margin is scaled by curvedLinkControlPointDistance × link-length-in-NDC so a
+  // bulging curve whose endpoints sit just off the edge isn't falsely culled.
   vec2 aNorm = (2.0 * a / spaceSize - 1.0) * (spaceSize / screenSize);
   vec2 bNorm = (2.0 * b / spaceSize - 1.0) * (spaceSize / screenSize);
   #ifdef USE_UNIFORM_BUFFERS
@@ -159,7 +161,12 @@ void main() {
   vec2 aNDC = (transformationMatrix * vec3(aNorm, 1.0)).xy;
   vec2 bNDC = (transformationMatrix * vec3(bNorm, 1.0)).xy;
   #endif
-  const float linkCullMargin = 0.15;
+  // Baseline margin covers line width + small float-precision slack.
+  // Curvature bulge: link can deviate up to |curvedLinkControlPointDistance| × linkLengthNDC
+  // perpendicular to the endpoint segment. Expand the margin by that worst case.
+  float linkLenNDC = length(bNDC - aNDC);
+  float curveBulge = abs(curvedLinkControlPointDistance) * linkLenNDC;
+  float linkCullMargin = 0.15 + curveBulge;
   if ((aNDC.x < -1.0 - linkCullMargin && bNDC.x < -1.0 - linkCullMargin) ||
       (aNDC.x > 1.0 + linkCullMargin && bNDC.x > 1.0 + linkCullMargin) ||
       (aNDC.y < -1.0 - linkCullMargin && bNDC.y < -1.0 - linkCullMargin) ||
