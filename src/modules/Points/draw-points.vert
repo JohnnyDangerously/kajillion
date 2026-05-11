@@ -32,6 +32,7 @@ layout(std140) uniform drawVertexUniforms {
   float hasImages;
   float imageCount;
   float imageAtlasCoordsTextureSize;
+  float pointMinPixelSize;
 } drawVertex;
 
 #define ratio drawVertex.ratio
@@ -50,6 +51,7 @@ layout(std140) uniform drawVertexUniforms {
 #define hasImages drawVertex.hasImages
 #define imageCount drawVertex.imageCount
 #define imageAtlasCoordsTextureSize drawVertex.imageAtlasCoordsTextureSize
+#define pointMinPixelSize drawVertex.pointMinPixelSize
 #else
 uniform float ratio;
 uniform mat3 transformationMatrix;
@@ -67,6 +69,7 @@ uniform float skipGreyed;
 uniform float hasImages;
 uniform float imageCount;
 uniform float imageAtlasCoordsTextureSize;
+uniform float pointMinPixelSize;
 #endif
 
 out float pointShape;
@@ -153,6 +156,14 @@ void main() {
   if (isOutlined > 0.0) {
     overallSizeValue *= outlineRingScale;
     overallSizeValue = min(overallSizeValue, maxPointSize * ratio);
+  }
+
+  // Hard-skip rendering when the final sprite size is below the configured threshold.
+  // Saves fragment shader work for sub-pixel sprites at far zoom levels.
+  if (pointMinPixelSize > 0.0 && overallSizeValue < pointMinPixelSize) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    gl_PointSize = 0.0;
+    return;
   }
 
   gl_PointSize = overallSizeValue;

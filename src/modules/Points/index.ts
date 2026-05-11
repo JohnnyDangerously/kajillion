@@ -119,6 +119,7 @@ export class Points extends CoreModule {
       hasImages: number;
       imageCount: number;
       imageAtlasCoordsTextureSize: number;
+      pointMinPixelSize: number;
     };
     drawFragmentUniforms: {
       greyoutOpacity: number;
@@ -583,6 +584,7 @@ export class Points extends CoreModule {
           hasImages: 'f32',
           imageCount: 'f32',
           imageAtlasCoordsTextureSize: 'f32',
+          pointMinPixelSize: 'f32',
         },
         defaultUniforms: {
           // Order MUST match uniformTypes and shader declaration
@@ -610,6 +612,7 @@ export class Points extends CoreModule {
           hasImages: (this.imageCount > 0) ? 1 : 0, // Convert boolean to float
           imageCount: this.imageCount,
           imageAtlasCoordsTextureSize: this.imageAtlasCoordsTextureSize ?? 0,
+          pointMinPixelSize: config.pointMinPixelSize,
         },
       },
       drawFragmentUniforms: {
@@ -1432,6 +1435,7 @@ export class Points extends CoreModule {
       hasImages: (this.imageCount > 0) ? 1 : 0, // Convert boolean to float
       imageCount: this.imageCount,
       imageAtlasCoordsTextureSize: this.imageAtlasCoordsTextureSize ?? 0,
+      pointMinPixelSize: config.pointMinPixelSize,
     }
 
     const baseFragmentUniforms = {

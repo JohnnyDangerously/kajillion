@@ -47,6 +47,8 @@ export const defaultConfigValues = {
   linkArrowsSizeScale: 1,
   linkVisibilityDistanceRange: [50, 150],
   linkVisibilityMinTransparency: 0.25,
+  linkMinPixelLength: 0.5,
+  pointMinPixelSize: 0.5,
 
   // Link interaction
   hoveredLinkCursor: 'auto',

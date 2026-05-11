@@ -278,6 +278,26 @@ export interface GraphConfigInterface {
    * Default value: `0.25`
    */
   linkVisibilityMinTransparency: number;
+  /**
+   * Hard-skip rendering of links whose on-screen length (in CSS pixels) falls below this threshold.
+   * Unlike `linkVisibilityDistanceRange` which fades opacity, this discards the link's draw entirely,
+   * saving fragment shader work. Useful at galaxy zoom where sub-pixel edges become invisible noise.
+   *
+   * Set to `0` to disable.
+   *
+   * Default value: `0.5`
+   */
+  linkMinPixelLength: number;
+  /**
+   * Hard-skip rendering of point sprites whose final on-screen size (in device pixels) falls below
+   * this threshold. Sub-pixel sprites get rasterized to at most one fragment and contribute mostly
+   * noise; skipping them reduces fragment cost at far zoom levels.
+   *
+   * Set to `0` to disable.
+   *
+   * Default value: `0.5`
+   */
+  pointMinPixelSize: number;
 
   /**
    * Decay coefficient. Lower = the simulation cools down faster after each interaction.

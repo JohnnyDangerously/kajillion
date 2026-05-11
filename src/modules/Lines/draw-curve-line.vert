@@ -37,6 +37,7 @@ layout(std140) uniform drawLineUniforms {
   float linkStatusTextureSize;
   float focusedLinkIndex;
   float focusedLinkWidthIncrease;
+  float linkMinPixelLength;
 } drawLine;
 
 #define transformationMatrix drawLine.transformationMatrix
@@ -62,6 +63,7 @@ layout(std140) uniform drawLineUniforms {
 #define linkStatusTextureSize drawLine.linkStatusTextureSize
 #define focusedLinkIndex drawLine.focusedLinkIndex
 #define focusedLinkWidthIncrease drawLine.focusedLinkWidthIncrease
+#define linkMinPixelLength drawLine.linkMinPixelLength
 #else
 uniform mat3 transformationMatrix;
 uniform float pointsTextureSize;
@@ -87,6 +89,7 @@ uniform float isLinkHighlightingActive;
 uniform float linkStatusTextureSize;
 uniform float focusedLinkIndex;
 uniform float focusedLinkWidthIncrease;
+uniform float linkMinPixelLength;
 #endif
 
 out vec4 rgbaColor;
@@ -176,7 +179,14 @@ void main() {
 
   // Convert link distance to screen pixels
   float linkDistPx = linkDist * transformationMatrix[0][0];
-  
+
+  // Hard-skip rendering when the link's screen length falls below the configured threshold.
+  // Sub-pixel links contribute mostly noise and waste fragment work at galaxy zoom.
+  if (linkMinPixelLength > 0.0 && linkDistPx < linkMinPixelLength) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    return;
+  }
+
   // Calculate line width using the width scale
   float linkWidth = width * widthScale;
   float k = 2.0;

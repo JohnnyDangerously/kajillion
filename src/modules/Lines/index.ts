@@ -192,6 +192,7 @@ export class Lines extends CoreModule {
           linkStatusTextureSize: 0,
           focusedLinkIndex: config.focusedLinkIndex ?? -1,
           focusedLinkWidthIncrease: config.focusedLinkWidthIncrease,
+          linkMinPixelLength: config.linkMinPixelLength,
         },
       },
       drawLineFragmentUniforms: {
@@ -398,6 +399,7 @@ export class Lines extends CoreModule {
         linkStatusTextureSize: this.linkStatusTextureSize,
         focusedLinkIndex: config.focusedLinkIndex ?? -1,
         focusedLinkWidthIncrease: config.focusedLinkWidthIncrease,
+        linkMinPixelLength: config.linkMinPixelLength,
       },
       drawLineFragmentUniforms: {
         renderMode: 0.0, // Normal rendering
@@ -902,6 +904,7 @@ export class Lines extends CoreModule {
         linkStatusTextureSize: this.linkStatusTextureSize,
         focusedLinkIndex: config.focusedLinkIndex ?? -1,
         focusedLinkWidthIncrease: config.focusedLinkWidthIncrease,
+        linkMinPixelLength: config.linkMinPixelLength,
       },
       drawLineFragmentUniforms: {
         renderMode: 1.0, // Index rendering for picking
