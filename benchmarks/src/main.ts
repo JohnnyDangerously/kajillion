@@ -16,6 +16,7 @@ interface BenchParams {
   pointMinPixelSize: number | undefined;
   linkMinPixelLength: number | undefined;
   useWebGPU: boolean;
+  nosim: boolean;
 }
 
 interface PassStats {
@@ -66,6 +67,7 @@ function readParams (): BenchParams {
     pointMinPixelSize: parseOptionalNum(p.get('pointMinPixelSize'), 'pointMinPixelSize'),
     linkMinPixelLength: parseOptionalNum(p.get('linkMinPixelLength'), 'linkMinPixelLength'),
     useWebGPU: p.get('useWebGPU') === '1' || p.get('useWebGPU') === 'true',
+    nosim: p.get('nosim') === '1' || p.get('nosim') === 'true',
   }
 }
 
@@ -233,7 +235,7 @@ async function runOnce (
     renderLinks: true,
     curvedLinks: false,
     fitViewOnInit: true,
-    enableSimulation: true,
+    enableSimulation: !params.nosim,
     simulationFriction: 0.85,
     simulationRepulsion: 0.5,
     simulationGravity: 0.1,
