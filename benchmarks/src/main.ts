@@ -159,12 +159,15 @@ function renderResults (
   container: HTMLElement,
   params: BenchParams,
   data: GeneratedGraph,
-  rawSnapshots: GpuTimingSnapshot[]
+  rawSnapshots: GpuTimingSnapshot[],
+  wallFpsList: number[]
 ): void {
   const entries = Object.entries(agg).sort((a, b) => b[1].median - a[1].median)
   const totalMedian = entries.reduce((s, [, t]) => s + t.median, 0)
   const fps = deriveFps(rawSnapshots, params.measureMs)
   const msPerFrame = fps > 0 ? 1000 / fps : 0
+  const wallFps = median(wallFpsList)
+  const wallMsPerFrame = wallFps > 0 ? 1000 / wallFps : 0
   const rows = entries.map(([label, t]) => `
     <tr>
       <td>${label}</td>
@@ -180,9 +183,10 @@ function renderResults (
   const rawJson = JSON.stringify({
     params,
     dataset: { nodeCount: data.nodeCount, edgeCount: data.edgeCount },
-    derived: { renderFps: fps, msPerRenderFrame: msPerFrame },
+    derived: { renderFps: fps, msPerRenderFrame: msPerFrame, wallFps, wallMsPerFrame },
     aggregate: agg,
     runs: rawSnapshots,
+    wallFps: wallFpsList,
   }, null, 2)
   const fallbackRow = '<tr><td colspan="5"><em>No samples — extension unsupported on this browser?</em></td></tr>'
 
@@ -190,7 +194,8 @@ function renderResults (
     <h2>Baseline result</h2>
     <p><strong>Dataset:</strong> ${datasetLine}</p>
     <p><strong>Window:</strong> ${params.repeat} run(s) of ${params.measureMs} ms measurement after ${params.warmupMs} ms warmup</p>
-    <p><strong>Render FPS (median across runs):</strong> ${fps.toFixed(1)} fps &middot; ${formatMs(msPerFrame)} per render frame</p>
+    <p><strong>Render FPS (GPU timer, median):</strong> ${fps.toFixed(1)} fps &middot; ${formatMs(msPerFrame)} per render frame</p>
+    <p><strong>Wall-clock FPS (rAF count, median):</strong> ${wallFps.toFixed(1)} fps &middot; ${formatMs(wallMsPerFrame)} per frame</p>
     <p><strong>Sum of per-pass medians:</strong> ${formatMs(totalMedian)}
       <em>(reference only — passes don't all run every frame)</em></p>
     <table>
@@ -216,7 +221,7 @@ async function runOnce (
   params: BenchParams,
   status: HTMLElement,
   runIdx: number
-): Promise<GpuTimingSnapshot> {
+): Promise<{ snapshot: GpuTimingSnapshot; wallFps: number }> {
   const config: GraphConfig = {
     spaceSize: 4096,
     backgroundColor: '#0f1115',
@@ -267,10 +272,26 @@ async function runOnce (
     await delay(params.warmupMs)
     graph.resetGpuTimings()
     status.textContent = `Measuring${tag} (${params.measureMs} ms)…`
+
+    // Wall-clock FPS: count rAF callbacks across the measurement window.
+    // Required for the WebGPU path since EXT_disjoint_timer_query is WebGL2-only.
+    let rafCount = 0
+    let rafActive = true
+    const tickRaf = (): void => {
+      if (!rafActive) return
+      rafCount += 1
+      requestAnimationFrame(tickRaf)
+    }
+    const wallStart = performance.now()
+    requestAnimationFrame(tickRaf)
     await delay(params.measureMs)
+    rafActive = false
+    const wallElapsedMs = performance.now() - wallStart
+    const wallFps = wallElapsedMs > 0 ? (rafCount * 1000) / wallElapsedMs : 0
+
     const snapshot = graph.getGpuTimings() ?? {}
     graph.destroy()
-    return snapshot
+    return { snapshot, wallFps }
   } catch (err) {
     console.error(`[bench] failed at stage='${stage}':`, err)
     if (err instanceof Error) {
@@ -300,14 +321,16 @@ async function run (): Promise<void> {
   status.textContent = `Generated ${nodes} nodes / ${edges} edges in ${tGen.toFixed(0)} ms. Initializing engine…`
 
   const snapshots: GpuTimingSnapshot[] = []
+  const wallFpsList: number[] = []
   for (let i = 0; i < params.repeat; i += 1) {
-    const snap = await runOnce(data, graphDiv, params, status, i)
-    snapshots.push(snap)
+    const { snapshot, wallFps } = await runOnce(data, graphDiv, params, status, i)
+    snapshots.push(snapshot)
+    wallFpsList.push(wallFps)
   }
 
   const agg = aggregate(snapshots)
   status.textContent = 'Done.'
-  renderResults(agg, resultsDiv, params, data, snapshots)
+  renderResults(agg, resultsDiv, params, data, snapshots, wallFpsList)
   console.log('[kajillion-bench] aggregate', agg)
   await postResults({
     timestamp: new Date().toISOString(),
@@ -318,6 +341,7 @@ async function run (): Promise<void> {
     dataset: { nodeCount: data.nodeCount, edgeCount: data.edgeCount },
     aggregate: agg,
     runs: snapshots,
+    wallFps: wallFpsList,
   })
 }
 
