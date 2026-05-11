@@ -91,6 +91,17 @@ function aggregate (snapshots: GpuTimingSnapshot[]): AggregateSnapshot {
   return out
 }
 
+function deriveFps (rawSnapshots: GpuTimingSnapshot[], measureMs: number): number {
+  // Render passes run every render frame; force passes run only when sim is active.
+  // FPS = render-pass sample count / measure window in seconds.
+  const renderCounts = rawSnapshots.map(s => {
+    const candidates = ['render.points', 'render.lines'].map(k => s[k]?.sampleCount ?? 0)
+    return Math.max(...candidates, 0)
+  })
+  const medianCount = median(renderCounts)
+  return medianCount * 1000 / measureMs
+}
+
 function renderResults (
   agg: AggregateSnapshot,
   container: HTMLElement,
@@ -100,6 +111,8 @@ function renderResults (
 ): void {
   const entries = Object.entries(agg).sort((a, b) => b[1].median - a[1].median)
   const totalMedian = entries.reduce((s, [, t]) => s + t.median, 0)
+  const fps = deriveFps(rawSnapshots, params.measureMs)
+  const msPerFrame = fps > 0 ? 1000 / fps : 0
   const rows = entries.map(([label, t]) => `
     <tr>
       <td>${label}</td>
@@ -115,6 +128,7 @@ function renderResults (
   const rawJson = JSON.stringify({
     params,
     dataset: { nodeCount: data.nodeCount, edgeCount: data.edgeCount },
+    derived: { renderFps: fps, msPerRenderFrame: msPerFrame },
     aggregate: agg,
     runs: rawSnapshots,
   }, null, 2)
@@ -124,7 +138,9 @@ function renderResults (
     <h2>Baseline result</h2>
     <p><strong>Dataset:</strong> ${datasetLine}</p>
     <p><strong>Window:</strong> ${params.repeat} run(s) of ${params.measureMs} ms measurement after ${params.warmupMs} ms warmup</p>
-    <p><strong>Total instrumented GPU time per frame (median across runs):</strong> ${formatMs(totalMedian)}</p>
+    <p><strong>Render FPS (median across runs):</strong> ${fps.toFixed(1)} fps &middot; ${formatMs(msPerFrame)} per render frame</p>
+    <p><strong>Sum of per-pass medians:</strong> ${formatMs(totalMedian)}
+      <em>(reference only — passes don't all run every frame)</em></p>
     <table>
       <thead>
         <tr><th>Pass</th><th>Median (ms)</th><th>Min (ms)</th><th>Max (ms)</th><th>Runs</th></tr>
