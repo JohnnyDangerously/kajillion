@@ -17,6 +17,7 @@ import findHoveredPointVert from '@/graph/modules/Points/find-hovered-point.vert
 import fillGridWithSampledPointsFrag from '@/graph/modules/Points/fill-sampled-points.frag?raw'
 import fillGridWithSampledPointsVert from '@/graph/modules/Points/fill-sampled-points.vert?raw'
 import updatePositionFrag from '@/graph/modules/Points/update-position.frag?raw'
+import updatePositionWgsl from '@/graph/modules/Points/update-position.wgsl?raw'
 import { createIndexesForBuffer } from '@/graph/modules/Shared/buffer'
 import { getBytesPerRow } from '@/graph/modules/Shared/texture-utils'
 import trackPositionsFrag from '@/graph/modules/Points/track-positions.frag?raw'
@@ -500,6 +501,8 @@ export class Points extends CoreModule {
       })
 
       this.updatePositionCommand ||= new Model(device, {
+        // Dual-backend: source (WGSL) used on WebGPU device, vs/fs (GLSL) on WebGL2.
+        source: updatePositionWgsl,
         fs: updatePositionFrag,
         vs: updateVert,
         topology: 'triangle-strip',
