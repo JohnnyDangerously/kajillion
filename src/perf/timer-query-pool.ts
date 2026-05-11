@@ -38,6 +38,8 @@ export class TimerQueryPool {
   private inFlight: InFlightQuery[] = []
   private stats = new Map<string, PassStats>()
   private frameCounter = 0
+  private skippedReentries = 0
+  private disjointEvents = 0
 
   public constructor (device: Device) {
     if (device.info.type !== 'webgl') return
@@ -62,7 +64,16 @@ export class TimerQueryPool {
 
   public begin (label: string): void {
     if (!this.hasTimerQuery || !this.gl) return
-    if (this.currentQuery) return
+    if (this.currentQuery) {
+      // Re-entry: a prior begin() didn't get its matching end() (early-return,
+      // throw outside wrap(), branch bug). Close + drop the stale query so the
+      // new label's data isn't silently attributed to the previous label.
+      this.gl.endQuery(TIME_ELAPSED_EXT)
+      this.gl.deleteQuery(this.currentQuery)
+      this.skippedReentries += 1
+      this.currentQuery = null
+      this.currentLabel = null
+    }
     const query = this.gl.createQuery()
     if (!query) return
     this.gl.beginQuery(TIME_ELAPSED_EXT, query)
@@ -119,9 +130,15 @@ export class TimerQueryPool {
   }
 
   public destroy (): void {
-    if (this.gl && this.currentQuery) {
-      this.gl.endQuery(TIME_ELAPSED_EXT)
-      this.gl.deleteQuery(this.currentQuery)
+    // Guard against context-lost state and silently swallow any spec-edge errors
+    // — destroy() is a cleanup path; throwing here would break Graph.destroy().
+    if (this.gl && this.currentQuery && !this.gl.isContextLost()) {
+      try {
+        this.gl.endQuery(TIME_ELAPSED_EXT)
+        this.gl.deleteQuery(this.currentQuery)
+      } catch {
+        // ignore — context may have transitioned mid-tick
+      }
     }
     this.reset()
     this.currentQuery = null
@@ -133,6 +150,16 @@ export class TimerQueryPool {
   private drainReady (): void {
     if (!this.gl || this.inFlight.length === 0) return
     const disjoint = Boolean(this.gl.getParameter(GPU_DISJOINT_EXT))
+    if (disjoint) {
+      // Spec: when GPU_DISJOINT_EXT is true, ALL outstanding queries on the
+      // context are invalid — not just the ready ones. Drop the entire queue
+      // so future drains don't record contaminated samples from queries that
+      // happened to still be pending across the disjoint event.
+      for (const q of this.inFlight) this.gl.deleteQuery(q.query)
+      this.inFlight = []
+      this.disjointEvents += 1
+      return
+    }
     const remaining: InFlightQuery[] = []
     for (const q of this.inFlight) {
       const available = Boolean(this.gl.getQueryParameter(q.query, QUERY_RESULT_AVAILABLE))
@@ -140,10 +167,8 @@ export class TimerQueryPool {
         remaining.push(q)
         continue
       }
-      if (!disjoint) {
-        const ns = this.gl.getQueryParameter(q.query, QUERY_RESULT) as number
-        this.recordSample(q.label, ns)
-      }
+      const ns = this.gl.getQueryParameter(q.query, QUERY_RESULT) as number
+      this.recordSample(q.label, ns)
       this.gl.deleteQuery(q.query)
     }
     this.inFlight = remaining
