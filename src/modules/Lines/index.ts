@@ -212,8 +212,8 @@ export class Lines extends CoreModule {
     })
 
     this.drawCurveCommand ||= new Model(device, {
-      vs: drawLineVert,
       source: drawLineWgsl,
+      vs: drawLineVert,
       fs: drawLineFrag,
       modules: [conicParametricCurveModule],
       topology: 'triangle-strip',

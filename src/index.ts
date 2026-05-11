@@ -1569,18 +1569,42 @@ export class Graph {
   private async createDevice (
     canvas: HTMLCanvasElement
   ): Promise<Device> {
-    const useWebGPU = this.config.useWebGPU === true
-    return await luma.createDevice({
-      type: useWebGPU ? 'webgpu' : 'webgl',
-      adapters: useWebGPU ? [webgpuAdapter] : [webgl2Adapter],
-      createCanvasContext: {
-        canvas, // Provide existing canvas
-        useDevicePixels: this.config.pixelRatio, // Use config pixelRatio value
-        autoResize: true,
-        width: undefined,
-        height: undefined,
-      },
-    })
+    // Truthy check (not `=== true`) so consumers parsing config from URL query strings
+    // (where the value is the string 'true') get the expected behavior. Warn on values
+    // that look intentional but aren't booleans so misconfig is visible.
+    const useWebGPURaw = this.config.useWebGPU as unknown
+    const useWebGPU = useWebGPURaw === true || useWebGPURaw === 'true' || useWebGPURaw === 1
+    if (useWebGPURaw !== undefined && useWebGPURaw !== false && useWebGPURaw !== true) {
+      console.warn(
+        `[kajillion] config.useWebGPU should be a boolean; got ${typeof useWebGPURaw}: ${String(useWebGPURaw)}.` +
+        ` Interpreted as ${useWebGPU}.`
+      )
+    }
+    try {
+      return await luma.createDevice({
+        type: useWebGPU ? 'webgpu' : 'webgl',
+        adapters: useWebGPU ? [webgpuAdapter] : [webgl2Adapter],
+        createCanvasContext: {
+          canvas,
+          useDevicePixels: this.config.pixelRatio,
+          autoResize: true,
+          width: undefined,
+          height: undefined,
+        },
+      })
+    } catch (e) {
+      if (useWebGPU) {
+        // Improve the error so users know why a working WebGL2 setup just stopped
+        // working after they flipped the flag.
+        throw new Error(
+          'kajillion: WebGPU device requested via config.useWebGPU but creation failed. ' +
+          'Browser may not support WebGPU (Firefox: enable dom.webgpu.enabled; Safari: ' +
+          'requires 26+ on iOS). Set useWebGPU: false to use the WebGL2 path.',
+          { cause: e }
+        )
+      }
+      throw e
+    }
   }
 
   /**

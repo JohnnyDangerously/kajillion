@@ -115,7 +115,9 @@ export function getMaxPointSize (device: Device, pixelRatio: number): number {
     return (range?.[1] ?? MAX_POINT_SIZE) / pixelRatio
   }
   case 'webgpu':
-    // Will be implemented when WebGPU support is added
+    // WebGPU has no built-in gl_PointSize equivalent — points are always rasterized
+    // at size 1 and larger sprites need instanced-quad emulation. Returning the same
+    // artistic cap as WebGL2 keeps cull-margin math consistent across backends.
     return MAX_POINT_SIZE / pixelRatio
   default:
     return MAX_POINT_SIZE / pixelRatio

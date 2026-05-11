@@ -58,10 +58,15 @@ export function generateBA (nodeCount: number, m = 3, seed = 42): GeneratedGraph
     }
   }
 
+  // Initial positions in [0, 1]^2 scaled to cosmos's default spaceSize (4096).
+  // The previous [-0.5, 0.5] range fell outside cosmos's [0, spaceSize] world,
+  // so the force simulation spent the warmup window expanding the cloud
+  // outward instead of settling — measurements drifted run-to-run.
+  const halfSpace = 4096 / 2
   const positions = new Float32Array(nodeCount * 2)
   for (let i = 0; i < nodeCount; i += 1) {
-    positions[i * 2] = rng() - 0.5
-    positions[i * 2 + 1] = rng() - 0.5
+    positions[i * 2] = halfSpace + (rng() - 0.5) * halfSpace
+    positions[i * 2 + 1] = halfSpace + (rng() - 0.5) * halfSpace
   }
 
   return {

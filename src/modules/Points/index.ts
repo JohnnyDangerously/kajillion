@@ -1355,6 +1355,10 @@ export class Points extends CoreModule {
     })
     // Generate mip chain so deep-zoom (small sprite) sampling uses lower-LOD instead of
     // aliasing the base texture. Avoids the "fuzzy avatar" effect at far zoom.
+    // We set MIN_FILTER explicitly here as well: luma.gl's `sampler` prop on createTexture
+    // doesn't reliably propagate to the underlying GL texture parameters on every code
+    // path in 9.2, so the raw texParameteri is the load-bearing call that guarantees
+    // the mip chain is actually used at draw time.
     {
       const webglDevice = device as WebGLDevice
       const rawGl = webglDevice.gl as WebGL2RenderingContext | null
@@ -1362,6 +1366,8 @@ export class Points extends CoreModule {
       if (rawGl && handle) {
         rawGl.bindTexture(rawGl.TEXTURE_2D, handle)
         rawGl.generateMipmap(rawGl.TEXTURE_2D)
+        rawGl.texParameteri(rawGl.TEXTURE_2D, rawGl.TEXTURE_MIN_FILTER, rawGl.LINEAR_MIPMAP_LINEAR)
+        rawGl.texParameteri(rawGl.TEXTURE_2D, rawGl.TEXTURE_MAG_FILTER, rawGl.LINEAR)
         rawGl.bindTexture(rawGl.TEXTURE_2D, null)
       }
     }
