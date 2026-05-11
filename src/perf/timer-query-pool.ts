@@ -1,10 +1,14 @@
 import { Device } from '@luma.gl/core'
 import { WebGLDevice } from '@luma.gl/webgl'
 
-const TIME_ELAPSED_EXT = 0x88BF
-const GPU_DISJOINT_EXT = 0x8FBB
-const QUERY_RESULT_AVAILABLE = 0x8867
-const QUERY_RESULT = 0x8866
+// EXT_disjoint_timer_query_webgl2 enums. Pulled from the extension object at runtime
+// to avoid relying on raw hex literals, with these as the documented fallback values
+// from the registry. (Some browser polyfills don't expose the named constants on the
+// returned object, so we keep both paths.)
+const TIME_ELAPSED_EXT_FALLBACK = 0x88BF
+const GPU_DISJOINT_EXT_FALLBACK = 0x8FBB
+const QUERY_RESULT_AVAILABLE_FALLBACK = 0x8867
+const QUERY_RESULT_FALLBACK = 0x8866
 
 const ROLLING_WINDOW = 60
 
@@ -33,6 +37,10 @@ export type GpuTimingSnapshot = Record<string, GpuPassTiming>
 export class TimerQueryPool {
   private gl: WebGL2RenderingContext | null = null
   private hasTimerQuery = false
+  private timeElapsedEnum = TIME_ELAPSED_EXT_FALLBACK
+  private gpuDisjointEnum = GPU_DISJOINT_EXT_FALLBACK
+  private queryResultAvailableEnum = QUERY_RESULT_AVAILABLE_FALLBACK
+  private queryResultEnum = QUERY_RESULT_FALLBACK
   private currentQuery: WebGLQuery | null = null
   private currentLabel: string | null = null
   private inFlight: InFlightQuery[] = []
@@ -42,12 +50,27 @@ export class TimerQueryPool {
   private disjointEvents = 0
 
   public constructor (device: Device) {
-    if (device.info.type !== 'webgl') return
+    if (device.info.type !== 'webgl') {
+      console.warn('[kajillion] GPU timing requires a WebGL2 device; got', device.info.type)
+      return
+    }
     const webglDevice = device as WebGLDevice
     const rawGl = webglDevice.gl as WebGL2RenderingContext | null
     if (!rawGl) return
-    const ext = rawGl.getExtension('EXT_disjoint_timer_query_webgl2')
-    if (!ext) return
+    const ext = rawGl.getExtension('EXT_disjoint_timer_query_webgl2') as Record<string, number> | null
+    if (!ext) {
+      console.warn(
+        '[kajillion] EXT_disjoint_timer_query_webgl2 unavailable in this browser; ' +
+        'GPU timings disabled. Firefox: enable webgl.enable-privileged-extensions in about:config.'
+      )
+      return
+    }
+    // Capture the canonical extension enums when the polyfill exposes them; fall
+    // back to the registry hex values otherwise.
+    this.timeElapsedEnum = ext.TIME_ELAPSED_EXT ?? TIME_ELAPSED_EXT_FALLBACK
+    this.gpuDisjointEnum = ext.GPU_DISJOINT_EXT ?? GPU_DISJOINT_EXT_FALLBACK
+    this.queryResultAvailableEnum = ext.QUERY_RESULT_AVAILABLE ?? QUERY_RESULT_AVAILABLE_FALLBACK
+    this.queryResultEnum = ext.QUERY_RESULT ?? QUERY_RESULT_FALLBACK
     this.gl = rawGl
     this.hasTimerQuery = true
   }
@@ -68,7 +91,7 @@ export class TimerQueryPool {
       // Re-entry: a prior begin() didn't get its matching end() (early-return,
       // throw outside wrap(), branch bug). Close + drop the stale query so the
       // new label's data isn't silently attributed to the previous label.
-      this.gl.endQuery(TIME_ELAPSED_EXT)
+      this.gl.endQuery(this.timeElapsedEnum)
       this.gl.deleteQuery(this.currentQuery)
       this.skippedReentries += 1
       this.currentQuery = null
@@ -76,14 +99,14 @@ export class TimerQueryPool {
     }
     const query = this.gl.createQuery()
     if (!query) return
-    this.gl.beginQuery(TIME_ELAPSED_EXT, query)
+    this.gl.beginQuery(this.timeElapsedEnum, query)
     this.currentQuery = query
     this.currentLabel = label
   }
 
   public end (): void {
     if (!this.hasTimerQuery || !this.gl || !this.currentQuery || !this.currentLabel) return
-    this.gl.endQuery(TIME_ELAPSED_EXT)
+    this.gl.endQuery(this.timeElapsedEnum)
     this.inFlight.push({
       label: this.currentLabel,
       query: this.currentQuery,
@@ -134,7 +157,7 @@ export class TimerQueryPool {
     // — destroy() is a cleanup path; throwing here would break Graph.destroy().
     if (this.gl && this.currentQuery && !this.gl.isContextLost()) {
       try {
-        this.gl.endQuery(TIME_ELAPSED_EXT)
+        this.gl.endQuery(this.timeElapsedEnum)
         this.gl.deleteQuery(this.currentQuery)
       } catch {
         // ignore — context may have transitioned mid-tick
@@ -149,7 +172,7 @@ export class TimerQueryPool {
 
   private drainReady (): void {
     if (!this.gl || this.inFlight.length === 0) return
-    const disjoint = Boolean(this.gl.getParameter(GPU_DISJOINT_EXT))
+    const disjoint = Boolean(this.gl.getParameter(this.gpuDisjointEnum))
     if (disjoint) {
       // Spec: when GPU_DISJOINT_EXT is true, ALL outstanding queries on the
       // context are invalid — not just the ready ones. Drop the entire queue
@@ -162,12 +185,12 @@ export class TimerQueryPool {
     }
     const remaining: InFlightQuery[] = []
     for (const q of this.inFlight) {
-      const available = Boolean(this.gl.getQueryParameter(q.query, QUERY_RESULT_AVAILABLE))
+      const available = Boolean(this.gl.getQueryParameter(q.query, this.queryResultAvailableEnum))
       if (!available) {
         remaining.push(q)
         continue
       }
-      const ns = this.gl.getQueryParameter(q.query, QUERY_RESULT) as number
+      const ns = this.gl.getQueryParameter(q.query, this.queryResultEnum) as number
       this.recordSample(q.label, ns)
       this.gl.deleteQuery(q.query)
     }

@@ -58,7 +58,10 @@ fn pointInPolygon(point: vec2f, pathLength: i32) -> bool {
       break;
     }
 
-    let j = i32(((f32(i) + 1.0) % f32(pathLength)));
+    // (i + 1) % pathLength on i32 — well-defined for non-negative ints,
+    // and safe under any future refactor that might introduce negatives
+    // (unlike float `%` which is IEEE remainder, not floor mod).
+    let j = (i + 1) % pathLength;
 
     let pi = getPolygonPoint(i, pathLength);
     let pj = getPolygonPoint(j, pathLength);
