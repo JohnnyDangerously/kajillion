@@ -337,6 +337,19 @@ export class Graph {
   }
 
   /**
+   * Clears all in-flight GPU timer queries and the rolling sample window.
+   * Call this just before starting a measurement period (e.g. after a warmup
+   * window has elapsed) so that subsequent `getGpuTimings()` calls reflect
+   * only the work done since the reset.
+   *
+   * No-op when `enableGpuTimings` is false or the extension is unsupported.
+   */
+  public resetGpuTimings (): void {
+    if (this._isDestroyed || !this.timerQueryPool) return
+    this.timerQueryPool.reset()
+  }
+
+  /**
    * Apply a new configuration. Changes take effect immediately.
    *
    * **Important:** Every call fully resets the configuration to defaults first,

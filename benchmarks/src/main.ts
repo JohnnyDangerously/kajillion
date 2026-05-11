@@ -172,6 +172,7 @@ async function runOnce (
   const tag = params.repeat > 1 ? ` [run ${runIdx + 1}/${params.repeat}]` : ''
   status.textContent = `Engine ready${tag}. Warmup (${params.warmupMs} ms)…`
   await delay(params.warmupMs)
+  graph.resetGpuTimings()
   status.textContent = `Measuring${tag} (${params.measureMs} ms)…`
   await delay(params.measureMs)
   const snapshot = graph.getGpuTimings() ?? {}
