@@ -578,6 +578,14 @@ export interface GraphConfigInterface {
    */
   showFPSMonitor: boolean;
   /**
+   * Enable per-pass GPU timing collection via `EXT_disjoint_timer_query_webgl2`.
+   * When enabled, `graph.getGpuTimings()` returns a snapshot of average and last-sample
+   * GPU time (ms) for each instrumented pass. Has near-zero overhead when the extension
+   * is unavailable (Firefox in many configurations) or when no passes are wrapped.
+   * Default value: `false`
+   */
+  enableGpuTimings: boolean;
+  /**
    * Pixel ratio for the canvas. Higher values use more GPU memory but provide better quality on high-DPI displays.
    * Default value: `window.devicePixelRatio || 2`
    */

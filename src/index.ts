@@ -21,6 +21,7 @@ import { Points } from '@/graph/modules/Points'
 import { Store, ALPHA_MIN, MAX_HOVER_DETECTION_DELAY, MIN_MOUSE_MOVEMENT_THRESHOLD, type Hovered } from '@/graph/modules/Store'
 import { Zoom } from '@/graph/modules/Zoom'
 import { Drag } from '@/graph/modules/Drag'
+import { TimerQueryPool, type GpuTimingSnapshot } from '@/graph/perf'
 
 export class Graph {
   /** Current graph configuration. Always fully populated with default values for any unset properties. */
@@ -59,6 +60,7 @@ export class Graph {
   private dragInstance = new Drag(this.store, this.config)
 
   private fpsMonitor: FPSMonitor | undefined
+  private timerQueryPool: TimerQueryPool | undefined
 
   private currentEvent: D3ZoomEvent<HTMLCanvasElement, undefined> | D3DragEvent<HTMLCanvasElement, undefined, Hovered> | MouseEvent | undefined
   /**
@@ -277,6 +279,7 @@ export class Graph {
       this.store.updateLinkHoveringEnabled(this.config)
 
       if (this.config.showFPSMonitor) this.fpsMonitor = new FPSMonitor(this.canvas)
+      if (this.config.enableGpuTimings) this.timerQueryPool = new TimerQueryPool(device)
 
       if (this.config.randomSeed !== undefined) this.store.addRandomSeed(this.config.randomSeed)
 
@@ -315,6 +318,22 @@ export class Graph {
   public get maxPointSize (): number {
     if (this._isDestroyed) return 0
     return this.store.maxPointSize
+  }
+
+  /**
+   * Returns a snapshot of per-pass GPU timings (in milliseconds) for the most recent frames.
+   * Requires `enableGpuTimings: true` in config and `EXT_disjoint_timer_query_webgl2` support
+   * on the underlying WebGL2 context (widely available in Chromium-based browsers and Safari;
+   * disabled by default in Firefox on many systems).
+   *
+   * Returns `null` if timings are disabled or unsupported.
+   *
+   * @returns Map of pass label to `{ avgMs, lastMs, sampleCount }`, or `null`.
+   */
+  public getGpuTimings (): GpuTimingSnapshot | null {
+    if (this._isDestroyed || !this.timerQueryPool) return null
+    if (!this.timerQueryPool.isSupported()) return null
+    return this.timerQueryPool.getSnapshot()
   }
 
   /**
@@ -1249,6 +1268,7 @@ export class Graph {
     }
 
     this.fpsMonitor?.destroy()
+    this.timerQueryPool?.destroy()
 
     // Destroy all module resources before destroying the device
     this.points?.destroy()
@@ -1459,6 +1479,14 @@ export class Graph {
       } else {
         this.fpsMonitor?.destroy()
         this.fpsMonitor = undefined
+      }
+    }
+    if (prevConfig.enableGpuTimings !== this.config.enableGpuTimings) {
+      if (this.config.enableGpuTimings && this.device) {
+        this.timerQueryPool = new TimerQueryPool(this.device)
+      } else {
+        this.timerQueryPool?.destroy()
+        this.timerQueryPool = undefined
       }
     }
     if (prevConfig.enableZoom !== this.config.enableZoom || prevConfig.enableDrag !== this.config.enableDrag) {
@@ -1675,6 +1703,7 @@ export class Graph {
     if (!this.store.pointsTextureSize) return
 
     this.fpsMonitor?.begin()
+    this.timerQueryPool?.tick()
     this.resizeCanvas()
     if (!this.dragInstance.isActive) {
       this.findHoveredItem()
@@ -2025,6 +2054,7 @@ export class Graph {
 }
 
 export type { GraphConfig } from './config'
+export type { GpuPassTiming, GpuTimingSnapshot } from './perf'
 export { PointShape } from './modules/GraphData'
 
 export * from './variables'

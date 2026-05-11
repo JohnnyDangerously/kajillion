@@ -104,6 +104,7 @@ export const defaultConfigValues = {
 
   // Display
   showFPSMonitor: false,
+  enableGpuTimings: false,
   pixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 2 : 2,
 
   // Zoom and pan
