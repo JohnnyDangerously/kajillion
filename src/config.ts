@@ -320,8 +320,8 @@ export interface GraphConfigInterface {
    * Decay coefficient. Lower = the simulation cools down faster after each interaction.
    *
    * Settle time is wall-clock based: at the default 60 Hz reference frame rate, alpha decays
-   * from 1 to `alphaStopThreshold` in approximately `decay × ln(stopThreshold) / -3` ticks
-   * (≈ 432 ticks ≈ 7.2 seconds at `decay=1000`, `alphaStopThreshold=0.05`). At lower actual
+   * from 1 to `alphaStopThreshold` in approximately `decay × ln(stopThreshold) / ln(0.001)`
+   * ticks (≈ 432 ticks ≈ 7.2 seconds at `decay=1000`, `alphaStopThreshold=0.05`). At lower actual
    * frame rates the per-tick decay is scaled up so the wall-clock settle time stays roughly
    * constant — a slow GPU does not prevent the simulation from settling.
    *

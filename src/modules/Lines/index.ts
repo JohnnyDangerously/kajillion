@@ -76,6 +76,7 @@ export class Lines extends CoreModule {
       linkStatusTextureSize: number;
       focusedLinkIndex: number;
       focusedLinkWidthIncrease: number;
+      linkMinPixelLength: number;
     };
     drawLineFragmentUniforms: {
       renderMode: number;
@@ -170,6 +171,7 @@ export class Lines extends CoreModule {
           linkStatusTextureSize: 'f32',
           focusedLinkIndex: 'f32',
           focusedLinkWidthIncrease: 'f32',
+          linkMinPixelLength: 'f32',
         },
         defaultUniforms: {
           transformationMatrix: store.transformationMatrix4x4,

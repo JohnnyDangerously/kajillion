@@ -1187,6 +1187,7 @@ export class Graph {
     this.store.simulationProgress = 0
     this.store.alpha = alpha
     this.lastSimTickMs = 0
+    this.lastPhysicsTickMs = Number.NEGATIVE_INFINITY
     this.config.onSimulationStart?.()
 
     // Note: Does NOT start frames - that's handled separately
@@ -1201,6 +1202,8 @@ export class Graph {
     this.store.isSimulationRunning = false
     this.store.simulationProgress = 0
     this.store.alpha = 0
+    this.lastSimTickMs = 0
+    this.lastPhysicsTickMs = Number.NEGATIVE_INFINITY
     this.config.onSimulationEnd?.()
   }
 
@@ -1213,6 +1216,8 @@ export class Graph {
     if (this._isDestroyed) return
     if (this.ensureDevice(() => this.pause())) return
     this.store.isSimulationRunning = false
+    this.lastSimTickMs = 0
+    this.lastPhysicsTickMs = Number.NEGATIVE_INFINITY
     this.config.onSimulationPause?.()
   }
 
@@ -1673,21 +1678,41 @@ export class Graph {
       }
 
       // Time-based alpha decay: scale by actual frame dt so settle time in wall-clock
-      // seconds is FPS-invariant. Without this, a slow GPU would never let alpha drop
-      // below alphaStopThreshold because per-tick decay × low ticks/sec = no progress.
-      // Reference rate is 60 Hz (16.67 ms); cap dtScale to keep the decay math sane.
+      // seconds is FPS-invariant. Reference rate is 60 Hz (16.67 ms).
+      // When the page is hidden / has been backgrounded, dt can be huge (seconds).
+      // We treat that as a "skip this tick" rather than apply a 10x catch-up, because
+      // the catch-up causes premature end() during background tabs.
       const tickNowMs = performance.now()
       let dtScale = 1.0
       if (this.lastSimTickMs > 0) {
-        dtScale = Math.min(10, Math.max(0.1, (tickNowMs - this.lastSimTickMs) / (1000 / 60)))
+        const dt = tickNowMs - this.lastSimTickMs
+        if (typeof document !== 'undefined' && document.hidden) {
+          // Tab not visible — don't progress alpha while the user isn't looking.
+          this.lastSimTickMs = tickNowMs
+        } else if (!Number.isFinite(dt) || dt > 1000) {
+          // Frame >1s late (e.g. system pause) — refresh tick time but skip decay.
+          this.lastSimTickMs = tickNowMs
+          dtScale = 0
+        } else {
+          dtScale = Math.min(10, Math.max(0.1, dt / (1000 / 60)))
+          this.lastSimTickMs = tickNowMs
+        }
+      } else {
+        this.lastSimTickMs = tickNowMs
       }
-      this.lastSimTickMs = tickNowMs
-      this.store.alpha += this.store.addAlpha(this.config.simulationDecay) * dtScale
+      if (dtScale > 0) {
+        this.store.alpha += this.store.addAlpha(this.config.simulationDecay) * dtScale
+      }
       if (this.isRightClickMouse && this.config.enableRightClickRepulsion) {
+        // Right-click overrides decay this tick — pin alpha back to the kick floor.
         this.store.alpha = Math.max(this.store.alpha, 0.1)
       }
-      const stopThreshold = Math.max(ALPHA_MIN, this.config.alphaStopThreshold)
-      this.store.simulationProgress = Math.sqrt(Math.min(1, stopThreshold / this.store.alpha))
+      // Clamp threshold to [ALPHA_MIN, 1]; NaN-safe via Number.isFinite check
+      const rawThreshold = this.config.alphaStopThreshold
+      const stopThreshold = Number.isFinite(rawThreshold)
+        ? Math.min(1, Math.max(ALPHA_MIN, rawThreshold))
+        : ALPHA_MIN
+      this.store.simulationProgress = Math.sqrt(Math.min(1, stopThreshold / Math.max(this.store.alpha, ALPHA_MIN)))
 
       this.config.onSimulationTick?.(
         this.store.alpha,
@@ -1720,9 +1745,13 @@ export class Graph {
     if (this._isDestroyed) return
 
     // Check if simulation should end BEFORE scheduling next frame
-    // This prevents one extra frame from running after simulation ends
+    // This prevents one extra frame from running after simulation ends.
+    // Threshold is clamped to [ALPHA_MIN, 1] and NaN-safe.
     const { store: { alpha, isSimulationRunning } } = this
-    const stopThreshold = Math.max(ALPHA_MIN, this.config.alphaStopThreshold)
+    const rawThreshold = this.config.alphaStopThreshold
+    const stopThreshold = Number.isFinite(rawThreshold)
+      ? Math.min(1, Math.max(ALPHA_MIN, rawThreshold))
+      : ALPHA_MIN
     if (alpha < stopThreshold && isSimulationRunning) {
       this.end()
     }
@@ -1756,7 +1785,10 @@ export class Graph {
     // When simulation ends, forces stop but rendering continues.
     // When physicsTickRate > 0, physics is throttled to that rate; between ticks,
     // positions are held and only render runs. User-triggered `step()` bypasses this.
-    const tickRate = this.config.physicsTickRate
+    // NaN / non-finite physicsTickRate is treated as 0 (uncapped) — silent footgun
+    // if user passes e.g. parseInt(emptyString) which yields NaN.
+    const rawTickRate = this.config.physicsTickRate
+    const tickRate = Number.isFinite(rawTickRate) ? rawTickRate : 0
     if (tickRate <= 0) {
       this.runSimulationStep(false)
     } else {
@@ -1832,13 +1864,14 @@ export class Graph {
   }
 
   /**
-   * Called automatically when simulation completes (alpha < ALPHA_MIN).
+   * Called automatically when simulation completes (alpha < alphaStopThreshold).
    * Rendering continues after this is called (for rendering/interaction).
    */
   private end (): void {
     this.store.isSimulationRunning = false
     this.store.simulationProgress = 1
     this.lastSimTickMs = 0
+    this.lastPhysicsTickMs = Number.NEGATIVE_INFINITY
     this.config.onSimulationEnd?.()
     // Force hover detection on next frame since points may have moved under stationary mouse
     this._shouldForceHoverDetection = true
