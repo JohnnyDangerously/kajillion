@@ -211,10 +211,13 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 
   // Calculate final color with opacity based on link distance
   let rgbColor = input.color.rgb;
-  // Adjust opacity based on link distance
+  // Adjust opacity based on link distance.
+  // Range stored as [near, far]: .x (= .r) is the near distance (fully opaque end),
+  // .y (= .g) is the far distance (faded end). map() arguments here are
+  // intentionally (far, near, 0, 1) so longer links get lower opacity.
   var opacity = input.color.a * drawLine.linkOpacity * max(
     drawLine.linkVisibilityMinTransparency,
-    map(linkDistPx, drawLine.linkVisibilityDistanceRange.g, drawLine.linkVisibilityDistanceRange.r, 0.0, 1.0),
+    map(linkDistPx, drawLine.linkVisibilityDistanceRange.y, drawLine.linkVisibilityDistanceRange.x, 0.0, 1.0),
   );
 
   // Apply greyed-out opacity from link status texture

@@ -370,8 +370,8 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // Engine fix: render via instanced quads and pass a real (u,v) varying.
   // Until then we draw a single centred sample of every shape/image, which
   // is enough to keep the pipeline alive and the colour valid.
-  let gl_PointCoord_emulated = vec2f(0.5);
-  let pointCoord = 2.0 * gl_PointCoord_emulated - vec2f(1.0); // = vec2f(0.0)
+  let pointCoordCenter = vec2f(0.5);
+  let pointCoord = 2.0 * pointCoordCenter - vec2f(1.0); // = vec2f(0.0)
 
   var finalShapeColor = vec4f(0.0);
   var finalImageColor = vec4f(0.0);
