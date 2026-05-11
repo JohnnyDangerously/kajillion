@@ -57,7 +57,8 @@ export const defaultConfigValues = {
   focusedLinkWidthIncrease: 5,
 
   // Simulation
-  simulationDecay: 5000,
+  simulationDecay: 1000,
+  alphaStopThreshold: 0.05,
   simulationGravity: 0.25,
   simulationCenter: 0,
   simulationRepulsion: 1.0,

@@ -1659,7 +1659,8 @@ export class Graph {
       if (this.isRightClickMouse && this.config.enableRightClickRepulsion) {
         this.store.alpha = Math.max(this.store.alpha, 0.1)
       }
-      this.store.simulationProgress = Math.sqrt(Math.min(1, ALPHA_MIN / this.store.alpha))
+      const stopThreshold = Math.max(ALPHA_MIN, this.config.alphaStopThreshold)
+      this.store.simulationProgress = Math.sqrt(Math.min(1, stopThreshold / this.store.alpha))
 
       this.config.onSimulationTick?.(
         this.store.alpha,
@@ -1694,7 +1695,8 @@ export class Graph {
     // Check if simulation should end BEFORE scheduling next frame
     // This prevents one extra frame from running after simulation ends
     const { store: { alpha, isSimulationRunning } } = this
-    if (alpha < ALPHA_MIN && isSimulationRunning) {
+    const stopThreshold = Math.max(ALPHA_MIN, this.config.alphaStopThreshold)
+    if (alpha < stopThreshold && isSimulationRunning) {
       this.end()
     }
 

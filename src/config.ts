@@ -281,9 +281,26 @@ export interface GraphConfigInterface {
 
   /**
    * Decay coefficient. Use smaller values if you want the simulation to "cool down" slower.
-   * Default value: `5000`
+   * Higher values keep the simulation warm for longer (better final layout, more GPU cost over time);
+   * lower values settle faster (snappier feel, less GPU cost once stable).
+   * Default value: `1000`
    */
   simulationDecay: number;
+  /**
+   * Alpha threshold at which the simulation is considered "settled" and stops running force passes.
+   * When `alpha` drops below this value, `onSimulationEnd` fires and the six force passes
+   * (gravity, center, repulsion, link-incoming, link-outgoing, cluster) are skipped each frame
+   * until the next interaction (drag, zoom, restart) reseeds alpha.
+   *
+   * Raising this value makes the graph settle visually sooner at the cost of slightly less
+   * fine-grained layout convergence; lowering it (toward `0.001`) lets the simulation run
+   * longer for higher-quality stationary layouts.
+   *
+   * Internally clamped to at least `0.001` to guarantee the simulation always terminates.
+   *
+   * Default value: `0.05`
+   */
+  alphaStopThreshold: number;
     /**
    * Gravity force coefficient.
    * Default value: `0.25`
