@@ -1,0 +1,241 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Raw WebGPU 100k instanced quads</title>
+<style>
+  body { background:#0f1115; color:#cbd0d8; font:13px/1.4 system-ui,sans-serif; margin:0; padding:12px; }
+  #status { white-space:pre; }
+  canvas { display:block; width:100%; height:600px; background:#0f1115; border-top:1px solid #1c1f25; border-bottom:1px solid #1c1f25; margin-top:8px; }
+</style>
+</head>
+<body>
+<h2 style="margin:0 0 8px 0">Raw WebGPU — 100k instanced quads (no luma.gl)</h2>
+<div id="status">initializing…</div>
+<canvas id="c"></canvas>
+<script type="module">
+'use strict';
+
+const N = parseInt(new URL(location).searchParams.get('n') ?? '100000', 10);
+const POINT_SIZE_PX = parseFloat(new URL(location).searchParams.get('size') ?? '4');
+const BLEND_MODE = new URL(location).searchParams.get('blend') ?? 'alpha'; // alpha | add | none
+const status = document.getElementById('status');
+const canvas = document.getElementById('c');
+
+function log (...a) { status.textContent += '\n' + a.join(' '); }
+
+async function main () {
+  if (!navigator.gpu) { status.textContent = 'no navigator.gpu'; return; }
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+  if (!adapter) { status.textContent = 'no adapter'; return; }
+
+  const requiredFeatures = [];
+  if (adapter.features.has('timestamp-query')) requiredFeatures.push('timestamp-query');
+  const device = await adapter.requestDevice({ requiredFeatures });
+  const hasTimestamp = adapter.features.has('timestamp-query');
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.floor(rect.width * dpr);
+  canvas.height = Math.floor(rect.height * dpr);
+
+  const ctx = canvas.getContext('webgpu');
+  const format = navigator.gpu.getPreferredCanvasFormat();
+  ctx.configure({ device, format, alphaMode: 'premultiplied' });
+
+  status.textContent = `adapter: vendor=${adapter.info?.vendor ?? '?'} arch=${adapter.info?.architecture ?? '?'}
+features.timestamp-query: ${hasTimestamp}
+canvas: ${canvas.width}x${canvas.height} (dpr=${dpr})
+N=${N.toLocaleString()}  point-size=${POINT_SIZE_PX}px  blend=${BLEND_MODE}`;
+
+  // Pre-fill instance positions. Spread across [-1, 1] in clip-space-ish.
+  // Use a deterministic pseudo-random spread so we hit overdraw similar to a real graph.
+  const positions = new Float32Array(N * 4); // vec4f per instance: x, y, _, _
+  let s = 0x12345678 >>> 0;
+  const rand = () => { s = (s * 1103515245 + 12345) >>> 0; return ((s >>> 8) & 0xffffff) / 0xffffff; };
+  for (let i = 0; i < N; i++) {
+    // Cluster near center to mimic a graph layout, matching kajillion's overdraw profile.
+    const r = rand() * rand();           // skew toward zero
+    const angle = rand() * 6.2831853;
+    positions[i * 4 + 0] = Math.cos(angle) * r;
+    positions[i * 4 + 1] = Math.sin(angle) * r;
+  }
+
+  const positionBuffer = device.createBuffer({
+    size: positions.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
+  device.queue.writeBuffer(positionBuffer, 0, positions);
+
+  // Quad corner vertices: triangle-strip, 4 verts, in NDC [-1, 1].
+  const quadVerts = new Float32Array([-1, -1,  1, -1, -1,  1,  1,  1]);
+  const quadBuffer = device.createBuffer({
+    size: quadVerts.byteLength,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+  });
+  device.queue.writeBuffer(quadBuffer, 0, quadVerts);
+
+  // Uniforms: half-extent in clip space (precomputed CPU-side).
+  const halfX = POINT_SIZE_PX / canvas.width;
+  const halfY = POINT_SIZE_PX / canvas.height;
+  const uniformsBuffer = device.createBuffer({
+    size: 16, // vec2 + pad
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+  device.queue.writeBuffer(uniformsBuffer, 0, new Float32Array([halfX, halfY, 0, 0]));
+
+  const shader = device.createShaderModule({
+    code: `
+struct Uniforms { halfExtent: vec2<f32>, _pad: vec2<f32> };
+@group(0) @binding(0) var<uniform> u: Uniforms;
+@group(0) @binding(1) var<storage, read> positions: array<vec4<f32>>;
+
+struct VOut { @builtin(position) pos: vec4<f32>, @location(0) pointCoord: vec2<f32> };
+
+@vertex
+fn vs(@location(0) corner: vec2<f32>, @builtin(instance_index) i: u32) -> VOut {
+  let center = positions[i].xy;
+  var out: VOut;
+  out.pos = vec4<f32>(center + corner * u.halfExtent, 0.0, 1.0);
+  out.pointCoord = corner;
+  return out;
+}
+
+@fragment
+fn fs(@location(0) pc: vec2<f32>) -> @location(0) vec4<f32> {
+  let d = dot(pc, pc);
+  let alpha = 1.0 - smoothstep(0.7, 1.0, d);
+  if (alpha <= 0.0) { discard; }
+  return vec4<f32>(0.5, 0.8, 1.0, alpha);
+}
+`,
+  });
+
+  const colorTarget = {
+    format,
+    blend: BLEND_MODE === 'none' ? undefined
+      : BLEND_MODE === 'add' ? {
+        color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
+        alpha: { srcFactor: 'one',       dstFactor: 'one', operation: 'add' },
+      } : {
+        color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+        alpha: { srcFactor: 'one',       dstFactor: 'one-minus-src-alpha', operation: 'add' },
+      },
+  };
+
+  const pipeline = device.createRenderPipeline({
+    layout: 'auto',
+    vertex: {
+      module: shader, entryPoint: 'vs',
+      buffers: [{
+        arrayStride: 8,
+        stepMode: 'vertex',
+        attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }],
+      }],
+    },
+    fragment: { module: shader, entryPoint: 'fs', targets: [colorTarget] },
+    primitive: { topology: 'triangle-strip' },
+  });
+
+  const bindGroup = device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: uniformsBuffer } },
+      { binding: 1, resource: { buffer: positionBuffer } },
+    ],
+  });
+
+  // Timestamp setup.
+  let querySet = null, queryResolveBuffer = null, queryStaging = null;
+  if (hasTimestamp) {
+    querySet = device.createQuerySet({ type: 'timestamp', count: 2 });
+    queryResolveBuffer = device.createBuffer({
+      size: 16, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+    });
+    queryStaging = device.createBuffer({
+      size: 16, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    });
+  }
+
+  // Render loop.
+  let frame = 0;
+  const wallSamples = [];
+  const gpuSamples = [];
+  let lastT = performance.now();
+  let mapInFlight = false;
+  let pendingStaging = null;
+  const measure = (msNs) => { gpuSamples.push(msNs); if (gpuSamples.length > 60) gpuSamples.shift(); };
+
+  function tick (now) {
+    const dt = now - lastT;
+    lastT = now;
+    wallSamples.push(dt);
+    if (wallSamples.length > 60) wallSamples.shift();
+
+    const encoder = device.createCommandEncoder();
+    const renderPassDesc = {
+      colorAttachments: [{
+        view: ctx.getCurrentTexture().createView(),
+        loadOp: 'clear',
+        clearValue: { r: 0.06, g: 0.07, b: 0.08, a: 1 },
+        storeOp: 'store',
+      }],
+    };
+    if (hasTimestamp) {
+      renderPassDesc.timestampWrites = {
+        querySet, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1,
+      };
+    }
+    const pass = encoder.beginRenderPass(renderPassDesc);
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.setVertexBuffer(0, quadBuffer);
+    pass.draw(4, N, 0, 0);
+    pass.end();
+
+    if (hasTimestamp && !mapInFlight) {
+      encoder.resolveQuerySet(querySet, 0, 2, queryResolveBuffer, 0);
+      encoder.copyBufferToBuffer(queryResolveBuffer, 0, queryStaging, 0, 16);
+      pendingStaging = queryStaging;
+    }
+    device.queue.submit([encoder.finish()]);
+
+    if (hasTimestamp && !mapInFlight && pendingStaging) {
+      mapInFlight = true;
+      const s = pendingStaging; pendingStaging = null;
+      s.mapAsync(GPUMapMode.READ).then(() => {
+        const view = new DataView(s.getMappedRange());
+        const beginLo = view.getUint32(0, true), beginHi = view.getUint32(4, true);
+        const endLo = view.getUint32(8, true),   endHi = view.getUint32(12, true);
+        const begin = BigInt(beginHi) * BigInt(0x100000000) + BigInt(beginLo);
+        const end   = BigInt(endHi)   * BigInt(0x100000000) + BigInt(endLo);
+        s.unmap();
+        if (end > begin) measure(Number(end - begin));
+        mapInFlight = false;
+      }).catch(() => { mapInFlight = false; });
+    }
+
+    if (frame % 30 === 0) {
+      const w = wallSamples.slice().sort((a, b) => a - b);
+      const wMed = w[Math.floor(w.length / 2)] ?? 0;
+      const g = gpuSamples.slice().sort((a, b) => a - b);
+      const gMed = g[Math.floor(g.length / 2)] ?? 0;
+      status.textContent =
+        `adapter: vendor=${adapter.info?.vendor ?? '?'} arch=${adapter.info?.architecture ?? '?'}
+canvas: ${canvas.width}x${canvas.height} (dpr=${dpr})
+N=${N.toLocaleString()}  point-size=${POINT_SIZE_PX}px  blend=${BLEND_MODE}
+frame=${frame}
+wall-clock: ${wMed.toFixed(2)} ms/frame  (${(1000 / wMed).toFixed(1)} fps)
+gpu render pass: ${(gMed / 1e6).toFixed(3)} ms  (samples: ${gpuSamples.length})`;
+    }
+
+    frame++;
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+main().catch(e => { status.textContent = 'error: ' + e.message; throw e; });
+</script>
+</body>
+</html>
