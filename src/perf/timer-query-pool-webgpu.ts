@@ -13,6 +13,8 @@ const BYTES_PER_TIMESTAMP = 8
 interface FrameRecord {
   pairs: Array<{ label: string; beginIdx: number; endIdx: number }>;
   stagingBuffer: GPUBuffer | null;
+  byteLength: number;
+  copyScheduled: boolean;
   mapInFlight: boolean;
 }
 
@@ -107,15 +109,27 @@ export class TimerQueryPoolWebGPU {
 
   public tick (): void {
     if (!this.hasTimestamp) return
-    // Close out the previous frame: schedule a resolve + copy + mapAsync. The
-    // resolve rides on this frame's commandEncoder and is submitted alongside
-    // the regular render work, so no extra submit() is needed.
+
+    // Step 1: any frame whose copy was queued in a prior tick has now been
+    // submitted (luma.gl submits the encoder at end-of-frame). Kick mapAsync
+    // now that the buffer's "mapping pending" state won't conflict with a
+    // pending submit.
+    for (const f of this.inFlight) {
+      if (f.copyScheduled && !f.mapInFlight && f.stagingBuffer) {
+        this.startMapForFrame(f)
+      }
+    }
+
+    // Step 2: close the just-finished frame: schedule a resolve + copy into
+    // the *current* encoder. mapAsync is deferred to the next tick (step 1
+    // above on the next call). The resolve + copy ride on this frame's
+    // submit so no extra submission is needed.
     if (this.currentFrame && this.currentFrame.pairs.length > 0) {
       this.closeFrameForResolve(this.currentFrame)
       this.inFlight.push(this.currentFrame)
     }
 
-    this.currentFrame = { pairs: [], stagingBuffer: null, mapInFlight: false }
+    this.currentFrame = { pairs: [], stagingBuffer: null, byteLength: 0, copyScheduled: false, mapInFlight: false }
     this.nextIndex = 0
     this.pending = null
 
@@ -242,6 +256,10 @@ export class TimerQueryPoolWebGPU {
     })
   }
 
+  // Stage 1 (called from tick): encode resolveQuerySet + copyBufferToBuffer
+  // into the current command encoder. Does NOT call mapAsync — that has to
+  // wait until after submit() so the buffer isn't in a "mapping pending"
+  // state when submit references it.
   private closeFrameForResolve (frame: FrameRecord): void {
     if (!this.gpuDevice || !this.querySet || !this.resolveBuffer || !this.device) return
     let minIdx = Number.POSITIVE_INFINITY
@@ -261,11 +279,25 @@ export class TimerQueryPoolWebGPU {
     encoder.copyBufferToBuffer(this.resolveBuffer, 0, staging, 0, byteLength)
 
     frame.stagingBuffer = staging
+    frame.byteLength = byteLength
+    frame.copyScheduled = true
+  }
+
+  // Stage 2 (called from a later tick, after the prior tick's submit): now
+  // safe to mapAsync the staging buffer, decode timestamps, and recycle.
+  private startMapForFrame (frame: FrameRecord): void {
+    const staging = frame.stagingBuffer
+    if (!staging) return
+    const byteLength = frame.byteLength
     frame.mapInFlight = true
+
+    let minIdx = Number.POSITIVE_INFINITY
+    for (const p of frame.pairs) if (p.beginIdx < minIdx) minIdx = p.beginIdx
+    const firstQuery = minIdx
+    const queryCount = byteLength / BYTES_PER_TIMESTAMP
 
     staging.mapAsync(GPUMapMode.READ, 0, byteLength).then(() => {
       if (!this.gpuDevice) {
-        // Pool destroyed mid-flight; let GC handle the staging buffer.
         return
       }
       const range = staging.getMappedRange(0, byteLength)

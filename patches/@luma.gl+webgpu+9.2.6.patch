@@ -54,6 +54,26 @@ index 4bee5c2..3c5e24a 100644
  }
  //# sourceMappingURL=webgpu-compute-pipeline.js.map
 \ No newline at end of file
+diff --git a/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-render-pass.js b/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-render-pass.js
+index 678650b..f8c82a5 100644
+--- a/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-render-pass.js
++++ b/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-render-pass.js
+@@ -12,10 +12,11 @@ export class WebGPURenderPass extends RenderPass {
+         this.device = device;
+         const framebuffer = props.framebuffer || device.getCanvasContext().getCurrentFramebuffer();
+         const renderPassDescriptor = this.getRenderPassDescriptor(framebuffer);
+-        const webgpuQuerySet = props.timestampQuerySet;
+-        if (webgpuQuerySet) {
+-            renderPassDescriptor.occlusionQuerySet = webgpuQuerySet.handle;
+-        }
++        // Upstream luma.gl 9.2.6 misroutes props.timestampQuerySet to
++        // renderPassDescriptor.occlusionQuerySet, which fails validation because
++        // a timestamp QuerySet is not an occlusion QuerySet. The occlusion path
++        // is unused in this codebase, so we just skip it. The timestampWrites
++        // branch below handles the timestamp case correctly.
+         if (device.features.has('timestamp-query')) {
+             const webgpuTSQuerySet = props.timestampQuerySet;
+             renderPassDescriptor.timestampWrites = webgpuTSQuerySet
 diff --git a/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-render-pipeline.js b/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-render-pipeline.js
 index 6fdf33d..3487498 100644
 --- a/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-render-pipeline.js
