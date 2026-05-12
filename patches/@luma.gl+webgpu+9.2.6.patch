@@ -1,3 +1,37 @@
+diff --git a/node_modules/@luma.gl/webgpu/dist/adapter/helpers/get-vertex-buffer-layout.js b/node_modules/@luma.gl/webgpu/dist/adapter/helpers/get-vertex-buffer-layout.js
+index f47f5cd..d97a408 100644
+--- a/node_modules/@luma.gl/webgpu/dist/adapter/helpers/get-vertex-buffer-layout.js
++++ b/node_modules/@luma.gl/webgpu/dist/adapter/helpers/get-vertex-buffer-layout.js
+@@ -38,8 +38,16 @@ export function getVertexBufferLayout(shaderLayout, bufferLayout) {
+                 // @ts-ignore
+                 const location = attributeLayout?.location;
+                 format = attributeMapping.format || mapping.format;
++                // BUGFIX: honor user-provided bufferLayout[i].stepMode. Upstream
++                // luma.gl 9.2.6 only read stepMode from the shader-layout
++                // attribute (always undefined for WGSL) and fell back to a
++                // name-prefix heuristic (only matched `instance*`). Result was
++                // every per-instance buffer silently set to stepMode:'vertex',
++                // turning a draw of 4 verts × N instances into 4N per-vertex
++                // fetches reading way past buffer bounds.
+                 stepMode =
+-                    attributeLayout?.stepMode ||
++                    mapping.stepMode ||
++                        attributeLayout?.stepMode ||
+                         (attributeLayout?.name.startsWith('instance') ? 'instance' : 'vertex');
+                 vertexAttributes.push({
+                     format: getWebGPUVertexFormat(format),
+@@ -56,8 +64,10 @@ export function getVertexBufferLayout(shaderLayout, bufferLayout) {
+                 continue; // eslint-disable-line no-continue
+             }
+             byteStride = getVertexFormatInfo(format).byteLength;
++            // BUGFIX: see interleaved branch above. Honor mapping.stepMode.
+             stepMode =
+-                attributeLayout.stepMode ||
++                mapping.stepMode ||
++                    attributeLayout.stepMode ||
+                     (attributeLayout.name.startsWith('instance') ? 'instance' : 'vertex');
+             vertexAttributes.push({
+                 format: getWebGPUVertexFormat(format),
 diff --git a/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-compute-pipeline.js b/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-compute-pipeline.js
 index 4bee5c2..3c5e24a 100644
 --- a/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-compute-pipeline.js
