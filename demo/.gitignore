@@ -1,3 +1,7 @@
 dist/
 baselines/*.json
 !baselines/.gitkeep
+# Named baseline snapshots (baseline-v0-*.json, baseline-v1-*.json, …)
+# are intentionally checked in as reference points. Ad-hoc latest.json
+# and timestamped recordings stay local.
+!baselines/baseline-v*.json

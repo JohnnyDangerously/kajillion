@@ -1,0 +1,276 @@
+{
+  "timestamp": "2026-05-12T20:46:39.830Z",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/148.0.0.0 Safari/537.36",
+  "devicePixelRatio": 1,
+  "viewport": {
+    "width": 1280,
+    "height": 577
+  },
+  "power": {
+    "supported": true,
+    "level": 1,
+    "charging": true,
+    "throttleSuspected": false
+  },
+  "params": {
+    "nodeCount": 100000,
+    "edgesPerNode": 3,
+    "seed": 42,
+    "warmupMs": 2000,
+    "measureMs": 8000,
+    "label": "baseline-webgpu-full",
+    "repeat": 5,
+    "linkBlendMode": "add",
+    "useWebGPU": true,
+    "nosim": false,
+    "adaptiveDpr": true,
+    "msaa": 4
+  },
+  "dataset": {
+    "nodeCount": 100000,
+    "edgeCount": 299994
+  },
+  "aggregate": {
+    "render.canvas": {
+      "median": 21.687972881355932,
+      "min": 21.23477477966102,
+      "max": 22.566229333333332,
+      "samples": [
+        21.23477477966102,
+        22.566229333333332,
+        21.687972881355932,
+        21.919015050847456,
+        21.29155413333333
+      ]
+    },
+    "force.gravity": {
+      "median": 0.015291733333333333,
+      "min": 0.010922666666666666,
+      "max": 0.01807889655172414,
+      "samples": [
+        0.017476266666666667,
+        0.01807889655172414,
+        0.013107200000000001,
+        0.010922666666666666,
+        0.015291733333333333
+      ]
+    },
+    "force.quadtree.build": {
+      "median": 5.321523200000001,
+      "min": 5.312785066666667,
+      "max": 5.6112375172413795,
+      "samples": [
+        5.312785066666667,
+        5.6112375172413795,
+        5.321523200000001,
+        5.317154133333334,
+        5.341184
+      ]
+    },
+    "force.repulsion": {
+      "median": 0.7711402666666667,
+      "min": 0.7645866666666666,
+      "max": 0.7820629333333333,
+      "samples": [
+        0.7820629333333333,
+        0.7683531034482758,
+        0.7733248,
+        0.7711402666666667,
+        0.7645866666666666
+      ]
+    },
+    "force.link.incoming": {
+      "median": 0.3757397333333333,
+      "min": 0.37355520000000003,
+      "max": 0.393216,
+      "samples": [
+        0.38884693333333337,
+        0.3751371034482759,
+        0.37355520000000003,
+        0.393216,
+        0.3757397333333333
+      ]
+    },
+    "force.link.outgoing": {
+      "median": 0.07427413333333333,
+      "min": 0.07005572413793103,
+      "max": 0.08082773333333333,
+      "samples": [
+        0.0720896,
+        0.07005572413793103,
+        0.08082773333333333,
+        0.07427413333333333,
+        0.0786432
+      ]
+    }
+  },
+  "runs": [
+    {
+      "render.canvas": {
+        "avgMs": 21.23477477966102,
+        "lastMs": 24.969216,
+        "sampleCount": 59
+      },
+      "force.gravity": {
+        "avgMs": 0.017476266666666667,
+        "lastMs": 0,
+        "sampleCount": 30
+      },
+      "force.quadtree.build": {
+        "avgMs": 5.312785066666667,
+        "lastMs": 5.046272,
+        "sampleCount": 30
+      },
+      "force.repulsion": {
+        "avgMs": 0.7820629333333333,
+        "lastMs": 0.786432,
+        "sampleCount": 30
+      },
+      "force.link.incoming": {
+        "avgMs": 0.38884693333333337,
+        "lastMs": 0.786432,
+        "sampleCount": 30
+      },
+      "force.link.outgoing": {
+        "avgMs": 0.0720896,
+        "lastMs": 0.065536,
+        "sampleCount": 30
+      }
+    },
+    {
+      "render.canvas": {
+        "avgMs": 22.566229333333332,
+        "lastMs": 25.034752,
+        "sampleCount": 57
+      },
+      "force.gravity": {
+        "avgMs": 0.01807889655172414,
+        "lastMs": 0,
+        "sampleCount": 29
+      },
+      "force.quadtree.build": {
+        "avgMs": 5.6112375172413795,
+        "lastMs": 5.373952,
+        "sampleCount": 29
+      },
+      "force.repulsion": {
+        "avgMs": 0.7683531034482758,
+        "lastMs": 0.786432,
+        "sampleCount": 29
+      },
+      "force.link.incoming": {
+        "avgMs": 0.3751371034482759,
+        "lastMs": 0.32768,
+        "sampleCount": 29
+      },
+      "force.link.outgoing": {
+        "avgMs": 0.07005572413793103,
+        "lastMs": 0.131072,
+        "sampleCount": 29
+      }
+    },
+    {
+      "render.canvas": {
+        "avgMs": 21.687972881355932,
+        "lastMs": 23.92064,
+        "sampleCount": 59
+      },
+      "force.gravity": {
+        "avgMs": 0.013107200000000001,
+        "lastMs": 0,
+        "sampleCount": 30
+      },
+      "force.quadtree.build": {
+        "avgMs": 5.321523200000001,
+        "lastMs": 5.046272,
+        "sampleCount": 30
+      },
+      "force.repulsion": {
+        "avgMs": 0.7733248,
+        "lastMs": 0.786432,
+        "sampleCount": 30
+      },
+      "force.link.incoming": {
+        "avgMs": 0.37355520000000003,
+        "lastMs": 0.32768,
+        "sampleCount": 30
+      },
+      "force.link.outgoing": {
+        "avgMs": 0.08082773333333333,
+        "lastMs": 0.131072,
+        "sampleCount": 30
+      }
+    },
+    {
+      "render.canvas": {
+        "avgMs": 21.919015050847456,
+        "lastMs": 20.905984,
+        "sampleCount": 59
+      },
+      "force.gravity": {
+        "avgMs": 0.010922666666666666,
+        "lastMs": 0,
+        "sampleCount": 30
+      },
+      "force.quadtree.build": {
+        "avgMs": 5.317154133333334,
+        "lastMs": 5.046272,
+        "sampleCount": 30
+      },
+      "force.repulsion": {
+        "avgMs": 0.7711402666666667,
+        "lastMs": 0.720896,
+        "sampleCount": 30
+      },
+      "force.link.incoming": {
+        "avgMs": 0.393216,
+        "lastMs": 0.524288,
+        "sampleCount": 30
+      },
+      "force.link.outgoing": {
+        "avgMs": 0.07427413333333333,
+        "lastMs": 0.065536,
+        "sampleCount": 30
+      }
+    },
+    {
+      "force.gravity": {
+        "avgMs": 0.015291733333333333,
+        "lastMs": 0,
+        "sampleCount": 30
+      },
+      "force.quadtree.build": {
+        "avgMs": 5.341184,
+        "lastMs": 5.046272,
+        "sampleCount": 30
+      },
+      "force.repulsion": {
+        "avgMs": 0.7645866666666666,
+        "lastMs": 0.720896,
+        "sampleCount": 30
+      },
+      "force.link.incoming": {
+        "avgMs": 0.3757397333333333,
+        "lastMs": 0.393216,
+        "sampleCount": 30
+      },
+      "force.link.outgoing": {
+        "avgMs": 0.0786432,
+        "lastMs": 0.065536,
+        "sampleCount": 30
+      },
+      "render.canvas": {
+        "avgMs": 21.29155413333333,
+        "lastMs": 19.202048,
+        "sampleCount": 60
+      }
+    }
+  ],
+  "wallFps": [
+    55.11466600012498,
+    54.870198857681714,
+    54.99243853953692,
+    55.239642567018684,
+    55.243094613173355
+  ]
+}
