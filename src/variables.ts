@@ -47,7 +47,7 @@ export const defaultConfigValues = {
   linkArrowsSizeScale: 1,
   linkVisibilityDistanceRange: [50, 150],
   linkVisibilityMinTransparency: 0.25,
-  linkBlendMode: 'normal',
+  linkBlendMode: 'add',
   linkMinPixelLength: 0.5,
   pointMinPixelSize: 0.5,
 
@@ -60,7 +60,7 @@ export const defaultConfigValues = {
   focusedLinkWidthIncrease: 5,
 
   // Simulation
-  simulationDecay: 1000,
+  simulationDecay: 500,
   alphaStopThreshold: 0.05,
   physicsTickRate: 0,
   simulationGravity: 0.25,
@@ -112,7 +112,7 @@ export const defaultConfigValues = {
   useWebGPU: false,
   enableGpuTimings: false,
   pixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 2 : 2,
-  adaptivePixelRatio: false,
+  adaptivePixelRatio: true,
   adaptivePixelRatioSettleMs: 150,
   msaa: 1,
 
