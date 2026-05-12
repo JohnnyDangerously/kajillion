@@ -258,9 +258,12 @@ export class Lines extends CoreModule {
          */
       parameters: {
         cullMode: 'back',
+        // Premultiplied alpha when linkBlendMode is 'normal'; user-selected
+        // additive when 'add'. The fragment shader outputs vec4(rgb * a, a)
+        // in both modes (one-shot canonical).
         blend: true,
         blendColorOperation: 'add',
-        blendColorSrcFactor: config.linkBlendMode === 'add' ? 'one' : 'src-alpha',
+        blendColorSrcFactor: 'one',
         blendColorDstFactor: config.linkBlendMode === 'add' ? 'one' : 'one-minus-src-alpha',
         blendAlphaOperation: 'add',
         blendAlphaSrcFactor: 'one',

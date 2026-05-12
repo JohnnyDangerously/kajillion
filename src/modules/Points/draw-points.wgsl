@@ -378,11 +378,18 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
 
     var opacity: f32;
     if (input.pointShape == CIRCLE) {
-      let pointCenterDistance = dot(shapeCoord, shapeCoord);
-      opacity = 1.0 - smoothstep(smoothingConst, 1.0, pointCenterDistance);
+      // Analytic AA: signed distance from disc edge in unit-coord space.
+      // fwidth() gives the screen-space pixel width of one unit, so the
+      // smoothstep range is always exactly one device pixel regardless of
+      // point size or zoom level. Crisp at every scale, no fixed-threshold
+      // shimmer when zooming.
+      let d = length(shapeCoord) - 1.0;
+      let aa = max(fwidth(d), 1e-4);
+      opacity = 1.0 - smoothstep(-aa, aa, d);
     } else {
       let shapeDistance = getShapeDistance(shapeCoord, input.pointShape);
-      opacity = 1.0 - smoothstep(-0.01, 0.01, shapeDistance);
+      let aa = max(fwidth(shapeDistance), 1e-4);
+      opacity = 1.0 - smoothstep(-aa, aa, shapeDistance);
     }
     opacity = opacity * input.shapeColor.a;
 
@@ -450,5 +457,8 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
     );
   }
 
-  return fragColor;
+  // Premultiplied alpha: pair with blend (one, one-minus-src-alpha). Stacks
+  // of translucent nodes composite correctly without dark halos. Equivalent
+  // math to alpha-over when used with the correct blend factors.
+  return vec4<f32>(fragColor.rgb * fragColor.a, fragColor.a);
 }

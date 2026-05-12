@@ -729,9 +729,13 @@ export class Points extends CoreModule {
         // All texture bindings will be set dynamically in draw() method
       },
       parameters: {
+        // Premultiplied alpha: fragment shader outputs vec4(rgb * a, a),
+        // blend reads src as already-multiplied. Composites correctly when
+        // many translucent points stack. (Mathematically equivalent to
+        // alpha-over when the shader pre-multiplies.)
         blend: true,
         blendColorOperation: 'add',
-        blendColorSrcFactor: 'src-alpha',
+        blendColorSrcFactor: 'one',
         blendColorDstFactor: 'one-minus-src-alpha',
         blendAlphaOperation: 'add',
         blendAlphaSrcFactor: 'one',
