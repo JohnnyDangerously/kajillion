@@ -460,8 +460,10 @@ export class Lines extends CoreModule {
       },
     })
 
-    // Update texture bindings dynamically
+    // Update texture bindings dynamically. WebGPU reads positions via the
+    // points module's storage-buffer mirror; WebGL2 reads from the texture.
     this.drawCurveCommand.setBindings({
+      ...(points.positionStorageBuffer && { positions: points.positionStorageBuffer }),
       positionsTexture: points.currentPositionTexture,
       linkStatus: this.linkStatusTexture,
     })

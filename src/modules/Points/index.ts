@@ -45,6 +45,12 @@ export class Points extends CoreModule {
   public scaleY: ((y: number) => number) | undefined
   public shouldSkipRescale: boolean | undefined
   public imageAtlasTexture: Texture | undefined
+  // WebGPU-only mirror of currentPositionTexture as a storage buffer. Vertex
+  // shaders read positions[idx] instead of textureSampleLevel(positionsTexture)
+  // — the texture path costs ~750ms/frame at n=100k due to vertex-stage texture
+  // sampling on Apple TBDR; storage-buffer reads drop that to ~10ms.
+  public positionStorageBuffer: Buffer | undefined
+  public pointStatusStorageBuffer: Buffer | undefined
   public imageCount = 0
   // Add texture properties for position data (public for Clusters module access)
   public currentPositionTexture: Texture | undefined
@@ -85,6 +91,7 @@ export class Points extends CoreModule {
   private findPointsInPolygonVertexCoordBuffer: Buffer | undefined
   private drawHighlightedVertexCoordBuffer: Buffer | undefined
   private drawQuadVertexBuffer: Buffer | undefined
+  private positionStorageBufferTextureSize = 0
   private trackPointsVertexCoordBuffer: Buffer | undefined
   private trackedIndices: number[] | undefined
   private searchTexture: Texture | undefined
@@ -298,6 +305,24 @@ export class Points extends CoreModule {
         x: 0,
         y: 0,
       })
+    }
+
+    // WebGPU vertex-pulling: mirror currentPositionTexture as a storage buffer.
+    // Vertex shaders read positions[idx] directly instead of paying for the
+    // textureSampleLevel slow path that costs ~750ms/frame at n=100k.
+    if (device.info?.type === 'webgpu' &&
+        (!this.positionStorageBuffer || this.positionStorageBufferTextureSize !== pointsTextureSize)) {
+      if (this.positionStorageBuffer && !this.positionStorageBuffer.destroyed) {
+        this.positionStorageBuffer.destroy()
+      }
+      const byteLength = pointsTextureSize * pointsTextureSize * 16 // vec4<f32>
+      this.positionStorageBuffer = device.createBuffer({
+        byteLength,
+        usage: Buffer.STORAGE | Buffer.COPY_DST,
+      })
+      // Seed with the same initial positions written to currentPositionTexture.
+      this.positionStorageBuffer.write(new Uint8Array(initialState.buffer, initialState.byteOffset, initialState.byteLength))
+      this.positionStorageBufferTextureSize = pointsTextureSize
     }
 
     // Create previousPositionTexture and framebuffer
@@ -1540,6 +1565,10 @@ export class Points extends CoreModule {
       })
 
       this.drawCommand.setBindings({
+        // WebGPU binding: vertex-pulled positions via storage buffer (fast path).
+        // WebGL2 binding: positionsTexture (legacy path); luma.gl ignores unused
+        // bindings per backend's shader layout.
+        ...(this.positionStorageBuffer && { positions: this.positionStorageBuffer }),
         positionsTexture: this.currentPositionTexture,
         pointStatus: this.pointStatusTexture,
         imageAtlasTexture: this.imageAtlasTexture,
@@ -1559,6 +1588,10 @@ export class Points extends CoreModule {
       })
 
       this.drawCommand.setBindings({
+        // WebGPU binding: vertex-pulled positions via storage buffer (fast path).
+        // WebGL2 binding: positionsTexture (legacy path); luma.gl ignores unused
+        // bindings per backend's shader layout.
+        ...(this.positionStorageBuffer && { positions: this.positionStorageBuffer }),
         positionsTexture: this.currentPositionTexture,
         pointStatus: this.pointStatusTexture,
         imageAtlasTexture: this.imageAtlasTexture,
@@ -1578,6 +1611,10 @@ export class Points extends CoreModule {
       })
 
       this.drawCommand.setBindings({
+        // WebGPU binding: vertex-pulled positions via storage buffer (fast path).
+        // WebGL2 binding: positionsTexture (legacy path); luma.gl ignores unused
+        // bindings per backend's shader layout.
+        ...(this.positionStorageBuffer && { positions: this.positionStorageBuffer }),
         positionsTexture: this.currentPositionTexture,
         pointStatus: this.pointStatusTexture,
         imageAtlasTexture: this.imageAtlasTexture,
@@ -2303,6 +2340,27 @@ export class Points extends CoreModule {
       this.trackPointsVertexCoordBuffer.destroy()
     }
     this.trackPointsVertexCoordBuffer = undefined
+  }
+
+  /**
+   * WebGPU vertex-pulling sync: copy currentPositionTexture → positionStorageBuffer
+   * so the draw vertex shader can read positions via storage-buffer indexing
+   * instead of textureSampleLevel. No-op on WebGL2. Cheap (~20µs for n=1M on
+   * M-series unified memory).
+   */
+  public syncPositionStorageBuffer (): void {
+    if (!this.device || this.device.info?.type !== 'webgpu') return
+    if (!this.currentPositionTexture || this.currentPositionTexture.destroyed) return
+    if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return
+    const size = this.positionStorageBufferTextureSize
+    if (size === 0) return
+    this.device.commandEncoder.copyTextureToBuffer({
+      sourceTexture: this.currentPositionTexture,
+      destinationBuffer: this.positionStorageBuffer,
+      width: size,
+      height: size,
+      bytesPerRow: getBytesPerRow('rgba32float', size),
+    })
   }
 
   public swapFbo (): void {

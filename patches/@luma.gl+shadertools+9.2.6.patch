@@ -1,0 +1,31 @@
+diff --git a/node_modules/@luma.gl/shadertools/dist/lib/wgsl/get-shader-layout-wgsl.js b/node_modules/@luma.gl/shadertools/dist/lib/wgsl/get-shader-layout-wgsl.js
+index b2ceffe..802c641 100644
+--- a/node_modules/@luma.gl/shadertools/dist/lib/wgsl/get-shader-layout-wgsl.js
++++ b/node_modules/@luma.gl/shadertools/dist/lib/wgsl/get-shader-layout-wgsl.js
+@@ -52,6 +52,26 @@ export function getShaderLayoutFromWGSL(source) {
+             location: sampler.binding
+         });
+     }
++    // Upstream luma.gl 9.2.6 omits storage-buffer bindings from the shader
++    // layout — only uniforms/textures/samplers are extracted. That breaks
++    // pipeline creation for any WGSL with `var<storage, read>` bindings:
++    // the bind group layout requires the storage binding but luma's binding
++    // map has no entry, so the pipeline is created without it and Dawn errors
++    // ("Binding doesn't exist in BindGroupLayoutInternal"). Backfill them.
++    for (const storage of parsedWGSL.storage || []) {
++        // wgsl-reflect exposes the storage access mode ('read', 'write',
++        // 'read_write'). luma.gl distinguishes 'read-only-storage' from
++        // 'storage' (read-write) — required for WebGPU, since a read_write
++        // storage binding visible from the Vertex stage is rejected by
++        // Dawn ("read-only storage buffer bindings are allowed" at vertex).
++        const isReadOnly = storage.access === 'read';
++        shaderLayout.bindings.push({
++            type: isReadOnly ? 'read-only-storage' : 'storage',
++            name: storage.name,
++            group: storage.group,
++            location: storage.binding,
++        });
++    }
+     const vertex = parsedWGSL.entry.vertex[0]; // "main"
+     // Vertex shader inputs
+     const attributeCount = vertex?.inputs.length || 0; // inputs to "main"

@@ -1845,6 +1845,12 @@ export class Graph {
       }
     }
 
+    // WebGPU vertex-pulling: refresh the position storage buffer from the
+    // ping-ponged currentPositionTexture before draw. Vertex shaders read this
+    // buffer directly instead of paying for textureSampleLevel from the vertex
+    // stage (a TBDR slow path that cost ~750ms/frame at n=100k before this).
+    this.points?.syncPositionStorageBuffer()
+
     // Create a single render pass for drawing (points, lines, etc.)
     // Simulation will use separate render passes later
     if (this.device) {

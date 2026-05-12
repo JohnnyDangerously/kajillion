@@ -36,14 +36,16 @@ struct DrawFragmentUniforms {
 
 @group(0) @binding(0) var<uniform> drawVertex: DrawVertexUniforms;
 @group(0) @binding(1) var<uniform> drawFragment: DrawFragmentUniforms;
-@group(0) @binding(2) var positionsTexture: texture_2d<f32>;
-@group(0) @binding(3) var positionsTextureSampler: sampler;
-@group(0) @binding(4) var pointStatus: texture_2d<f32>;
-@group(0) @binding(5) var pointStatusSampler: sampler;
-@group(0) @binding(6) var imageAtlasTexture: texture_2d<f32>;
-@group(0) @binding(7) var imageAtlasTextureSampler: sampler;
-@group(0) @binding(8) var imageAtlasCoords: texture_2d<f32>;
-@group(0) @binding(9) var imageAtlasCoordsSampler: sampler;
+// Vertex-pulling: positions live in a storage buffer indexed by instance.
+// Replaces textureSampleLevel(positionsTexture, ...) — that path costs
+// ~750ms/frame at n=100k due to vertex-stage texture sampling on Apple TBDR.
+@group(0) @binding(2) var<storage, read> positions: array<vec4<f32>>;
+@group(0) @binding(3) var pointStatus: texture_2d<f32>;
+@group(0) @binding(4) var pointStatusSampler: sampler;
+@group(0) @binding(5) var imageAtlasTexture: texture_2d<f32>;
+@group(0) @binding(6) var imageAtlasTextureSampler: sampler;
+@group(0) @binding(7) var imageAtlasCoords: texture_2d<f32>;
+@group(0) @binding(8) var imageAtlasCoordsSampler: sampler;
 
 struct VertexInput {
   @location(0) quadCorner: vec2<f32>,
@@ -82,7 +84,7 @@ fn calculatePointSize(pointSize: f32) -> f32 {
 const outlineRingScale: f32 = 1.3;
 
 @vertex
-fn vertexMain(input: VertexInput) -> VertexOutput {
+fn vertexMain(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> VertexOutput {
   var output: VertexOutput;
   output.pointShape = 0.0;
   output.isGreyedOut = 0.0;
@@ -114,8 +116,10 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
     return output;
   }
 
-  // Position
-  let pointPosition = textureSampleLevel(positionsTexture, positionsTextureSampler, uv, 0.0);
+  // Position via storage-buffer vertex-pulling. The sim writes
+  // currentPositionTexture; renderFrame copies it to `positions` once per
+  // frame before draw. Indexing by instance avoids per-vertex texture sampling.
+  let pointPosition = positions[instanceIdx];
   let point = pointPosition.rg;
 
   // Transform point position to normalized device coordinates

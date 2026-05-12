@@ -52,10 +52,12 @@ struct DrawLineFragmentUniforms {
 
 @group(0) @binding(0) var<uniform> drawLine: DrawLineUniforms;
 @group(0) @binding(1) var<uniform> drawLineFragment: DrawLineFragmentUniforms;
-@group(0) @binding(2) var positionsTexture: texture_2d<f32>;
-@group(0) @binding(3) var positionsTextureSampler: sampler;
-@group(0) @binding(4) var linkStatus: texture_2d<f32>;
-@group(0) @binding(5) var linkStatusSampler: sampler;
+// Vertex-pulling: read endpoint positions from a storage buffer indexed
+// by (texY * pointsTextureSize + texX). The legacy texture-sample path
+// cost ~600ms/frame at n=100k due to vertex-stage texture sampling.
+@group(0) @binding(2) var<storage, read> positions: array<vec4<f32>>;
+@group(0) @binding(3) var linkStatus: texture_2d<f32>;
+@group(0) @binding(4) var linkStatusSampler: sampler;
 
 struct VertexInput {
   @location(0) position: vec2<f32>,
@@ -120,11 +122,14 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   output.smoothing = 0.0;
   output.arrowWidthFactor = 0.0;
 
-  let pointTexturePosA = (input.pointA + vec2<f32>(0.5)) / drawLine.pointsTextureSize;
-  let pointTexturePosB = (input.pointB + vec2<f32>(0.5)) / drawLine.pointsTextureSize;
-
-  let pointPositionA = textureSampleLevel(positionsTexture, positionsTextureSampler, pointTexturePosA, 0.0);
-  let pointPositionB = textureSampleLevel(positionsTexture, positionsTextureSampler, pointTexturePosB, 0.0);
+  // Storage-buffer vertex-pulling. pointA/pointB are (texX, texY) tex coords;
+  // the linear storage index is texY * pointsTextureSize + texX, matching the
+  // texture's row-major layout that the sim writes via copyTextureToBuffer.
+  let textureSize = u32(drawLine.pointsTextureSize);
+  let idxA = u32(input.pointA.y) * textureSize + u32(input.pointA.x);
+  let idxB = u32(input.pointB.y) * textureSize + u32(input.pointB.x);
+  let pointPositionA = positions[idxA];
+  let pointPositionB = positions[idxB];
   let a = pointPositionA.xy;
   let b = pointPositionB.xy;
 
