@@ -882,7 +882,8 @@ export class Graph {
     positions.length = this.graph.pointsNumber * 2
     // WebGPU has no sync pixel-readback; fall back to the last-set CPU positions.
     // Accurate before the simulation runs (e.g. for fitViewOnInit) and degrades
-    // gracefully as the sim moves things — proper async readback is a follow-up.
+    // gracefully as the sim moves things. For settled-state positions on
+    // WebGPU, use the async `readbackPointPositions()` below.
     if (this.device.info?.type === 'webgpu') {
       const cached = this.graph.inputPointPositions
       if (!cached) return positions
@@ -902,6 +903,33 @@ export class Graph {
       }
     }
     return positions
+  }
+
+  /**
+   * Async readback of settled X/Y point positions from the GPU.
+   *
+   * On WebGPU this copies the live positionStorageBuffer into a MAP_READ
+   * staging buffer and mapAsync's it. The cost is one buffer-to-buffer
+   * copy + one GPU submit + one async map (typically 1-5 ms at n=1M on
+   * M-series); not per-frame fast, but cheap enough to pre-bake a
+   * settled layout or export a snapshot.
+   *
+   * On WebGL2 this delegates to the synchronous `getPointPositions()`
+   * path that already pixel-reads from the FBO.
+   *
+   * Returns a flat Float32Array of `[x0, y0, x1, y1, …]` of length
+   * `pointsNumber * 2`. Empty array if no points are loaded.
+   */
+  public async readbackPointPositions (): Promise<Float32Array> {
+    if (this._isDestroyed || !this.device || !this.points) return new Float32Array(0)
+    if (this.graph.pointsNumber === undefined) return new Float32Array(0)
+    if (this.device.info?.type === 'webgpu') {
+      return this.points.readbackPointPositions()
+    }
+    // WebGL2: the synchronous getPointPositions already reads from the
+    // FBO. Wrap it as an async result for API parity.
+    const arr = this.getPointPositions()
+    return Float32Array.from(arr)
   }
 
   /**

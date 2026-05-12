@@ -326,7 +326,10 @@ export class Points extends CoreModule {
       const byteLength = pointsTextureSize * pointsTextureSize * 16 // vec4<f32>
       this.positionStorageBuffer = device.createBuffer({
         byteLength,
-        usage: Buffer.STORAGE | Buffer.COPY_DST,
+        // COPY_SRC enables `readbackPointPositions()` — without it the
+        // async staging copy returns zeros silently because the buffer
+        // can be written to but not copied from.
+        usage: Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC,
       })
       // Seed with the same initial positions written to currentPositionTexture.
       this.positionStorageBuffer.write(new Uint8Array(initialState.buffer, initialState.byteOffset, initialState.byteLength))
@@ -2428,6 +2431,48 @@ export class Points extends CoreModule {
       height: size,
       bytesPerRow: getBytesPerRow('rgba32float', size),
     })
+  }
+
+  /**
+   * Async readback of settled point positions from GPU memory.
+   *
+   * The WebGPU path's positionStorageBuffer is the live mirror of
+   * currentPositionTexture and is refreshed every frame by
+   * `syncPositionStorageBuffer()`. It can't be mapped directly (it uses
+   * STORAGE+COPY_DST), so we lazily allocate a dedicated COPY_DST+MAP_READ
+   * staging buffer, encode a buffer-to-buffer copy, submit, then mapAsync
+   * the staging buffer and decode the interleaved vec4<f32> layout.
+   *
+   * Returns a flat Float32Array of `[x0, y0, x1, y1, …]` for the actual
+   * pointsNumber, not the padded square (`pointsTextureSize²`).
+   *
+   * Use this for offline tasks: pre-baking a settled layout, exporting
+   * the graph, screenshots-with-labels. For per-frame rendering, use the
+   * positionStorageBuffer directly via vertex-pulling.
+   */
+  public async readbackPointPositions (): Promise<Float32Array> {
+    if (!this.device || this.device.info?.type !== 'webgpu') return new Float32Array(0)
+    if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return new Float32Array(0)
+    const size = this.positionStorageBufferTextureSize
+    if (size === 0) return new Float32Array(0)
+    // Flush any pending GPU work first so the storage buffer reflects the
+    // latest sim state. Without this, an open command encoder holding a
+    // sync-copy queued earlier this frame may not have executed.
+    this.device.submit()
+    // luma.gl auto-creates a temporary MAP_READ staging buffer, copies the
+    // contents over via its own isolated commandEncoder, and unmaps after.
+    // The returned Uint8Array is already a deep copy of the mapped range.
+    const raw = await this.positionStorageBuffer.readAsync()
+    const interleaved = new Float32Array(raw.buffer, raw.byteOffset, raw.byteLength / Float32Array.BYTES_PER_ELEMENT)
+    // Pack the (x, y) pairs back to back, dropping the padding vec4 channels
+    // and any padded tail entries beyond pointsNumber.
+    const n = this.data.pointsNumber ?? size * size
+    const xy = new Float32Array(n * 2)
+    for (let i = 0; i < n; i += 1) {
+      xy[i * 2] = interleaved[i * 4] ?? 0
+      xy[i * 2 + 1] = interleaved[i * 4 + 1] ?? 0
+    }
+    return xy
   }
 
   public swapFbo (): void {

@@ -147,6 +147,9 @@ async function rebuildGraph (cfg: DemoConfig): Promise<void> {
   graph.setLinks(data.links)
   graph.render()
   currentGraph = graph
+  // Expose for ad-hoc debugging (browser console, e2e probes). The demo is
+  // explicitly a debug surface; no need to gate this.
+  ;(window as unknown as { __demoGraph: Graph }).__demoGraph = graph
 }
 
 async function applyControlChange (): Promise<void> {
