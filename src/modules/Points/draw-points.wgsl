@@ -365,6 +365,20 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
 
   let pointCoord = input.pointCoord;
 
+  // Fast corner-cull for the common no-image circle case. The quad we draw
+  // is 2×2 in unit-coord space, but only the inscribed disk (r ≤ 1) is
+  // visible. The four corners cover ~21% of the quad footprint and would
+  // otherwise burn the full fragment shader (shape distance, fwidth,
+  // smoothstep, outline ring math) to produce zero opacity. Discard them
+  // immediately. The 1.05² margin keeps the analytic AA edge intact even
+  // for the smallest points where one device pixel may extend slightly
+  // past r=1; the outline path is excluded because the ring lives outside
+  // the disk.
+  let rSq = pointCoord.x * pointCoord.x + pointCoord.y * pointCoord.y;
+  if (input.pointShape == CIRCLE && input.imageAtlasUV.x == -1.0 && input.isOutlined == 0.0 && rSq > 1.1025) {
+    discard;
+  }
+
   // Analytic AA: signed distance from shape edge in unit-coord space.
   // fwidth() must be called in uniform control flow per WGSL spec, so the
   // distance is computed unconditionally at the top of the fragment. The
