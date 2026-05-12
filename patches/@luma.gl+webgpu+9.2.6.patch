@@ -184,3 +184,35 @@ index 6fdf33d..3487498 100644
      }
      /**
       * Populate the complex WebGPU GPURenderPipelineDescriptor
+diff --git a/node_modules/@luma.gl/webgpu/dist/dist.dev.js b/node_modules/@luma.gl/webgpu/dist/dist.dev.js
+index 7c74a16..b515715 100644
+--- a/node_modules/@luma.gl/webgpu/dist/dist.dev.js
++++ b/node_modules/@luma.gl/webgpu/dist/dist.dev.js
+@@ -1479,10 +1479,7 @@ var __exports__ = (() => {
+           this.device = device;
+           const framebuffer = props.framebuffer || device.getCanvasContext().getCurrentFramebuffer();
+           const renderPassDescriptor = this.getRenderPassDescriptor(framebuffer);
+-          const webgpuQuerySet = props.timestampQuerySet;
+-          if (webgpuQuerySet) {
+-            renderPassDescriptor.occlusionQuerySet = webgpuQuerySet.handle;
+-          }
++          // PATCHED-OUT: misroute of timestampQuerySet to occlusionQuerySet (see patches/)
+           if (device.features.has("timestamp-query")) {
+             const webgpuTSQuerySet = props.timestampQuerySet;
+             renderPassDescriptor.timestampWrites = webgpuTSQuerySet ? {
+diff --git a/node_modules/@luma.gl/webgpu/dist/index.cjs b/node_modules/@luma.gl/webgpu/dist/index.cjs
+index bae8af6..64cd501 100644
+--- a/node_modules/@luma.gl/webgpu/dist/index.cjs
++++ b/node_modules/@luma.gl/webgpu/dist/index.cjs
+@@ -1272,10 +1272,7 @@ var init_webgpu_render_pass = __esm({
+         this.device = device;
+         const framebuffer = props.framebuffer || device.getCanvasContext().getCurrentFramebuffer();
+         const renderPassDescriptor = this.getRenderPassDescriptor(framebuffer);
+-        const webgpuQuerySet = props.timestampQuerySet;
+-        if (webgpuQuerySet) {
+-          renderPassDescriptor.occlusionQuerySet = webgpuQuerySet.handle;
+-        }
++        // PATCHED-OUT: misroute of timestampQuerySet to occlusionQuerySet (see patches/)
+         if (device.features.has("timestamp-query")) {
+           const webgpuTSQuerySet = props.timestampQuerySet;
+           renderPassDescriptor.timestampWrites = webgpuTSQuerySet ? {

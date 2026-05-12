@@ -376,6 +376,14 @@ export class Points extends CoreModule {
           width: pointsTextureSize,
           height: pointsTextureSize,
           format: 'rgba32float',
+          // On WebGPU the compute force-link pass writes via
+          // `texture_storage_2d<rgba32float, write>`; that requires
+          // STORAGE_BINDING usage. SAMPLE/RENDER are needed for the
+          // fragment-based force passes (gravity/repulsion/center) and the
+          // updatePosition shader that consumes the velocity. COPY_DST is
+          // required for the initial zero-fill. WebGL2 ignores these flags
+          // (it doesn't model usage; ColorAttachment is implicit on FBO bind).
+          usage: Texture.SAMPLE | Texture.STORAGE | Texture.RENDER | Texture.COPY_DST,
         })
         this.velocityTexture.copyImageData({
           data: velocityData,

@@ -33,6 +33,7 @@ interface WebGPULikeDevice {
   commandEncoder: { handle: GPUCommandEncoder };
   features: { has: (name: string) => boolean };
   beginRenderPass: (props?: Record<string, unknown>) => unknown;
+  beginComputePass: (props?: Record<string, unknown>) => unknown;
 }
 
 export class TimerQueryPoolWebGPU {
@@ -55,6 +56,7 @@ export class TimerQueryPoolWebGPU {
   private pending: { label: string; beginIdx: number; endIdx: number } | null = null
 
   private originalBeginRenderPass: ((props?: Record<string, unknown>) => unknown) | null = null
+  private originalBeginComputePass: ((props?: Record<string, unknown>) => unknown) | null = null
 
   public constructor (device: Device) {
     if (device.info.type !== 'webgpu') {
@@ -100,6 +102,7 @@ export class TimerQueryPoolWebGPU {
     }
 
     this.installBeginRenderPassHook()
+    this.installBeginComputePassHook()
     this.hasTimestamp = true
   }
 
@@ -190,6 +193,7 @@ export class TimerQueryPoolWebGPU {
 
   public destroy (): void {
     this.uninstallBeginRenderPassHook()
+    this.uninstallBeginComputePassHook()
     this.inFlight = []
     this.stats.clear()
     this.currentFrame = null
@@ -240,6 +244,45 @@ export class TimerQueryPoolWebGPU {
       this.device.beginRenderPass = this.originalBeginRenderPass
     }
     this.originalBeginRenderPass = null
+  }
+
+  private installBeginComputePassHook (): void {
+    if (!this.device) return
+    const original = this.device.beginComputePass.bind(this.device)
+    this.originalBeginComputePass = original
+    // Mirrors installBeginRenderPassHook. Compute passes accept the same
+    // luma.gl timestamp props (timestampQuerySet / beginTimestampIndex /
+    // endTimestampIndex) — WebGPUComputePass funnels them into the
+    // GPUComputePassDescriptor.timestampWrites field. Same pending-slot
+    // contract as the render-pass hook: begin(label) stages indices, the
+    // next pass-start call (render OR compute) consumes them.
+    this.device.beginComputePass = (props?: Record<string, unknown>): unknown => {
+      const pending = this.pending
+      if (pending && this.querySet && this.currentFrame) {
+        const querySetShim = { handle: this.querySet }
+        const merged = {
+          ...(props ?? {}),
+          timestampQuerySet: querySetShim,
+          beginTimestampIndex: pending.beginIdx,
+          endTimestampIndex: pending.endIdx,
+        }
+        this.currentFrame.pairs.push({
+          label: pending.label,
+          beginIdx: pending.beginIdx,
+          endIdx: pending.endIdx,
+        })
+        this.pending = null
+        return original(merged)
+      }
+      return original(props)
+    }
+  }
+
+  private uninstallBeginComputePassHook (): void {
+    if (this.device && this.originalBeginComputePass) {
+      this.device.beginComputePass = this.originalBeginComputePass
+    }
+    this.originalBeginComputePass = null
   }
 
   private acquireStagingBuffer (byteLength: number): GPUBuffer {
