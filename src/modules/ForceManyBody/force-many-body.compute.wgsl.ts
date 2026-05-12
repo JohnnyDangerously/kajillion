@@ -96,14 +96,15 @@ fn calculateCentermassVelocity(level: u32, levelTextureSizeF: f32, pp: vec2<f32>
     let distVector = pp - centermassPosition;
     var l = dot(distVector, distVector);
     if (l > 0.0) {
-      let angle = atan2(distVector.y, distVector.x);
       let c = force.alpha * force.repulsion * centermass.b;
       let distanceMin2: f32 = 1.0;
       if (l < distanceMin2) {
         l = sqrt(distanceMin2 * l);
       }
       let addV = c / sqrt(l);
-      add = addV * vec2<f32>(cos(angle), sin(angle));
+      // normalize(distVector) replaces the legacy atan2+cos/sin reconstruction;
+      // identical output (unit vector along distVector), 6 ALU ops saved.
+      add = addV * normalize(distVector);
     }
   }
   return add;
@@ -149,7 +150,7 @@ fn computeMain(@builtin(global_invocation_id) gid: vec3<u32>) {
     bottom = bottom - cellSize * n_bottom;
 
     // Compute this level's cellSize and boundary counts.
-    cellSize = pow(2.0, force.levels - f32(i) - 1.0);
+    cellSize = exp2(force.levels - f32(i) - 1.0);
 
     let dist_left = x - left;
     n_left = max(0.0, floor(dist_left / cellSize - force.theta));
@@ -217,7 +218,7 @@ fn computeMain(@builtin(global_invocation_id) gid: vec3<u32>) {
   // (levels-1) is 2^levels.
   if (levelsActive > 0u) {
     let deepest = levelsActive - 1u;
-    let levelTextureSizeF = pow(2.0, force.levels);
+    let levelTextureSizeF = exp2(force.levels);
     var cmVelocity = calculateCentermassVelocity(deepest, levelTextureSizeF, pp);
     // Random jitter (matches force-centermass.wgsl: velocity += velocity*random)
     let rnd = textureLoad(randomValues, coords, 0);
