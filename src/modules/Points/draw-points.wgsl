@@ -365,35 +365,28 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
 
   let pointCoord = input.pointCoord;
 
+  // Analytic AA: signed distance from shape edge in unit-coord space.
+  // fwidth() must be called in uniform control flow per WGSL spec, so the
+  // distance is computed unconditionally at the top of the fragment. The
+  // shape branch below just gates whether we use it.
+  var shapeCoordForAA = pointCoord;
+  if (input.overallSize > input.shapeSize && input.shapeSize > 0.0) {
+    let scale = input.shapeSize / input.overallSize;
+    shapeCoordForAA = pointCoord / scale;
+  }
+  let distCircle = length(shapeCoordForAA) - 1.0;
+  let distShape = getShapeDistance(shapeCoordForAA, input.pointShape);
+  let isCircle = select(0.0, 1.0, input.pointShape == CIRCLE);
+  let dAA = mix(distShape, distCircle, isCircle);
+  let aaWidth = max(fwidth(dAA), 1e-4);
+  let shapeOpacity = 1.0 - smoothstep(-aaWidth, aaWidth, dAA);
+
   var finalShapeColor = vec4<f32>(0.0);
   var finalImageColor = vec4<f32>(0.0);
 
   // Handle shape rendering with centering logic
   if (input.pointShape != NONE) {
-    var shapeCoord = pointCoord;
-    if (input.overallSize > input.shapeSize && input.shapeSize > 0.0) {
-      let scale = input.shapeSize / input.overallSize;
-      shapeCoord = pointCoord / scale;
-    }
-
-    var opacity: f32;
-    if (input.pointShape == CIRCLE) {
-      // Analytic AA: signed distance from disc edge in unit-coord space.
-      // fwidth() gives the screen-space pixel width of one unit, so the
-      // smoothstep range is always exactly one device pixel regardless of
-      // point size or zoom level. Crisp at every scale, no fixed-threshold
-      // shimmer when zooming.
-      let d = length(shapeCoord) - 1.0;
-      let aa = max(fwidth(d), 1e-4);
-      opacity = 1.0 - smoothstep(-aa, aa, d);
-    } else {
-      let shapeDistance = getShapeDistance(shapeCoord, input.pointShape);
-      let aa = max(fwidth(shapeDistance), 1e-4);
-      opacity = 1.0 - smoothstep(-aa, aa, shapeDistance);
-    }
-    opacity = opacity * input.shapeColor.a;
-
-    finalShapeColor = vec4<f32>(input.shapeColor.rgb, opacity);
+    finalShapeColor = vec4<f32>(input.shapeColor.rgb, shapeOpacity * input.shapeColor.a);
   }
 
   // Handle image rendering with centering logic
