@@ -23,6 +23,9 @@ export class Lines extends CoreModule {
   public hoveredLineIndexFbo: Framebuffer | undefined
   public sampledLinksFbo: Framebuffer | undefined
   public linkStatusTexture: Texture | undefined
+  // Cached at updateArrow() time. Lets the line fragment shader skip the
+  // arrow-AA branch entirely when no link in the dataset is arrowed.
+  public hasArrowedLinks = false
   private linkStatusTextureSize = 0
   private drawCurveCommand: Model | undefined
   private drawCurveIndexCommand: Model | undefined
@@ -81,6 +84,7 @@ export class Lines extends CoreModule {
     };
     drawLineFragmentUniforms: {
       renderMode: number;
+      hasArrowedLinks: number;
     };
   }> | undefined
 
@@ -204,9 +208,11 @@ export class Lines extends CoreModule {
       drawLineFragmentUniforms: {
         uniformTypes: {
           renderMode: 'f32',
+          hasArrowedLinks: 'f32',
         },
         defaultUniforms: {
           renderMode: 0.0,
+          hasArrowedLinks: 0,
         },
       },
     })
@@ -462,6 +468,7 @@ export class Lines extends CoreModule {
       },
       drawLineFragmentUniforms: {
         renderMode: 0.0, // Normal rendering
+        hasArrowedLinks: this.hasArrowedLinks ? 1 : 0,
       },
     })
 
@@ -721,6 +728,13 @@ export class Lines extends CoreModule {
     const arrowData = data.linkArrows
       ? new Float32Array(data.linkArrows)
       : new Float32Array(linksNumber).fill(0)
+    // Scan once per upload to expose the all-zero (no-arrows) case to the
+    // fragment shader as a dead-strippable uniform flag.
+    let anyArrow = false
+    for (const v of arrowData) {
+      if (v !== 0) { anyArrow = true; break }
+    }
+    this.hasArrowedLinks = anyArrow
 
     if (!this.arrowBuffer) {
       this.arrowBuffer = device.createBuffer({
@@ -989,6 +1003,7 @@ export class Lines extends CoreModule {
       },
       drawLineFragmentUniforms: {
         renderMode: 1.0, // Index rendering for picking
+        hasArrowedLinks: this.hasArrowedLinks ? 1 : 0,
       },
     })
 

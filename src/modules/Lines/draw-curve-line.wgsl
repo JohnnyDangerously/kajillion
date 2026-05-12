@@ -48,6 +48,11 @@ struct DrawLineUniforms {
 
 struct DrawLineFragmentUniforms {
   renderMode: f32,
+  // Specialization flag — host sets to 1 only when the dataset contains at
+  // least one arrowed link. The fragment shader's arrow-AA path is dead-
+  // stripped by the compiler when this is constant zero, which is the
+  // default for graphs that don't customize linkArrows per-instance.
+  hasArrowedLinks: f32,
 };
 
 @group(0) @binding(0) var<uniform> drawLine: DrawLineUniforms;
@@ -279,7 +284,10 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   var opacity: f32 = 1.0;
   let color = input.rgbaColor.rgb;
 
-  if (input.useArrow > 0.5) {
+  // Uniform-gated fast path: when zero links in the dataset are arrowed
+  // (the default for plain edge data), the compiler dead-strips the whole
+  // arrow-AA branch and leaves only the cheap single-smoothstep line AA.
+  if (drawLineFragment.hasArrowedLinks > 0.0 && input.useArrow > 0.5) {
     let end_arrow = 0.5 + input.arrowLength / 2.0;
     let start_arrow = end_arrow - input.arrowLength;
     let arrowWidthDelta = input.arrowWidthFactor / 2.0;
