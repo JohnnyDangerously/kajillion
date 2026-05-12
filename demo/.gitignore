@@ -5,3 +5,7 @@ baselines/*.json
 # are intentionally checked in as reference points. Ad-hoc latest.json
 # and timestamped recordings stay local.
 !baselines/baseline-v*.json
+# Ad-hoc bakes stay local; only named shipping bakes (1m, 500k) check in.
+public/baked-*.bin
+!public/baked-1m.bin
+!public/baked-500k.bin

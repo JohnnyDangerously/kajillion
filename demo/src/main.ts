@@ -1,4 +1,5 @@
 import { Graph, type GraphConfig, type GpuTimingSnapshot } from '@kajillion/graph'
+import { encodeBaked, decodeBaked } from './baked-format'
 import { generateBA, type GeneratedGraph } from './generate-graph'
 
 interface DemoConfig {
@@ -38,6 +39,12 @@ const ctlEl = {
   sim: document.getElementById('c-sim') as HTMLInputElement,
   record: document.getElementById('btn-record') as HTMLButtonElement,
   recordStatus: document.getElementById('record-status') as HTMLElement,
+  bakeLabel: document.getElementById('c-bake-label') as HTMLInputElement,
+  bakePointsOnly: document.getElementById('c-bake-points-only') as HTMLInputElement,
+  bake: document.getElementById('btn-bake') as HTMLButtonElement,
+  bakeStatus: document.getElementById('bake-status') as HTMLElement,
+  load: document.getElementById('btn-load') as HTMLButtonElement,
+  loadStatus: document.getElementById('load-status') as HTMLElement,
 }
 
 const graphHost = document.getElementById('graph') as HTMLDivElement
@@ -352,6 +359,103 @@ async function recordBaseline (): Promise<void> {
 }
 
 ctlEl.record.addEventListener('click', () => { recordBaseline().catch(err => console.error(err)) })
+
+/* ────────────────────────────  Bake & Load  ─────────────────────────────── */
+
+async function bakeCurrentLayout (): Promise<void> {
+  const graph = currentGraph
+  const data = currentData
+  if (!graph || !data) {
+    ctlEl.bakeStatus.textContent = 'no graph loaded'
+    return
+  }
+  ctlEl.bake.disabled = true
+  const label = ctlEl.bakeLabel.value.trim() || 'default'
+  const pointsOnly = ctlEl.bakePointsOnly.checked
+  try {
+    // Wait for the simulation to settle so the bake captures the steady
+    // state rather than a mid-tumble snapshot. Cap at 60 s to avoid
+    // hanging on graphs that never quiet down (high-degree hubs etc.).
+    const settleDeadline = performance.now() + 60_000
+    while (graph.isSimulationRunning && performance.now() < settleDeadline) {
+      ctlEl.bakeStatus.textContent = `settling… alpha-progress ${graph.progress.toFixed(2)}`
+      await delay(200)
+    }
+    if (graph.isSimulationRunning) {
+      ctlEl.bakeStatus.textContent = 'warning: sim still running at 60 s, baking mid-state'
+    } else {
+      ctlEl.bakeStatus.textContent = 'reading back positions…'
+    }
+    const positions = await graph.readbackPointPositions()
+    if (positions.length === 0) {
+      ctlEl.bakeStatus.textContent = 'error: empty readback (WebGPU only)'
+      return
+    }
+    const blob = encodeBaked({
+      nodeCount: data.nodeCount,
+      edgeCount: pointsOnly ? 0 : data.edgeCount,
+      positions,
+      links: pointsOnly ? new Float32Array(0) : data.links,
+    })
+    const totalMb = (blob.byteLength / (1024 * 1024)).toFixed(2)
+    ctlEl.bakeStatus.textContent = `uploading ${totalMb} MB…`
+    const headers = new Headers()
+    headers.set('Content-Type', 'application/octet-stream')
+    const resp = await fetch(`/bake?label=${encodeURIComponent(label)}`, {
+      method: 'POST',
+      headers,
+      body: blob,
+    })
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`)
+    const json = await resp.json() as { savedTo: string; bytes: number }
+    ctlEl.bakeStatus.textContent = `saved · ${json.savedTo.split('/').pop()} · ${(json.bytes / (1024 * 1024)).toFixed(2)} MB`
+  } catch (err) {
+    ctlEl.bakeStatus.textContent = `error: ${(err as Error).message}`
+  } finally {
+    ctlEl.bake.disabled = false
+  }
+}
+
+async function loadBakedLayout (): Promise<void> {
+  const label = ctlEl.bakeLabel.value.trim() || 'default'
+  ctlEl.load.disabled = true
+  try {
+    ctlEl.loadStatus.textContent = `fetching baked-${label}.bin…`
+    const resp = await fetch(`/baked-${encodeURIComponent(label)}.bin`)
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    const buf = await resp.arrayBuffer()
+    const layout = decodeBaked(buf)
+    ctlEl.loadStatus.textContent = `decoded: ${layout.nodeCount.toLocaleString()} nodes, ${layout.edgeCount.toLocaleString()} edges. Rendering…`
+
+    // Tear down the live (sim-active) graph and rebuild with the baked
+    // positions, simulation disabled. The visitor sees a settled graph at
+    // scale — the audit's "headline screenshot the engine has earned".
+    if (currentGraph) {
+      try { currentGraph.destroy() } catch { /* ignore */ }
+      currentGraph = null
+    }
+    graphHost.innerHTML = ''
+    const cfg: DemoConfig = { ...currentConfig, sim: false }
+    const gcfg = buildGraphConfig(cfg)
+    const graph = new Graph(graphHost, gcfg)
+    await graph.ready
+    graph.setPointPositions(layout.positions, true /* dontRescale: positions are already in spaceSize */)
+    if (layout.edgeCount > 0) graph.setLinks(layout.links)
+    graph.render()
+    currentGraph = graph
+    currentData = { positions: layout.positions, links: layout.links, nodeCount: layout.nodeCount, edgeCount: layout.edgeCount }
+    overlayEl.metaN.textContent = `${layout.nodeCount.toLocaleString()} (baked)`
+    ;(window as unknown as { __demoGraph: Graph }).__demoGraph = graph
+    ctlEl.loadStatus.textContent = `loaded · ${(buf.byteLength / (1024 * 1024)).toFixed(2)} MB`
+  } catch (err) {
+    ctlEl.loadStatus.textContent = `error: ${(err as Error).message}`
+  } finally {
+    ctlEl.load.disabled = false
+  }
+}
+
+ctlEl.bake.addEventListener('click', () => { bakeCurrentLayout().catch(err => console.error(err)) })
+ctlEl.load.addEventListener('click', () => { loadBakedLayout().catch(err => console.error(err)) })
 
 /* ────────────────────────────  Boot  ────────────────────────────────────── */
 
