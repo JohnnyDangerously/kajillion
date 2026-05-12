@@ -690,6 +690,23 @@ export interface GraphConfigInterface {
    */
   pixelRatio: number;
   /**
+   * Adaptive pixel ratio during interaction. When the user is panning, zooming,
+   * or dragging, the canvas drops to this pixel ratio to keep frames cheap; on
+   * settle (default ~150ms after the last interaction event) it restores to
+   * `pixelRatio`. Fragment work is quadratic in pixel ratio, so 2.0 → 1.0
+   * during pan typically gives a 4× render cost reduction on retina displays.
+   *
+   * - `false` (default): always use `pixelRatio`.
+   * - `true`: use 1.0 during interaction.
+   * - `number`: use this value during interaction.
+   */
+  adaptivePixelRatio: boolean | number;
+  /**
+   * Milliseconds after the last interaction event before the canvas restores
+   * the full pixelRatio. Default 150ms.
+   */
+  adaptivePixelRatioSettleMs: number;
+  /**
    * Increase or decrease the size of the points when zooming in or out.
    * Default value: `false`
    */

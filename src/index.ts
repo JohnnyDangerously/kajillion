@@ -63,6 +63,11 @@ export class Graph {
   private dragInstance = new Drag(this.store, this.config)
 
   private fpsMonitor: FPSMonitor | undefined
+  // Adaptive DPR state — last applied useDevicePixels value, and the timestamp
+  // of the last frame the user was interacting. Used to avoid touching the
+  // canvas context every frame and to delay the settle restore.
+  private _lastAppliedDpr: number | undefined
+  private _lastInteractionMs = 0
   private timerQueryPool: ITimerQueryPool | undefined
   private lastPhysicsTickMs = Number.NEGATIVE_INFINITY
   private lastSimTickMs = 0
@@ -1812,6 +1817,35 @@ export class Graph {
   }
 
   /**
+   * Adaptive DPR. During pan/zoom/drag/active simulation, drop the canvas's
+   * effective pixel ratio to `adaptivePixelRatio` (default 1.0). On settle —
+   * idle for `adaptivePixelRatioSettleMs` after the last interaction event —
+   * restore the configured `pixelRatio`. Fragment cost is quadratic in pixel
+   * ratio, so 2.0 → 1.0 during pan typically gives a 4× render speedup on
+   * retina displays.
+   */
+  private maybeApplyAdaptiveDpr (nowMs: number): void {
+    if (!this.device?.canvasContext) return
+    const setting = this.config.adaptivePixelRatio
+    if (!setting) return
+    const interactionDpr = typeof setting === 'number' ? setting : 1.0
+    const fullDpr = this.config.pixelRatio
+    const isInteracting =
+      this.dragInstance.isActive ||
+      this.zoomInstance.isRunning ||
+      this.store.isSimulationRunning
+    if (isInteracting) {
+      this._lastInteractionMs = nowMs
+    }
+    const settleMs = this.config.adaptivePixelRatioSettleMs ?? 150
+    const settled = nowMs - this._lastInteractionMs > settleMs
+    const desired = settled ? fullDpr : interactionDpr
+    if (this._lastAppliedDpr === desired) return
+    this._lastAppliedDpr = desired
+    this.device.canvasContext.setProps({ useDevicePixels: desired })
+  }
+
+  /**
    * Renders a single frame (the actual rendering logic).
    * This does NOT schedule the next frame.
    */
@@ -1822,6 +1856,7 @@ export class Graph {
     this.fpsMonitor?.begin()
     this.timerQueryPool?.tick()
     this.resizeCanvas()
+    this.maybeApplyAdaptiveDpr(now ?? performance.now())
     if (!this.dragInstance.isActive) {
       this.findHoveredItem()
     }

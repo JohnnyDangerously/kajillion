@@ -112,6 +112,8 @@ export const defaultConfigValues = {
   useWebGPU: false,
   enableGpuTimings: false,
   pixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 2 : 2,
+  adaptivePixelRatio: false,
+  adaptivePixelRatioSettleMs: 150,
 
   // Zoom and pan
   enableZoom: true,

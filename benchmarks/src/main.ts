@@ -17,6 +17,7 @@ interface BenchParams {
   linkMinPixelLength: number | undefined;
   useWebGPU: boolean;
   nosim: boolean;
+  adaptiveDpr: boolean | undefined;
 }
 
 interface PassStats {
@@ -68,6 +69,7 @@ function readParams (): BenchParams {
     linkMinPixelLength: parseOptionalNum(p.get('linkMinPixelLength'), 'linkMinPixelLength'),
     useWebGPU: p.get('useWebGPU') === '1' || p.get('useWebGPU') === 'true',
     nosim: p.get('nosim') === '1' || p.get('nosim') === 'true',
+    adaptiveDpr: p.get('adaptiveDpr') === '1' || p.get('adaptiveDpr') === 'true' ? true : undefined,
   }
 }
 
@@ -247,6 +249,7 @@ async function runOnce (
     config.initialZoomLevel = params.zoomLevel
   }
   config.linkBlendMode = params.linkBlendMode
+  if (params.adaptiveDpr) config.adaptivePixelRatio = true
   if (params.linkOpacity !== undefined) config.linkOpacity = params.linkOpacity
   if (params.pointMinPixelSize !== undefined) config.pointMinPixelSize = params.pointMinPixelSize
   if (params.linkMinPixelLength !== undefined) config.linkMinPixelLength = params.linkMinPixelLength
