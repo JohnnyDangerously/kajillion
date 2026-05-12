@@ -1192,6 +1192,25 @@ export class Points extends CoreModule {
     } else {
       this.pointStatusTexture.copyImageData(copyData)
     }
+
+    // WebGPU vertex-pulling mirror: same per-point RGBA32F state in a
+    // storage buffer the draw vertex shader reads by instance index. The
+    // texture is still allocated above because non-draw shaders
+    // (find-hovered-point, find-points-in-rect, find-points-in-polygon)
+    // still sample it; only the hot vertex-stage sample is replaced.
+    if (device.info?.type === 'webgpu') {
+      const expectedBytes = state.byteLength
+      if (!this.pointStatusStorageBuffer || this.pointStatusStorageBuffer.destroyed || this.pointStatusStorageBuffer.byteLength !== expectedBytes) {
+        if (this.pointStatusStorageBuffer && !this.pointStatusStorageBuffer.destroyed) {
+          this.pointStatusStorageBuffer.destroy()
+        }
+        this.pointStatusStorageBuffer = device.createBuffer({
+          byteLength: expectedBytes,
+          usage: Buffer.STORAGE | Buffer.COPY_DST,
+        })
+      }
+      this.pointStatusStorageBuffer.write(new Uint8Array(state.buffer, state.byteOffset, state.byteLength))
+    }
   }
 
   public updatePinnedStatus (): void {
@@ -1614,6 +1633,7 @@ export class Points extends CoreModule {
         // WebGL2 binding: positionsTexture (legacy path); luma.gl ignores unused
         // bindings per backend's shader layout.
         ...(this.positionStorageBuffer && { positions: this.positionStorageBuffer }),
+        ...(this.pointStatusStorageBuffer && { pointStatusBuf: this.pointStatusStorageBuffer }),
         positionsTexture: this.currentPositionTexture,
         pointStatus: this.pointStatusTexture,
         imageAtlasTexture: this.imageAtlasTexture,
@@ -1637,6 +1657,7 @@ export class Points extends CoreModule {
         // WebGL2 binding: positionsTexture (legacy path); luma.gl ignores unused
         // bindings per backend's shader layout.
         ...(this.positionStorageBuffer && { positions: this.positionStorageBuffer }),
+        ...(this.pointStatusStorageBuffer && { pointStatusBuf: this.pointStatusStorageBuffer }),
         positionsTexture: this.currentPositionTexture,
         pointStatus: this.pointStatusTexture,
         imageAtlasTexture: this.imageAtlasTexture,
@@ -1660,6 +1681,7 @@ export class Points extends CoreModule {
         // WebGL2 binding: positionsTexture (legacy path); luma.gl ignores unused
         // bindings per backend's shader layout.
         ...(this.positionStorageBuffer && { positions: this.positionStorageBuffer }),
+        ...(this.pointStatusStorageBuffer && { pointStatusBuf: this.pointStatusStorageBuffer }),
         positionsTexture: this.currentPositionTexture,
         pointStatus: this.pointStatusTexture,
         imageAtlasTexture: this.imageAtlasTexture,

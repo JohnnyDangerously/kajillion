@@ -54,6 +54,12 @@ struct DrawFragmentUniforms {
 @group(0) @binding(6) var imageAtlasTextureSampler: sampler;
 @group(0) @binding(7) var imageAtlasCoords: texture_2d<f32>;
 @group(0) @binding(8) var imageAtlasCoordsSampler: sampler;
+// Vertex-pulling: pointStatus (R=greyout, G=outlined) read via storage
+// buffer instead of vertex-stage textureSampleLevel. Parallels the
+// positions buffer; Apple TBDR pays a heavy cost for vertex-stage texture
+// sampling. The texture itself is preserved at @binding(3) because
+// non-draw shaders (find-hovered-point etc.) still sample it.
+@group(0) @binding(9) var<storage, read> pointStatusBuf: array<vec4<f32>>;
 
 struct VertexInput {
   @location(0) quadCorner: vec2<f32>,
@@ -105,8 +111,11 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> 
 
   let uv = (input.pointIndices + vec2<f32>(0.5)) / drawVertex.pointsTextureSize;
 
-  // Read point status texture: R = greyout, G = outlined
-  let status = textureSampleLevel(pointStatus, pointStatusSampler, uv, 0.0);
+  // Read point status (R = greyout, G = outlined) via storage buffer to
+  // avoid vertex-stage textureSampleLevel — the same TBDR pathology that
+  // motivated the positions→storage migration. The CPU host writes the
+  // same RGBA32F state to both the texture and the buffer.
+  let status = pointStatusBuf[instanceIdx];
   output.isGreyedOut = status.r;
   output.isOutlined = status.g;
   var isHighlighted: f32 = 0.0;
