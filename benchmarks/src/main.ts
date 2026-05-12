@@ -18,6 +18,7 @@ interface BenchParams {
   useWebGPU: boolean;
   nosim: boolean;
   adaptiveDpr: boolean | undefined;
+  msaa: 1 | 4;
 }
 
 interface PassStats {
@@ -70,6 +71,7 @@ function readParams (): BenchParams {
     useWebGPU: p.get('useWebGPU') === '1' || p.get('useWebGPU') === 'true',
     nosim: p.get('nosim') === '1' || p.get('nosim') === 'true',
     adaptiveDpr: p.get('adaptiveDpr') === '1' || p.get('adaptiveDpr') === 'true' ? true : undefined,
+    msaa: p.get('msaa') === '4' ? 4 : 1,
   }
 }
 
@@ -254,6 +256,7 @@ async function runOnce (
   if (params.pointMinPixelSize !== undefined) config.pointMinPixelSize = params.pointMinPixelSize
   if (params.linkMinPixelLength !== undefined) config.linkMinPixelLength = params.linkMinPixelLength
   if (params.useWebGPU) config.useWebGPU = true
+  if (params.msaa === 4) config.msaa = 4
 
   /* eslint-disable no-console */
   let stage = 'construct'

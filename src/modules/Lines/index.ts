@@ -269,6 +269,8 @@ export class Lines extends CoreModule {
         blendAlphaSrcFactor: 'one',
         blendAlphaDstFactor: config.linkBlendMode === 'add' ? 'one' : 'one-minus-src-alpha',
         depthWriteEnabled: false,
+        // Match the canvas pass's sample count (1 or 4 when MSAA on).
+        sampleCount: config.msaa,
       },
     })
 

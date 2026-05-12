@@ -114,6 +114,7 @@ export const defaultConfigValues = {
   pixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 2 : 2,
   adaptivePixelRatio: false,
   adaptivePixelRatioSettleMs: 150,
+  msaa: 1,
 
   // Zoom and pan
   enableZoom: true,

@@ -749,6 +749,12 @@ export class Points extends CoreModule {
         blendAlphaSrcFactor: 'one',
         blendAlphaDstFactor: 'one-minus-src-alpha',
         depthWriteEnabled: false,
+        // MSAA sample count must match the render pass's color attachment.
+        // 1 = no MSAA (canvas single-sample). 4 = 4× MSAA into a separate
+        // multisample target that resolves to the canvas on store. See
+        // src/index.ts for the hand-rolled descriptor that supplies the
+        // multisample view + resolveTarget.
+        sampleCount: this.config.msaa,
       },
     })
 
@@ -1050,6 +1056,7 @@ export class Points extends CoreModule {
         blendAlphaSrcFactor: 'one',
         blendAlphaDstFactor: 'one-minus-src-alpha',
         depthWriteEnabled: false,
+        sampleCount: this.config.msaa,
       },
     })
 

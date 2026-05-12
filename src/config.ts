@@ -707,6 +707,24 @@ export interface GraphConfigInterface {
    */
   adaptivePixelRatioSettleMs: number;
   /**
+   * Multi-sample anti-aliasing for the canvas render pass. WebGPU-only.
+   *
+   * - `1` (default): no MSAA. Analytic AA in the point/line fragment shaders
+   *   handles edge smoothing.
+   * - `4`: 4× MSAA. Produces noticeably smoother edges where analytic AA is
+   *   weakest — short lines at oblique angles, small points crossing pixel
+   *   boundaries, dense overlapping shapes. On Apple TBDR the multisample
+   *   target lives in tile memory and resolves on tile store; the extra
+   *   cost is typically only ~10-20% of a non-MSAA render at the same
+   *   resolution because shaded samples are amortized via coverage masking.
+   *
+   * Memory cost: an MSAA render target sized to the canvas. At 1920×1080
+   * × DPR=2 × 4 samples × 8 bytes/texel (rgba16float canvas), that's
+   * ~265 MB. At higher resolutions (4K) the cost scales linearly; budget
+   * before enabling on memory-constrained devices.
+   */
+  msaa: 1 | 4;
+  /**
    * Increase or decrease the size of the points when zooming in or out.
    * Default value: `false`
    */

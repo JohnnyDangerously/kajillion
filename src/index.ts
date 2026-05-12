@@ -25,6 +25,7 @@ import { Store, ALPHA_MIN, MAX_HOVER_DETECTION_DELAY, MIN_MOUSE_MOVEMENT_THRESHO
 import { Zoom } from '@/graph/modules/Zoom'
 import { Drag } from '@/graph/modules/Drag'
 import { createTimerQueryPool, type ITimerQueryPool, type GpuTimingSnapshot } from '@/graph/perf'
+import { MsaaTarget, makeMsaaPassWrapper } from '@/graph/render/msaa-target'
 
 export class Graph {
   /** Current graph configuration. Always fully populated with default values for any unset properties. */
@@ -69,6 +70,10 @@ export class Graph {
   private _lastAppliedDpr: number | undefined
   private _lastInteractionMs = 0
   private timerQueryPool: ITimerQueryPool | undefined
+  // MSAA target for the canvas pass. Allocated on the first frame when
+  // config.msaa > 1 and the device is WebGPU; resized to match canvas
+  // dimensions. Released in destroy().
+  private msaaTarget: MsaaTarget | undefined
   private lastPhysicsTickMs = Number.NEGATIVE_INFINITY
   private lastSimTickMs = 0
 
@@ -1321,6 +1326,8 @@ export class Graph {
     this.forceLinkIncoming?.destroy()
     this.forceLinkOutgoing?.destroy()
     this.forceMouse?.destroy()
+    this.msaaTarget?.destroy()
+    this.msaaTarget = undefined
 
     if (this.device) {
       // Only clear and destroy the device if Graph owns it
@@ -1846,6 +1853,92 @@ export class Graph {
   }
 
   /**
+   * Begin a hand-rolled MSAA-enabled render pass that targets the canvas.
+   *
+   * luma.gl 9.2.6's RenderPass abstraction doesn't expose `resolveTarget` on
+   * its color attachments, so we bypass it: hand-build the
+   * GPURenderPassDescriptor with the multisample texture as the `view` and
+   * the canvas backbuffer as the `resolveTarget`, with `storeOp: 'discard'`
+   * on the multisample view (only the resolved single-sample copy ever
+   * leaves tile memory on TBDR).
+   *
+   * The returned object satisfies the structural contract that
+   * `model.draw(pass)` relies on: a `.handle` GPURenderPassEncoder plus
+   * `pushDebugGroup`/`popDebugGroup`/`end` methods. luma's RenderPipeline
+   * and VertexArray only touch `pass.handle.{setPipeline,setBindGroup,
+   * setVertexBuffer,setIndexBuffer,draw,drawIndexed}`, all of which exist
+   * on the raw GPURenderPassEncoder.
+   */
+  private beginMsaaCanvasPass (
+    canvasFramebuffer: Framebuffer | undefined,
+    firstPass: boolean,
+    backgroundColor: [number, number, number, number]
+  ): RenderPass {
+    // The luma Framebuffer's first color attachment wraps a luma Texture
+    // around the canvas's current GPUTexture. Reach into it for the raw
+    // GPUTextureView we need as the resolve target.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const canvasAttachment = canvasFramebuffer?.colorAttachments?.[0] as any
+    const resolveView: GPUTextureView | undefined = canvasAttachment?.handle
+    const canvasTextureHandle: GPUTexture | undefined = canvasAttachment?.texture?.handle
+    if (!resolveView || !canvasTextureHandle) {
+      // Defensive fallback: if we can't reach the underlying view, drop
+      // MSAA for this frame so we don't crash. Should never hit on a
+      // healthy WebGPU device + valid canvas context.
+      console.warn('[kajillion] MSAA canvas pass: missing canvas view; falling back to single-sample.')
+      return (this.device as Device).beginRenderPass({
+        framebuffer: canvasFramebuffer,
+        clearColor: firstPass ? backgroundColor : false,
+        clearDepth: firstPass ? 1 : false,
+        clearStencil: firstPass ? 0 : false,
+      })
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gpuDevice = (this.device as any).handle as GPUDevice
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const commandEncoder = (this.device as any).commandEncoder?.handle as GPUCommandEncoder
+
+    // Lazy: allocate the MSAA target the first time we hit this path, and
+    // resize whenever the canvas backbuffer dimensions change.
+    this.msaaTarget ||= new MsaaTarget({
+      device: gpuDevice,
+      format: canvasTextureHandle.format,
+      sampleCount: 4,
+    })
+    this.msaaTarget.ensureSize(canvasTextureHandle.width, canvasTextureHandle.height)
+
+    const colorAttachment = this.msaaTarget.getColorAttachment(
+      resolveView,
+      firstPass,
+      {
+        r: backgroundColor[0],
+        g: backgroundColor[1],
+        b: backgroundColor[2],
+        a: backgroundColor[3],
+      }
+    )
+
+    const descriptor: GPURenderPassDescriptor = {
+      label: 'kajillion-msaa-canvas-pass',
+      colorAttachments: [colorAttachment],
+    }
+
+    // The timer-query pool's beginRenderPass interceptor injects
+    // timestampWrites into descriptors that pass through luma's
+    // `device.beginRenderPass`. We're bypassing luma here, so wire the
+    // timestamps ourselves by consuming the pool's pending slot if set.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pool = this.timerQueryPool as any
+    if (pool && typeof pool.consumePendingForRawPass === 'function') {
+      pool.consumePendingForRawPass(descriptor)
+    }
+
+    const handle = commandEncoder.beginRenderPass(descriptor)
+    return makeMsaaPassWrapper(handle) as unknown as RenderPass
+  }
+
+  /**
    * Renders a single frame (the actual rendering logic).
    * This does NOT schedule the next frame.
    */
@@ -1901,35 +1994,56 @@ export class Graph {
         !!this.graph.linksNumber &&
         this.graph.linksNumber > 0
 
-      // Lines and points run as separate render passes so WebGPU's
-      // timestampWrites can attach to each independently; on WebGL2 the split
-      // is a no-op cost-wise. Only the first pass clears; subsequent passes
-      // load the existing attachment so output composes correctly.
-      let firstPass = true
-      const startPass = (): RenderPass => {
-        const pass = (this.device as Device).beginRenderPass({
-          framebuffer: canvasFramebuffer,
-          clearColor: firstPass ? backgroundColor : false,
-          clearDepth: firstPass ? 1 : false,
-          clearStencil: firstPass ? 0 : false,
-        })
-        firstPass = false
-        return pass
-      }
+      const isWebGPU = this.device.info?.type === 'webgpu'
+      const msaaActive = isWebGPU && this.config.msaa > 1
 
-      if (shouldDrawLinks) {
-        this.timerQueryPool?.begin('render.lines')
-        const linesPass = startPass()
-        this.lines?.draw(linesPass)
-        linesPass.end()
+      if (msaaActive) {
+        // MSAA requires a *single* render pass for all canvas content: the
+        // resolve happens at pass-end and writes resolveTarget = avg(samples),
+        // which would overwrite (not blend over) a prior pass's resolved
+        // output. Splitting lines/points into separate passes — even with
+        // loadOp:'load' on the canvas — corrupts the composite because the
+        // multisample target is `storeOp:'discard'` (samples don't survive
+        // between passes; loading would read undefined). One combined pass,
+        // one resolve, one timestamp slot.
+        this.timerQueryPool?.begin('render.canvas')
+        const pass = this.beginMsaaCanvasPass(canvasFramebuffer, true, backgroundColor)
+        if (shouldDrawLinks) this.lines?.draw(pass)
+        this.points?.draw(pass)
+        pass.end()
+        this.timerQueryPool?.end()
+      } else {
+        // Non-MSAA: lines and points run as separate render passes so
+        // WebGPU's timestampWrites can attach to each independently; on
+        // WebGL2 the split is a no-op cost-wise. Only the first pass
+        // clears; subsequent passes load the existing attachment so output
+        // composes correctly.
+        let firstPass = true
+        const startPass = (): RenderPass => {
+          const pass = (this.device as Device).beginRenderPass({
+            framebuffer: canvasFramebuffer,
+            clearColor: firstPass ? backgroundColor : false,
+            clearDepth: firstPass ? 1 : false,
+            clearStencil: firstPass ? 0 : false,
+          })
+          firstPass = false
+          return pass
+        }
+
+        if (shouldDrawLinks) {
+          this.timerQueryPool?.begin('render.lines')
+          const linesPass = startPass()
+          this.lines?.draw(linesPass)
+          linesPass.end()
+          this.timerQueryPool?.end()
+        }
+
+        this.timerQueryPool?.begin('render.points')
+        const pointsPass = startPass()
+        this.points?.draw(pointsPass)
+        pointsPass.end()
         this.timerQueryPool?.end()
       }
-
-      this.timerQueryPool?.begin('render.points')
-      const pointsPass = startPass()
-      this.points?.draw(pointsPass)
-      pointsPass.end()
-      this.timerQueryPool?.end()
 
       if (this.dragInstance.isActive) {
         // Swap-before-write: after the swap, `previous` holds the freshest positions so drag()

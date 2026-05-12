@@ -168,6 +168,31 @@ export class TimerQueryPoolWebGPU {
     try { fn() } finally { this.end() }
   }
 
+  /**
+   * Hand-rolled-pass escape hatch. The canvas MSAA path bypasses luma's
+   * `device.beginRenderPass` (because luma doesn't expose `resolveTarget`),
+   * so the `installBeginRenderPassHook` interceptor never sees the call.
+   * The engine calls this method right before `commandEncoder.beginRenderPass`
+   * to consume the same `pending` slot that the hook would, and writes
+   * `timestampWrites` directly into the raw descriptor.
+   */
+  public consumePendingForRawPass (descriptor: GPURenderPassDescriptor): void {
+    if (!this.hasTimestamp) return
+    const pending = this.pending
+    if (!pending || !this.querySet || !this.currentFrame) return
+    descriptor.timestampWrites = {
+      querySet: this.querySet,
+      beginningOfPassWriteIndex: pending.beginIdx,
+      endOfPassWriteIndex: pending.endIdx,
+    }
+    this.currentFrame.pairs.push({
+      label: pending.label,
+      beginIdx: pending.beginIdx,
+      endIdx: pending.endIdx,
+    })
+    this.pending = null
+  }
+
   public getSnapshot (): GpuTimingSnapshot {
     const out: GpuTimingSnapshot = {}
     for (const [label, s] of this.stats) {
