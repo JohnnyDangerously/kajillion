@@ -1979,6 +1979,16 @@ export class Graph {
     // stage (a TBDR slow path that cost ~750ms/frame at n=100k before this).
     this.points?.syncPositionStorageBuffer()
 
+    // WebGPU per-link compute pre-pass: fills the visible vertex shader's
+    // input (lineInstanceBuffer) so the 16+ instance-uniform ops that the
+    // legacy shader runs 4× per quad corner are amortized to once per link.
+    // Must run BEFORE the canvas render pass opens — compute and render
+    // passes can't be nested. No-op on WebGL2 or before the pipeline is
+    // initialized.
+    this.timerQueryPool?.begin('lines.precompute')
+    this.lines?.precompute()
+    this.timerQueryPool?.end()
+
     // Create a single render pass for drawing (points, lines, etc.)
     // Simulation will use separate render passes later
     if (this.device) {
