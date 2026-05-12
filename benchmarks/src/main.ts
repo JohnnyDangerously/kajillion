@@ -19,6 +19,7 @@ interface BenchParams {
   nosim: boolean;
   adaptiveDpr: boolean | undefined;
   msaa: 1 | 4;
+  linkWidthScale: number | undefined;
 }
 
 interface PassStats {
@@ -72,6 +73,7 @@ function readParams (): BenchParams {
     nosim: p.get('nosim') === '1' || p.get('nosim') === 'true',
     adaptiveDpr: p.get('adaptiveDpr') === '1' || p.get('adaptiveDpr') === 'true' ? true : undefined,
     msaa: p.get('msaa') === '4' ? 4 : 1,
+    linkWidthScale: parseOptionalNum(p.get('linkWidthScale'), 'linkWidthScale'),
   }
 }
 
@@ -257,6 +259,7 @@ async function runOnce (
   if (params.linkMinPixelLength !== undefined) config.linkMinPixelLength = params.linkMinPixelLength
   if (params.useWebGPU) config.useWebGPU = true
   if (params.msaa === 4) config.msaa = 4
+  if (params.linkWidthScale !== undefined) config.linkWidthScale = params.linkWidthScale
 
   /* eslint-disable no-console */
   let stage = 'construct'
