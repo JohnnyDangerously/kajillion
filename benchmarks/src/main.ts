@@ -162,13 +162,58 @@ function deriveFps (rawSnapshots: GpuTimingSnapshot[], measureMs: number): numbe
   return medianCount * 1000 / measureMs
 }
 
+interface PowerInfo {
+  /** True if `navigator.getBattery()` was available and resolved. */
+  supported: boolean;
+  /** [0, 1]. Undefined when unsupported. */
+  level?: number;
+  charging?: boolean;
+  /**
+   * Throttle hint: machine is NOT on charger. macOS Low Power Mode kicks in
+   * silently when discharging (especially below 80%) and drops GPU perf
+   * ~1.5-2×. There is no web API for LPM directly, so charger state is the
+   * best proxy available. If true, cross-run perf comparisons against
+   * AC-power baselines are invalid.
+   */
+  throttleSuspected?: boolean;
+}
+
+async function getPowerInfo (): Promise<PowerInfo> {
+  type NavigatorBattery = Navigator & {
+    getBattery?: () => Promise<{ level: number; charging: boolean }>;
+  }
+  const nav = navigator as NavigatorBattery
+  if (typeof nav.getBattery !== 'function') return { supported: false }
+  try {
+    const battery = await nav.getBattery()
+    const throttleSuspected = !battery.charging
+    return {
+      supported: true,
+      level: battery.level,
+      charging: battery.charging,
+      throttleSuspected,
+    }
+  } catch {
+    return { supported: false }
+  }
+}
+
+function formatPowerInfo (info: PowerInfo): string {
+  if (!info.supported) return 'navigator.getBattery unavailable (Safari/other)'
+  const pct = info.level !== undefined ? `${Math.round(info.level * 100)}%` : '?'
+  const src = info.charging ? 'AC' : 'Battery'
+  const warn = info.throttleSuspected ? ' ⚠︎ likely throttled' : ''
+  return `${src} ${pct}${warn}`
+}
+
 function renderResults (
   agg: AggregateSnapshot,
   container: HTMLElement,
   params: BenchParams,
   data: GeneratedGraph,
   rawSnapshots: GpuTimingSnapshot[],
-  wallFpsList: number[]
+  wallFpsList: number[],
+  power: PowerInfo
 ): void {
   const entries = Object.entries(agg).sort((a, b) => b[1].median - a[1].median)
   const totalMedian = entries.reduce((s, [, t]) => s + t.median, 0)
@@ -191,16 +236,30 @@ function renderResults (
   const rawJson = JSON.stringify({
     params,
     dataset: { nodeCount: data.nodeCount, edgeCount: data.edgeCount },
+    power,
     derived: { renderFps: fps, msPerRenderFrame: msPerFrame, wallFps, wallMsPerFrame },
     aggregate: agg,
     runs: rawSnapshots,
     wallFps: wallFpsList,
   }, null, 2)
   const fallbackRow = '<tr><td colspan="5"><em>No samples — extension unsupported on this browser?</em></td></tr>'
+  // Visible warning when the machine is likely throttled (battery + macOS
+  // Low Power Mode kicks in silently and drops GPU perf ~1.5-2×). Bigger
+  // and yellow so it can't be missed in a quick screenshot review — the
+  // bench has produced misleading regression alarms when this state was
+  // overlooked.
+  const powerBanner = power.throttleSuspected
+    ? `<p style="background:#3a2e0a;color:#ffe27a;padding:8px 12px;border-radius:4px;margin:8px 0">
+         <strong>⚠︎ Throttle suspected:</strong> ${formatPowerInfo(power)} —
+         absolute numbers are NOT comparable to runs on AC power.
+       </p>`
+    : ''
 
   container.innerHTML = `
     <h2>Baseline result</h2>
+    ${powerBanner}
     <p><strong>Dataset:</strong> ${datasetLine}</p>
+    <p><strong>Power:</strong> ${formatPowerInfo(power)}</p>
     <p><strong>Window:</strong> ${params.repeat} run(s) of ${params.measureMs} ms measurement after ${params.warmupMs} ms warmup</p>
     <p><strong>Render FPS (GPU timer, median):</strong> ${fps.toFixed(1)} fps &middot; ${formatMs(msPerFrame)} per render frame</p>
     <p><strong>Wall-clock FPS (rAF count, median):</strong> ${wallFps.toFixed(1)} fps &middot; ${formatMs(wallMsPerFrame)} per frame</p>
@@ -323,6 +382,17 @@ async function run (): Promise<void> {
   const graphDiv = document.getElementById('graph') as HTMLDivElement
   const resultsDiv = document.getElementById('results') as HTMLElement
 
+  // Capture power state BEFORE anything else. Logged loudly so a quick
+  // console scan reveals throttle conditions without scrolling — the most
+  // common bench mistake is comparing throttled to non-throttled numbers.
+  const power = await getPowerInfo()
+  // eslint-disable-next-line no-console
+  console.log(`[bench] power: ${formatPowerInfo(power)}`)
+  if (power.throttleSuspected) {
+    // eslint-disable-next-line no-console
+    console.warn('[bench] ⚠︎ Throttle suspected — comparisons to AC-power baselines are invalid.')
+  }
+
   status.textContent = `Generating BA graph (n=${params.nodeCount}, m=${params.edgesPerNode}, seed=${params.seed})…`
   const t0 = performance.now()
   const data = generateBA(params.nodeCount, params.edgesPerNode, params.seed)
@@ -341,13 +411,14 @@ async function run (): Promise<void> {
 
   const agg = aggregate(snapshots)
   status.textContent = 'Done.'
-  renderResults(agg, resultsDiv, params, data, snapshots, wallFpsList)
+  renderResults(agg, resultsDiv, params, data, snapshots, wallFpsList, power)
   console.log('[kajillion-bench] aggregate', agg)
   await postResults({
     timestamp: new Date().toISOString(),
     userAgent: navigator.userAgent,
     devicePixelRatio: window.devicePixelRatio,
     viewport: { width: window.innerWidth, height: window.innerHeight },
+    power,
     params,
     dataset: { nodeCount: data.nodeCount, edgeCount: data.edgeCount },
     aggregate: agg,
