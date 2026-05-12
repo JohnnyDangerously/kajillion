@@ -49,6 +49,10 @@ export class Graph {
   private shouldDestroyDevice: boolean
   private requestAnimationFrameId = 0
   private isRightClickMouse = false
+  // Idle-skip dirty flag: when true, next frame renders even if sim is
+  // settled. Set by programmatic state mutations that need a redraw
+  // (config changes, setColors, etc.). Auto-cleared after each render.
+  private isRenderDirty = true
 
   private store = new Store()
   private points: Points | undefined
@@ -1945,6 +1949,27 @@ export class Graph {
   private renderFrame (now?: number): void {
     if (this._isDestroyed) return
     if (!this.store.pointsTextureSize) return
+
+    // Idle-frame skip: when the simulation has fully settled (alpha dropped
+    // below alphaStopThreshold) AND there's no user-input event this frame
+    // AND no drag in progress, the canvas content from the previous frame
+    // is still on screen — re-rendering would produce identical pixels.
+    // Bail out: no GPU work, no timer-query slots, no hover readback.
+    // The browser keeps presenting the last-submitted swapchain image, so
+    // the canvas looks unchanged at vsync rate (~60 Hz) for free.
+    //
+    // Re-renders are triggered automatically by:
+    //   - mouse / wheel / pointer events (set `currentEvent` before this runs)
+    //   - active drag (`dragInstance.isActive === true`)
+    //   - sim restart (`isSimulationRunning` flips back to true; e.g. start())
+    // Programmatic state changes (setColors, setSizes, etc.) must call
+    // `this.markDirty()` to force a re-render on the next frame.
+    const isSettled = !this.store.isSimulationRunning
+    const isIdle = isSettled && !this.currentEvent && !this.dragInstance.isActive && !this.isRenderDirty
+    if (isIdle) {
+      return
+    }
+    this.isRenderDirty = false
 
     this.fpsMonitor?.begin()
     this.timerQueryPool?.tick()
