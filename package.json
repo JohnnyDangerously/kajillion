@@ -13,6 +13,7 @@
     "CITATION.cff"
   ],
   "scripts": {
+    "postinstall": "patch-package",
     "build": "vite build --mode es && vite build --mode umd",
     "watch": "vite build --watch",
     "lint": "eslint --cache ./src --ext .ts --ignore-path .gitignore",
@@ -79,7 +80,7 @@
     "@luma.gl/engine": "~9.2.6",
     "@luma.gl/shadertools": "~9.2.6",
     "@luma.gl/webgl": "~9.2.6",
-    "@luma.gl/webgpu": "~9.2.6",
+    "@luma.gl/webgpu": "9.2.6",
     "d3-array": "^3.2.0",
     "d3-color": "^3.1.0",
     "d3-drag": "^3.0.0",
@@ -91,6 +92,8 @@
     "dompurify": "^3.2.6",
     "gl-bench": "^1.0.42",
     "gl-matrix": "^3.4.3",
+    "patch-package": "^8.0.1",
+    "postinstall-postinstall": "^2.1.0",
     "random": "^4.1.0"
   },
   "pre-commit": "lint:staged",

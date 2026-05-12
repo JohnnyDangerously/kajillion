@@ -3,7 +3,7 @@ import 'd3-transition'
 import { easeQuadInOut, easeQuadIn, easeQuadOut } from 'd3-ease'
 import { D3ZoomEvent } from 'd3-zoom'
 import { D3DragEvent } from 'd3-drag'
-import { Device, Framebuffer, luma } from '@luma.gl/core'
+import { Device, Framebuffer, luma, type RenderPass } from '@luma.gl/core'
 import { webgl2Adapter } from '@luma.gl/webgl'
 // webgpuAdapter is dynamically imported inside createDevice() when useWebGPU is set.
 // Keeps it out of the WebGL2-only bundle (~50 KB min savings); zero cost when the
@@ -24,7 +24,7 @@ import { Points } from '@/graph/modules/Points'
 import { Store, ALPHA_MIN, MAX_HOVER_DETECTION_DELAY, MIN_MOUSE_MOVEMENT_THRESHOLD, type Hovered } from '@/graph/modules/Store'
 import { Zoom } from '@/graph/modules/Zoom'
 import { Drag } from '@/graph/modules/Drag'
-import { TimerQueryPool, type GpuTimingSnapshot } from '@/graph/perf'
+import { createTimerQueryPool, type ITimerQueryPool, type GpuTimingSnapshot } from '@/graph/perf'
 
 export class Graph {
   /** Current graph configuration. Always fully populated with default values for any unset properties. */
@@ -63,7 +63,7 @@ export class Graph {
   private dragInstance = new Drag(this.store, this.config)
 
   private fpsMonitor: FPSMonitor | undefined
-  private timerQueryPool: TimerQueryPool | undefined
+  private timerQueryPool: ITimerQueryPool | undefined
   private lastPhysicsTickMs = Number.NEGATIVE_INFINITY
   private lastSimTickMs = 0
 
@@ -284,7 +284,7 @@ export class Graph {
       this.store.updateLinkHoveringEnabled(this.config)
 
       if (this.config.showFPSMonitor) this.fpsMonitor = new FPSMonitor(this.canvas)
-      if (this.config.enableGpuTimings) this.timerQueryPool = new TimerQueryPool(device)
+      if (this.config.enableGpuTimings) this.timerQueryPool = createTimerQueryPool(device)
 
       if (this.config.randomSeed !== undefined) this.store.addRandomSeed(this.config.randomSeed)
 
@@ -1519,7 +1519,7 @@ export class Graph {
     }
     if (prevConfig.enableGpuTimings !== this.config.enableGpuTimings) {
       if (this.config.enableGpuTimings && this.device) {
-        this.timerQueryPool = new TimerQueryPool(this.device)
+        this.timerQueryPool = createTimerQueryPool(this.device)
       } else {
         this.timerQueryPool?.destroy()
         this.timerQueryPool = undefined
@@ -1852,12 +1852,6 @@ export class Graph {
       // 2D-only pass: drop the canvas's default depth attachment so the pipelines
       // (no depthWriteEnabled) match the render pass attachment state.
       const canvasFramebuffer = this.device.canvasContext?.getCurrentFramebuffer({ depthStencilFormat: false })
-      const drawRenderPass = this.device.beginRenderPass({
-        framebuffer: canvasFramebuffer,
-        clearColor: backgroundColor,
-        clearDepth: 1,
-        clearStencil: 0,
-      })
 
       const { config: { renderLinks } } = this
       const shouldDrawLinks =
@@ -1866,28 +1860,45 @@ export class Graph {
         !!this.graph.linksNumber &&
         this.graph.linksNumber > 0
 
+      // Lines and points run as separate render passes so WebGPU's
+      // timestampWrites can attach to each independently; on WebGL2 the split
+      // is a no-op cost-wise. Only the first pass clears; subsequent passes
+      // load the existing attachment so output composes correctly.
+      let firstPass = true
+      const startPass = (): RenderPass => {
+        const pass = (this.device as Device).beginRenderPass({
+          framebuffer: canvasFramebuffer,
+          clearColor: firstPass ? backgroundColor : false,
+          clearDepth: firstPass ? 1 : false,
+          clearStencil: firstPass ? 0 : false,
+        })
+        firstPass = false
+        return pass
+      }
+
       if (shouldDrawLinks) {
         this.timerQueryPool?.begin('render.lines')
-        this.lines?.draw(drawRenderPass)
+        const linesPass = startPass()
+        this.lines?.draw(linesPass)
+        linesPass.end()
         this.timerQueryPool?.end()
       }
 
       this.timerQueryPool?.begin('render.points')
-      this.points?.draw(drawRenderPass)
+      const pointsPass = startPass()
+      this.points?.draw(pointsPass)
+      pointsPass.end()
       this.timerQueryPool?.end()
 
       if (this.dragInstance.isActive) {
         // Swap-before-write: after the swap, `previous` holds the freshest positions so drag()
-        // reads those and writes the drag result into `current`. This runs
-        // after points.draw() above — the drag result becomes visible on
-        // the next frame; trackPoints() picks it up immediately below.
+        // reads those and writes the drag result into `current`. drag/trackPoints
+        // are independent of the canvas render pass — they use their own FBOs.
         this.points?.swapFbo()
         this.points?.drag()
-        // Update tracked positions after drag, even when simulation is disabled
         this.points?.trackPoints()
       }
 
-      drawRenderPass.end()
       this.device.submit()
     }
 

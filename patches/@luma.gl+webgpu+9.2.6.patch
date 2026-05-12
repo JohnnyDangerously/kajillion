@@ -1,0 +1,132 @@
+diff --git a/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-compute-pipeline.js b/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-compute-pipeline.js
+index 4bee5c2..3c5e24a 100644
+--- a/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-compute-pipeline.js
++++ b/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-compute-pipeline.js
+@@ -11,6 +11,8 @@ export class WebGPUComputePipeline extends ComputePipeline {
+     /** For internal use to create BindGroups */
+     _bindGroupLayout = null;
+     _bindGroup = null;
++    _bindGroupCache = new Map();
++    static _BIND_GROUP_CACHE_LIMIT = 32;
+     /** For internal use to create BindGroups */
+     _bindings = {};
+     constructor(device, props) {
+@@ -36,15 +38,34 @@ export class WebGPUComputePipeline extends ComputePipeline {
+     setBindings(bindings) {
+         Object.assign(this._bindings, bindings);
+     }
+-    /** Return a bind group created by setBindings */
++    /** Return a bind group created by setBindings. Keyed cache by binding-value
++     * identity so swapping textures/buffers between calls reuses cached groups.
++     */
+     _getBindGroup() {
+-        // Get hold of the bind group layout. We don't want to do this unless we know there is at least one bind group
+         this._bindGroupLayout = this._bindGroupLayout || this.handle.getBindGroupLayout(0);
+-        // Set up the bindings
+-        this._bindGroup =
+-            this._bindGroup ||
+-                getBindGroup(this.device.handle, this._bindGroupLayout, this.shaderLayout, this._bindings);
+-        return this._bindGroup;
++        const layoutBindings = this.shaderLayout.bindings;
++        const parts = new Array(layoutBindings.length);
++        for (let i = 0; i < layoutBindings.length; i++) {
++            parts[i] = this._bindings[layoutBindings[i].name];
++        }
++        let node = this._bindGroupCache;
++        for (let i = 0; i < parts.length - 1; i++) {
++            let next = node.get(parts[i]);
++            if (!next) { next = new Map(); node.set(parts[i], next); }
++            node = next;
++        }
++        const leafKey = parts[parts.length - 1];
++        let group = node.get(leafKey);
++        if (!group) {
++            group = getBindGroup(this.device.handle, this._bindGroupLayout, this.shaderLayout, this._bindings);
++            node.set(leafKey, group);
++            if (this._bindGroupCache.size > WebGPUComputePipeline._BIND_GROUP_CACHE_LIMIT) {
++                const oldestKey = this._bindGroupCache.keys().next().value;
++                this._bindGroupCache.delete(oldestKey);
++            }
++        }
++        this._bindGroup = group;
++        return group;
+     }
+ }
+ //# sourceMappingURL=webgpu-compute-pipeline.js.map
+\ No newline at end of file
+diff --git a/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-render-pipeline.js b/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-render-pipeline.js
+index 6fdf33d..3487498 100644
+--- a/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-render-pipeline.js
++++ b/node_modules/@luma.gl/webgpu/dist/adapter/resources/webgpu-render-pipeline.js
+@@ -15,6 +15,8 @@ export class WebGPURenderPipeline extends RenderPipeline {
+     _bindings;
+     _bindGroupLayout = null;
+     _bindGroup = null;
++    _bindGroupCache = new Map();
++    static _BIND_GROUP_CACHE_LIMIT = 32;
+     get [Symbol.toStringTag]() {
+         return 'WebGPURenderPipeline';
+     }
+@@ -50,12 +52,8 @@ export class WebGPURenderPipeline extends RenderPipeline {
+      * @todo Do we want to expose BindGroups in the API and remove this?
+      */
+     setBindings(bindings) {
+-        // Invalidate the cached bind group if any value has changed
+-        for (const [name, binding] of Object.entries(bindings)) {
+-            if (this._bindings[name] !== binding) {
+-                this._bindGroup = null;
+-            }
+-        }
++        // No invalidation needed: _getBindGroup() looks up by binding-identity
++        // signature so swapping values transparently picks a different cached group.
+         Object.assign(this._bindings, bindings);
+     }
+     /** @todo - should this be moved to renderpass? */
+@@ -88,19 +86,38 @@ export class WebGPURenderPipeline extends RenderPipeline {
+         options.vertexArray.unbindAfterRender(options.renderPass);
+         return true;
+     }
+-    /** Return a bind group created by setBindings */
++    /** Return a bind group created by setBindings. Keyed cache by binding-value
++     * identity: subsequent calls with the same set of binding references reuse the
++     * cached GPUBindGroup. Bounded LRU at the root level.
++     */
+     _getBindGroup() {
+-        if (this.shaderLayout.bindings.length === 0) {
++        const layoutBindings = this.shaderLayout.bindings;
++        if (layoutBindings.length === 0) {
+             return null;
+         }
+-        // Get hold of the bind group layout. We don't want to do this unless we know there is at least one bind group
+         this._bindGroupLayout = this._bindGroupLayout || this.handle.getBindGroupLayout(0);
+-        // Set up the bindings
+-        // TODO what if bindings change? We need to rebuild the bind group!
+-        this._bindGroup =
+-            this._bindGroup ||
+-                getBindGroup(this.device.handle, this._bindGroupLayout, this.shaderLayout, this._bindings);
+-        return this._bindGroup;
++        const parts = new Array(layoutBindings.length);
++        for (let i = 0; i < layoutBindings.length; i++) {
++            parts[i] = this._bindings[layoutBindings[i].name];
++        }
++        let node = this._bindGroupCache;
++        for (let i = 0; i < parts.length - 1; i++) {
++            let next = node.get(parts[i]);
++            if (!next) { next = new Map(); node.set(parts[i], next); }
++            node = next;
++        }
++        const leafKey = parts[parts.length - 1];
++        let group = node.get(leafKey);
++        if (!group) {
++            group = getBindGroup(this.device.handle, this._bindGroupLayout, this.shaderLayout, this._bindings);
++            node.set(leafKey, group);
++            if (this._bindGroupCache.size > WebGPURenderPipeline._BIND_GROUP_CACHE_LIMIT) {
++                const oldestKey = this._bindGroupCache.keys().next().value;
++                this._bindGroupCache.delete(oldestKey);
++            }
++        }
++        this._bindGroup = group;
++        return group;
+     }
+     /**
+      * Populate the complex WebGPU GPURenderPipelineDescriptor
