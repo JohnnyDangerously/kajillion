@@ -1738,9 +1738,12 @@ export class Graph {
         this.timerQueryPool?.end()
       }
 
-      this.timerQueryPool?.begin('force.repulsion')
       this.points?.swapFbo()
-      this.forceManyBody?.run()
+      this.timerQueryPool?.begin('force.quadtree.build')
+      const quadtreeReady = this.forceManyBody?.runQuadtreeBuild() ?? false
+      this.timerQueryPool?.end()
+      this.timerQueryPool?.begin('force.repulsion')
+      if (quadtreeReady) this.forceManyBody?.runForceSample()
       this.points?.updatePosition()
       this.timerQueryPool?.end()
 

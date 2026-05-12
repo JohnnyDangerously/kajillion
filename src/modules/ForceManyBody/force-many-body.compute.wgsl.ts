@@ -110,7 +110,10 @@ fn calculateCentermassVelocity(level: u32, levelTextureSizeF: f32, pp: vec2<f32>
   return add;
 }
 
-@compute @workgroup_size(8, 8, 1)
+// Apple GPU subgroup is 32 threads; (8,4)=32 = exactly 1 subgroup, whereas
+// (8,8)=64 = 2 subgroups per workgroup. Smaller groups reduce divergence
+// pressure when neighboring points land in different boundary states.
+@compute @workgroup_size(8, 4, 1)
 fn computeMain(@builtin(global_invocation_id) gid: vec3<u32>) {
   let pointsSize = u32(force.pointsTextureSize);
   if (gid.x >= pointsSize || gid.y >= pointsSize) {

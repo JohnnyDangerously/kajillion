@@ -379,11 +379,29 @@ export class ForceManyBody extends CoreModule {
   }
 
   public run (): void {
-    // Skip if sizes changed and create() wasn't called yet
+    if (!this.runQuadtreeBuild()) return
+    this.runForceSample()
+  }
+
+  /**
+   * Build the 14-level Barnes-Hut quadtree by running 14 sequential fragment
+   * passes (calculate-level shader). Split out of `run()` so the host can
+   * wrap it in its own timer bracket — otherwise its cost hides inside the
+   * `force.repulsion` measurement.
+   *
+   * Returns false if state isn't ready and the caller should skip the force
+   * sample as well.
+   */
+  public runQuadtreeBuild (): boolean {
     if (this.store.pointsTextureSize !== this.previousPointsTextureSize || this.store.adjustedSpaceSize !== this.previousSpaceSize) {
-      return
+      return false
     }
     this.drawLevels()
+    return true
+  }
+
+  /** Sample the quadtree to accumulate repulsion velocity. */
+  public runForceSample (): void {
     // On WebGPU the 14 sequential fragment passes + centermass fallback are
     // consolidated into a single compute dispatch. WebGL2 keeps the fragment
     // path.
@@ -645,11 +663,14 @@ export class ForceManyBody extends CoreModule {
 
     const size = store.pointsTextureSize ?? 0
     if (size === 0) return
-    const groups = Math.ceil(size / 8)
+    // Dispatch grid matches the shader's @workgroup_size(8, 4, 1): one
+    // workgroup covers an 8×4 patch of the points texture.
+    const groupsX = Math.ceil(size / 8)
+    const groupsY = Math.ceil(size / 4)
 
     const pass = device.beginComputePass({ id: 'force.many-body.compute' })
     pass.setPipeline(this.forceComputePipeline)
-    pass.dispatch(groups, groups, 1)
+    pass.dispatch(groupsX, groupsY, 1)
     pass.end()
   }
 }
