@@ -32,6 +32,14 @@ struct DrawFragmentUniforms {
   backgroundColor: vec4<f32>,
   outlineColor: vec4<f32>,
   outlineWidth: f32,
+  // Specialization flags — set by the host once per draw based on what the
+  // data actually contains. The WGSL compiler dead-strips branches behind
+  // these uniform conditions when the flag is constant zero, which avoids
+  // running the 8-way shape ladder / image sampling / outline ring math on
+  // the common case of plain circles with no decorations.
+  hasNonCircleShapes: f32,
+  hasOutlinedPoints: f32,
+  hasImagedPoints: f32,
 };
 
 @group(0) @binding(0) var<uniform> drawVertex: DrawVertexUniforms;
@@ -375,7 +383,15 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   // past r=1; the outline path is excluded because the ring lives outside
   // the disk.
   let rSq = pointCoord.x * pointCoord.x + pointCoord.y * pointCoord.y;
-  if (input.pointShape == CIRCLE && input.imageAtlasUV.x == -1.0 && input.isOutlined == 0.0 && rSq > 1.1025) {
+  // When the dataset has no shape/image/outline variation at all, the
+  // entire predicate collapses to `rSq > 1.1025` — the compiler can drop
+  // the four per-instance compares. When the dataset *does* have variants,
+  // the per-instance compares stay (we still want to corner-cull individual
+  // unadorned circle instances within a mixed dataset).
+  let isPlainCircle = (drawFragment.hasNonCircleShapes == 0.0 || input.pointShape == CIRCLE)
+                    && (drawFragment.hasImagedPoints == 0.0 || input.imageAtlasUV.x == -1.0)
+                    && (drawFragment.hasOutlinedPoints == 0.0 || input.isOutlined == 0.0);
+  if (isPlainCircle && rSq > 1.1025) {
     discard;
   }
 
@@ -388,10 +404,18 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
     let scale = input.shapeSize / input.overallSize;
     shapeCoordForAA = pointCoord / scale;
   }
-  let distCircle = length(shapeCoordForAA) - 1.0;
-  let distShape = getShapeDistance(shapeCoordForAA, input.pointShape);
-  let isCircle = select(0.0, 1.0, input.pointShape == CIRCLE);
-  let dAA = mix(distShape, distCircle, isCircle);
+  // Uniform-gated fast path: when the data contains zero non-circle shapes,
+  // the compiler dead-strips the entire shape-distance ladder and uses just
+  // the cheap `length() - 1` SDF.
+  var dAA: f32;
+  if (drawFragment.hasNonCircleShapes > 0.0) {
+    let distCircle = length(shapeCoordForAA) - 1.0;
+    let distShape = getShapeDistance(shapeCoordForAA, input.pointShape);
+    let isCircle = select(0.0, 1.0, input.pointShape == CIRCLE);
+    dAA = mix(distShape, distCircle, isCircle);
+  } else {
+    dAA = length(shapeCoordForAA) - 1.0;
+  }
   let aaWidth = max(fwidth(dAA), 1e-4);
   let shapeOpacity = 1.0 - smoothstep(-aaWidth, aaWidth, dAA);
 
@@ -403,22 +427,26 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
     finalShapeColor = vec4<f32>(input.shapeColor.rgb, shapeOpacity * input.shapeColor.a);
   }
 
-  // Handle image rendering with centering logic
-  if (input.imageAtlasUV.x != -1.0) {
-    var imageCoord = pointCoord;
-    if (input.overallSize > input.imageSizeVarying && input.imageSizeVarying > 0.0) {
-      let scale = input.imageSizeVarying / input.overallSize;
-      imageCoord = pointCoord / scale;
+  // Handle image rendering with centering logic. Outer uniform gate lets
+  // the compiler strip the entire image-sampling path when no point in the
+  // dataset is imaged.
+  if (drawFragment.hasImagedPoints > 0.0) {
+    if (input.imageAtlasUV.x != -1.0) {
+      var imageCoord = pointCoord;
+      if (input.overallSize > input.imageSizeVarying && input.imageSizeVarying > 0.0) {
+        let scale = input.imageSizeVarying / input.overallSize;
+        imageCoord = pointCoord / scale;
 
-      if (abs(imageCoord.x) > 1.0 || abs(imageCoord.y) > 1.0) {
-        finalImageColor = vec4<f32>(0.0);
+        if (abs(imageCoord.x) > 1.0 || abs(imageCoord.y) > 1.0) {
+          finalImageColor = vec4<f32>(0.0);
+        } else {
+          let atlasUV = mix(input.imageAtlasUV.xy, input.imageAtlasUV.zw, (imageCoord + vec2<f32>(1.0)) * 0.5);
+          finalImageColor = applyGreyoutToImage(sampleAtlas(atlasUV), input.isGreyedOut);
+        }
       } else {
         let atlasUV = mix(input.imageAtlasUV.xy, input.imageAtlasUV.zw, (imageCoord + vec2<f32>(1.0)) * 0.5);
         finalImageColor = applyGreyoutToImage(sampleAtlas(atlasUV), input.isGreyedOut);
       }
-    } else {
-      let atlasUV = mix(input.imageAtlasUV.xy, input.imageAtlasUV.zw, (imageCoord + vec2<f32>(1.0)) * 0.5);
-      finalImageColor = applyGreyoutToImage(sampleAtlas(atlasUV), input.isGreyedOut);
     }
   }
 
@@ -435,8 +463,9 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
     finalPointAlpha,
   );
 
-  // Render outline ring around the point
-  if (input.isOutlined > 0.0) {
+  // Render outline ring around the point. Outer uniform gate lets the
+  // compiler strip the entire ring-AA path when no point is outlined.
+  if (drawFragment.hasOutlinedPoints > 0.0 && input.isOutlined > 0.0) {
     let r = length(pointCoord);
     let ringSmoothing: f32 = 1.025;
     let rSafe = max(r, 1e-6);

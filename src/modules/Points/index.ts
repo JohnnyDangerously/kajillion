@@ -52,6 +52,11 @@ export class Points extends CoreModule {
   public positionStorageBuffer: Buffer | undefined
   public pointStatusStorageBuffer: Buffer | undefined
   public imageCount = 0
+  // Cached at setPointShapes() time. Lets the fragment shader skip the
+  // 8-way shape-distance ladder when every point in the dataset is the
+  // default circle (the common case for tools that don't customize point
+  // shapes per-instance).
+  public hasNonCircleShapes = false
   // Add texture properties for position data (public for Clusters module access)
   public currentPositionTexture: Texture | undefined
   public previousPositionTexture: Texture | undefined
@@ -146,6 +151,9 @@ export class Points extends CoreModule {
       backgroundColor: [number, number, number, number];
       outlineColor: [number, number, number, number];
       outlineWidth: number;
+      hasNonCircleShapes: number;
+      hasOutlinedPoints: number;
+      hasImagedPoints: number;
     };
   }> | undefined
 
@@ -672,6 +680,9 @@ export class Points extends CoreModule {
           backgroundColor: 'vec4<f32>',
           outlineColor: 'vec4<f32>',
           outlineWidth: 'f32',
+          hasNonCircleShapes: 'f32',
+          hasOutlinedPoints: 'f32',
+          hasImagedPoints: 'f32',
         },
         defaultUniforms: {
           // -1 is a sentinel value for the shader: when greyoutOpacity is -1, the shader skips opacity override (i.e. "not set")
@@ -681,6 +692,9 @@ export class Points extends CoreModule {
           backgroundColor: ensureVec4(store.backgroundColor, [0, 0, 0, 1]),
           outlineColor: ensureVec4(store.outlinedPointRingColor, [1, 1, 1, 1]),
           outlineWidth: 0.9,
+          hasNonCircleShapes: 0,
+          hasOutlinedPoints: 0,
+          hasImagedPoints: 0,
         },
       },
     })
@@ -1285,6 +1299,15 @@ export class Points extends CoreModule {
     if (data.pointsNumber === undefined || data.pointShapes === undefined) return
 
     const shapeData = data.pointShapes
+    // Scan once per shape update to learn whether every point is a circle
+    // (shape value 0). The fragment shader reads this flag through a
+    // uniform to dead-strip the 8-way shape-distance ladder on the common
+    // all-circles case. O(n) on a one-shot data upload is negligible.
+    let nonCircle = false
+    for (const v of shapeData) {
+      if (v !== 0) { nonCircle = true; break }
+    }
+    this.hasNonCircleShapes = nonCircle
     const requiredByteLength = shapeData.byteLength
 
     if (!this.shapeBuffer || this.shapeBuffer.byteLength !== requiredByteLength) {
@@ -1567,6 +1590,9 @@ export class Points extends CoreModule {
       backgroundColor: ensureVec4(store.backgroundColor, [0, 0, 0, 1]),
       outlineColor: ensureVec4(store.outlinedPointRingColor, [1, 1, 1, 1]),
       outlineWidth: 0.9,
+      hasNonCircleShapes: this.hasNonCircleShapes ? 1 : 0,
+      hasOutlinedPoints: config.outlinedPointIndices !== undefined ? 1 : 0,
+      hasImagedPoints: this.imageCount > 0 ? 1 : 0,
     }
 
     const hasHighlighting = config.highlightedPointIndices !== undefined
