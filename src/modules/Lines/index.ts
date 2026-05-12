@@ -1,5 +1,4 @@
-import { ComputePipeline, Framebuffer, Buffer, Shader, Texture, UniformStore, RenderPass } from '@luma.gl/core'
-import type { Binding, BindingDeclaration } from '@luma.gl/core'
+import { Framebuffer, Buffer, Texture, UniformStore, RenderPass } from '@luma.gl/core'
 import { Model } from '@luma.gl/engine'
 import { CoreModule } from '@/graph/modules/core-module'
 import type { Mat4Array } from '@/graph/modules/Store'
@@ -7,8 +6,6 @@ import { conicParametricCurveModule } from '@/graph/modules/Lines/conic-curve-mo
 import drawLineFrag from '@/graph/modules/Lines/draw-curve-line.frag?raw'
 import drawLineVert from '@/graph/modules/Lines/draw-curve-line.vert?raw'
 import drawLineWgsl from '@/graph/modules/Lines/draw-curve-line.wgsl?raw'
-import { drawCurveLineInstancedWgslSource } from '@/graph/modules/Lines/draw-curve-line-instanced.wgsl'
-import { precomputeLineInstancesWgsl } from '@/graph/modules/Lines/precompute-line-instances.compute.wgsl'
 import fillGridWithSampledLinksFrag from '@/graph/modules/Lines/fill-sampled-links.frag?raw'
 import fillGridWithSampledLinksVert from '@/graph/modules/Lines/fill-sampled-links.vert?raw'
 import fillGridWithSampledLinksWgsl from '@/graph/modules/Lines/fill-sampled-links.wgsl?raw'
@@ -28,22 +25,6 @@ export class Lines extends CoreModule {
   public linkStatusTexture: Texture | undefined
   private linkStatusTextureSize = 0
   private drawCurveCommand: Model | undefined
-  // WebGPU-only: thin-vertex-shader render Model paired with the per-instance
-  // compute pre-pass. Same draw target as drawCurveCommand but bypasses the
-  // 4× redundant instance-uniform work that the legacy vertex shader does on
-  // every quad corner. Picking pass (drawCurveIndexCommand) keeps the legacy
-  // shader since it runs per hover event, not per frame.
-  private drawCurveCommandInstanced: Model | undefined
-  // Compute pipeline that fills `lineInstanceBuffer` once per frame with all
-  // per-link state the visible vertex shader needs. 9 storage bindings + 1
-  // uniform — luma 9.2.6's compute path works at this scale (force-spring
-  // proves 5 bindings, line-precompute is the same template with more).
-  private precomputeShader: Shader | undefined
-  private precomputePipeline: ComputePipeline | undefined
-  // Output of the precompute pass: packed array<LineInstance>, 112 bytes per
-  // link (7 vec4). Bound as read-only storage in the visible vertex shader.
-  private lineInstanceBuffer: Buffer | undefined
-  private lineInstanceBufferLinksNumber = 0
   private drawCurveIndexCommand: Model | undefined
   private hoveredLineIndexCommand: Model | undefined
   private fillSampledLinksFboCommand: Model | undefined
@@ -141,27 +122,27 @@ export class Lines extends CoreModule {
     const linksNumber = this.data.linksNumber ?? 0
     this.pointABuffer ||= device.createBuffer({
       data: new Float32Array(linksNumber * 2),
-      usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+      usage: Buffer.VERTEX | Buffer.COPY_DST,
     })
     this.pointBBuffer ||= device.createBuffer({
       data: new Float32Array(linksNumber * 2),
-      usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+      usage: Buffer.VERTEX | Buffer.COPY_DST,
     })
     this.colorBuffer ||= device.createBuffer({
       data: new Float32Array(linksNumber * 4),
-      usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+      usage: Buffer.VERTEX | Buffer.COPY_DST,
     })
     this.widthBuffer ||= device.createBuffer({
       data: new Float32Array(linksNumber),
-      usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+      usage: Buffer.VERTEX | Buffer.COPY_DST,
     })
     this.arrowBuffer ||= device.createBuffer({
       data: new Float32Array(linksNumber),
-      usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+      usage: Buffer.VERTEX | Buffer.COPY_DST,
     })
     this.linkIndexBuffer ||= device.createBuffer({
       data: new Float32Array(linksNumber),
-      usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+      usage: Buffer.VERTEX | Buffer.COPY_DST,
     })
 
     // Create UniformStore for drawLine uniforms
@@ -340,17 +321,8 @@ export class Lines extends CoreModule {
     // Initialize quad buffer for full-screen rendering
     this.quadBuffer ||= device.createBuffer({
       data: new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
-      usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+      usage: Buffer.VERTEX | Buffer.COPY_DST,
     })
-
-    // WebGPU-only: per-instance compute pre-pass + thin-vertex render path.
-    // Constructed alongside the legacy fragment-path Models so the picking
-    // pass and WebGL2 fallback are unaffected.
-    if (device.info?.type === 'webgpu') {
-      this.ensureLineInstanceBuffer()
-      this.initPrecomputePipeline()
-      this.initDrawCurveInstancedModel()
-    }
 
     this.hoveredLineIndexUniformStore ||= new UniformStore({
       hoveredLineIndexUniforms: {
@@ -448,7 +420,7 @@ export class Lines extends CoreModule {
   }
 
   public draw (renderPass: RenderPass): void {
-    const { points } = this
+    const { config, points, store } = this
     if (!points) return
     if (!points.currentPositionTexture || points.currentPositionTexture.destroyed) return
     if (!this.pointABuffer || !this.pointBBuffer) this.updatePointsBuffer()
@@ -458,26 +430,43 @@ export class Lines extends CoreModule {
     if (!this.curveLineGeometry) this.updateCurveLineGeometry()
     if (!this.drawCurveCommand || !this.drawLineUniformStore || !this.linkStatusTexture) return
 
-    this.updateDrawLineUniforms()
+    const hasHighlighting = config.highlightedLinkIndices !== undefined
 
-    // WebGPU visible-pass: use the thin-vertex instanced Model, which reads
-    // precomputed per-instance state from `lineInstanceBuffer` instead of
-    // re-running the 16+ instance-uniform ops on every quad corner. The
-    // pre-pass that fills `lineInstanceBuffer` must have already been
-    // dispatched this frame via `Lines.precompute()` — called from
-    // renderFrame before the canvas render pass opens.
-    if (this.drawCurveCommandInstanced && this.lineInstanceBuffer) {
-      this.drawCurveCommandInstanced.setBindings({
-        instances: this.lineInstanceBuffer,
-      })
-      this.drawCurveCommandInstanced.setInstanceCount(this.data.linksNumber ?? 0)
-      this.drawCurveCommandInstanced.draw(renderPass)
-      return
-    }
+    // Update uniforms
+    this.drawLineUniformStore.setUniforms({
+      drawLineUniforms: {
+        transformationMatrix: store.transformationMatrix4x4,
+        pointsTextureSize: store.pointsTextureSize,
+        widthScale: config.linkWidthScale,
+        linkArrowsSizeScale: config.linkArrowsSizeScale,
+        spaceSize: store.adjustedSpaceSize,
+        screenSize: ensureVec2(store.screenSize, [0, 0]),
+        linkVisibilityDistanceRange: ensureVec2(config.linkVisibilityDistanceRange, [0, 0]),
+        linkVisibilityMinTransparency: config.linkVisibilityMinTransparency,
+        linkOpacity: config.linkOpacity,
+        greyoutOpacity: config.linkGreyoutOpacity,
+        curvedWeight: config.curvedLinkWeight,
+        curvedLinkControlPointDistance: config.curvedLinkControlPointDistance,
+        curvedLinkSegments: config.curvedLinks ? config.curvedLinkSegments : 1,
+        scaleLinksOnZoom: config.scaleLinksOnZoom ? 1 : 0,
+        maxPointSize: store.maxPointSize,
+        renderMode: 0.0, // Normal rendering
+        hoveredLinkIndex: store.hoveredLinkIndex ?? -1,
+        hoveredLinkColor: ensureVec4(store.hoveredLinkColor, [-1, -1, -1, -1]),
+        hoveredLinkWidthIncrease: config.hoveredLinkWidthIncrease,
+        isLinkHighlightingActive: hasHighlighting ? 1 : 0,
+        linkStatusTextureSize: this.linkStatusTextureSize,
+        focusedLinkIndex: config.focusedLinkIndex ?? -1,
+        focusedLinkWidthIncrease: config.focusedLinkWidthIncrease,
+        linkMinPixelLength: config.linkMinPixelLength,
+      },
+      drawLineFragmentUniforms: {
+        renderMode: 0.0, // Normal rendering
+      },
+    })
 
-    // Legacy fragment path (WebGL2 fallback + any frame before the compute
-    // pipeline is ready). WebGPU reads positions via the points module's
-    // storage-buffer mirror; WebGL2 reads from the texture.
+    // Update texture bindings dynamically. WebGPU reads positions via the
+    // points module's storage-buffer mirror; WebGL2 reads from the texture.
     this.drawCurveCommand.setBindings({
       ...(points.positionStorageBuffer && { positions: points.positionStorageBuffer }),
       positionsTexture: points.currentPositionTexture,
@@ -489,26 +478,6 @@ export class Lines extends CoreModule {
 
     // Render normal links
     this.drawCurveCommand.draw(renderPass)
-  }
-
-  /**
-   * Dispatch the per-link compute pre-pass that fills `lineInstanceBuffer`.
-   * Must be called before `draw()` each frame, OUTSIDE any active render
-   * pass (compute and render passes can't be nested in WebGPU).
-   *
-   * No-op on WebGL2 or before the compute pipeline is initialized.
-   */
-  public precompute (): void {
-    if (!this.precomputePipeline) return
-    // Lazy-create the instance buffer here so size changes (linksNumber
-    // changing across frames) are handled without needing every update*()
-    // method to know about the compute path.
-    this.ensureLineInstanceBuffer()
-    // The compute pass reads from the same managed uniform buffer that the
-    // visible vertex shader does, so the per-frame uniforms must be written
-    // BEFORE the compute dispatch encodes its commands.
-    this.updateDrawLineUniforms()
-    this.runPrecompute()
   }
 
   public updateLinkIndexFbo (): void {
@@ -615,7 +584,7 @@ export class Lines extends CoreModule {
       }
       this.pointABuffer = device.createBuffer({
         data: pointAData,
-        usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+        usage: Buffer.VERTEX | Buffer.COPY_DST,
       })
       // Note: Model attributes are set at creation time, so if Model exists and buffer is recreated,
       // the Model will need to be recreated too. For now, we ensure buffers exist before initPrograms.
@@ -629,7 +598,7 @@ export class Lines extends CoreModule {
       }
       this.pointBBuffer = device.createBuffer({
         data: pointBData,
-        usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+        usage: Buffer.VERTEX | Buffer.COPY_DST,
       })
     } else {
       this.pointBBuffer.write(pointBData)
@@ -645,7 +614,7 @@ export class Lines extends CoreModule {
       }
       this.linkIndexBuffer = device.createBuffer({
         data: linkIndices,
-        usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+        usage: Buffer.VERTEX | Buffer.COPY_DST,
       })
     } else {
       this.linkIndexBuffer.write(linkIndices)
@@ -682,7 +651,7 @@ export class Lines extends CoreModule {
     if (!this.colorBuffer) {
       this.colorBuffer = device.createBuffer({
         data: colorData,
-        usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+        usage: Buffer.VERTEX | Buffer.COPY_DST,
       })
     } else {
       // Check if buffer needs to be resized
@@ -693,7 +662,7 @@ export class Lines extends CoreModule {
         }
         this.colorBuffer = device.createBuffer({
           data: colorData,
-          usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+          usage: Buffer.VERTEX | Buffer.COPY_DST,
         })
       } else {
         this.colorBuffer.write(colorData)
@@ -717,7 +686,7 @@ export class Lines extends CoreModule {
     if (!this.widthBuffer) {
       this.widthBuffer = device.createBuffer({
         data: widthData,
-        usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+        usage: Buffer.VERTEX | Buffer.COPY_DST,
       })
     } else {
       // Check if buffer needs to be resized
@@ -728,7 +697,7 @@ export class Lines extends CoreModule {
         }
         this.widthBuffer = device.createBuffer({
           data: widthData,
-          usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+          usage: Buffer.VERTEX | Buffer.COPY_DST,
         })
       } else {
         this.widthBuffer.write(widthData)
@@ -756,7 +725,7 @@ export class Lines extends CoreModule {
     if (!this.arrowBuffer) {
       this.arrowBuffer = device.createBuffer({
         data: arrowData,
-        usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+        usage: Buffer.VERTEX | Buffer.COPY_DST,
       })
     } else {
       // Check if buffer needs to be resized
@@ -767,7 +736,7 @@ export class Lines extends CoreModule {
         }
         this.arrowBuffer = device.createBuffer({
           data: arrowData,
-          usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+          usage: Buffer.VERTEX | Buffer.COPY_DST,
         })
       } else {
         this.arrowBuffer.write(arrowData)
@@ -865,7 +834,7 @@ export class Lines extends CoreModule {
       }
       this.curveLineBuffer = device.createBuffer({
         data: flatGeometry,
-        usage: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+        usage: Buffer.VERTEX | Buffer.COPY_DST,
       })
     } else {
       this.curveLineBuffer.write(flatGeometry)
@@ -1072,12 +1041,6 @@ export class Lines extends CoreModule {
     this.drawCurveCommand?.destroy()
     this.drawCurveIndexCommand?.destroy()
     this.drawCurveCommand = undefined
-    this.drawCurveCommandInstanced?.destroy()
-    this.drawCurveCommandInstanced = undefined
-    this.precomputePipeline?.destroy()
-    this.precomputePipeline = undefined
-    this.precomputeShader?.destroy()
-    this.precomputeShader = undefined
     this.hoveredLineIndexCommand?.destroy()
     this.hoveredLineIndexCommand = undefined
     this.fillSampledLinksFboCommand?.destroy()
@@ -1152,199 +1115,12 @@ export class Lines extends CoreModule {
       this.quadBuffer.destroy()
     }
     this.quadBuffer = undefined
-    if (this.lineInstanceBuffer && !this.lineInstanceBuffer.destroyed) {
-      this.lineInstanceBuffer.destroy()
-    }
-    this.lineInstanceBuffer = undefined
-    this.lineInstanceBufferLinksNumber = 0
   }
 
   // Creates a 1×1 placeholder texture for the linkStatus sampler if none exists.
   // luma.gl silently skips the draw call when any declared sampler is unbound,
   // so this ensures a valid binding is always available. The shader won't sample
   // the placeholder — the isLinkHighlightingActive uniform guards that branch.
-  /**
-   * Ensure `lineInstanceBuffer` is sized for the current linksNumber.
-   * Per-link record is 112 bytes (7 vec4<f32>). Recreated when linksNumber
-   * grows past the current allocation (we don't shrink).
-   */
-  private ensureLineInstanceBuffer (): void {
-    const { device } = this
-    const linksNumber = this.data.linksNumber ?? 0
-    if (linksNumber <= 0) return
-    if (this.lineInstanceBuffer && this.lineInstanceBufferLinksNumber === linksNumber) return
-    if (this.lineInstanceBuffer && !this.lineInstanceBuffer.destroyed) {
-      this.lineInstanceBuffer.destroy()
-    }
-    // 112 = 7 vec4<f32> × 4 floats × 4 bytes — must match the WGSL struct
-    // in precompute-line-instances.compute.wgsl.ts. If you change the struct,
-    // change this constant.
-    const bytesPerInstance = 112
-    this.lineInstanceBuffer = device.createBuffer({
-      byteLength: linksNumber * bytesPerInstance,
-      usage: Buffer.STORAGE | Buffer.COPY_DST,
-    })
-    this.lineInstanceBufferLinksNumber = linksNumber
-  }
-
-  private initPrecomputePipeline (): void {
-    const { device } = this
-    if (this.precomputePipeline) return
-    if (!this.drawLineUniformStore) return
-
-    this.precomputeShader = device.createShader({
-      stage: 'compute',
-      source: precomputeLineInstancesWgsl(),
-    })
-
-    // Bind-group layout: 1 uniform + 7 read-only storage buffers (per-instance
-    // attributes + positions) + 1 read_write storage output. luma 9.2.6's
-    // getShaderLayoutFromWGSL doesn't walk compute entries, so the name→
-    // location mapping is hand-rolled (same as force-spring.compute path).
-    const bindings: BindingDeclaration[] = [
-      { type: 'uniform', name: 'drawLine', group: 0, location: 0 },
-      { type: 'read-only-storage', name: 'positions', group: 0, location: 1 },
-      { type: 'read-only-storage', name: 'pointAArr', group: 0, location: 2 },
-      { type: 'read-only-storage', name: 'pointBArr', group: 0, location: 3 },
-      { type: 'read-only-storage', name: 'colorArr', group: 0, location: 4 },
-      { type: 'read-only-storage', name: 'widthArr', group: 0, location: 5 },
-      { type: 'read-only-storage', name: 'arrowArr', group: 0, location: 6 },
-      { type: 'read-only-storage', name: 'linkIndexArr', group: 0, location: 7 },
-      { type: 'storage', name: 'instances', group: 0, location: 8 },
-    ]
-
-    this.precomputePipeline = device.createComputePipeline({
-      shader: this.precomputeShader,
-      entryPoint: 'computeMain',
-      shaderLayout: { bindings },
-    })
-  }
-
-  private initDrawCurveInstancedModel (): void {
-    const { device, config } = this
-    if (this.drawCurveCommandInstanced) return
-    if (!this.drawLineUniformStore) return
-
-    // Thin vertex shader: reads precomputed per-instance state from the
-    // `instances` storage buffer, evaluates only the actually-per-vertex
-    // conic Bezier math, transforms to clip space. The 4× redundant
-    // instance-uniform work that the legacy shader does on each quad corner
-    // is moved into the per-link compute pre-pass.
-    this.drawCurveCommandInstanced = new Model(device, {
-      source: drawCurveLineInstancedWgslSource(),
-      topology: 'triangle-strip',
-      colorAttachmentFormats: ['bgra8unorm'],
-      vertexCount: this.curveLineGeometry?.length ?? 0,
-      attributes: {
-        ...this.curveLineBuffer && { position: this.curveLineBuffer },
-      },
-      bufferLayout: [
-        { name: 'position', format: 'float32x2' },
-      ],
-      defines: {
-        USE_UNIFORM_BUFFERS: true,
-      },
-      bindings: {
-        drawLine: this.drawLineUniformStore.getManagedUniformBuffer(device, 'drawLineUniforms'),
-        drawLineFragment: this.drawLineUniformStore.getManagedUniformBuffer(device, 'drawLineFragmentUniforms'),
-      },
-      parameters: {
-        cullMode: 'back',
-        blend: true,
-        blendColorOperation: 'add',
-        blendColorSrcFactor: 'one',
-        blendColorDstFactor: config.linkBlendMode === 'add' ? 'one' : 'one-minus-src-alpha',
-        blendAlphaOperation: 'add',
-        blendAlphaSrcFactor: 'one',
-        blendAlphaDstFactor: config.linkBlendMode === 'add' ? 'one' : 'one-minus-src-alpha',
-        depthWriteEnabled: false,
-        sampleCount: config.msaa,
-      },
-    })
-  }
-
-  /**
-   * Dispatch the per-link compute pre-pass that fills `lineInstanceBuffer`
-   * with all the state the visible vertex shader needs. One thread per link,
-   * 64-wide workgroups. Called once per frame just before the canvas pass.
-   */
-  private runPrecompute (): void {
-    const { device, points } = this
-    if (!this.precomputePipeline || !this.lineInstanceBuffer) return
-    if (!this.drawLineUniformStore) return
-    if (!points?.positionStorageBuffer || points.positionStorageBuffer.destroyed) return
-    if (!this.pointABuffer || !this.pointBBuffer) return
-    if (!this.colorBuffer || !this.widthBuffer) return
-    if (!this.arrowBuffer || !this.linkIndexBuffer) return
-
-    const linksNumber = this.data.linksNumber ?? 0
-    if (linksNumber <= 0) return
-
-    const bindings: Record<string, Binding> = {
-      drawLine: this.drawLineUniformStore.getManagedUniformBuffer(device, 'drawLineUniforms'),
-      positions: points.positionStorageBuffer,
-      pointAArr: this.pointABuffer,
-      pointBArr: this.pointBBuffer,
-      colorArr: this.colorBuffer,
-      widthArr: this.widthBuffer,
-      arrowArr: this.arrowBuffer,
-      linkIndexArr: this.linkIndexBuffer,
-      instances: this.lineInstanceBuffer,
-    }
-    this.precomputePipeline.setBindings(bindings)
-
-    const workgroups = Math.ceil(linksNumber / 64)
-    const pass = device.beginComputePass({ id: 'lines.precompute' })
-    pass.setPipeline(this.precomputePipeline)
-    pass.dispatch(workgroups, 1, 1)
-    pass.end()
-  }
-
-  /**
-   * Write the per-frame uniforms that both the compute pre-pass and the
-   * visible vertex shader need. Idempotent — calling twice per frame just
-   * rewrites the same managed uniform buffer with the same values. Called
-   * from `precompute()` (so the compute pass sees current state) and from
-   * `draw()` (so the WebGL2 path still works without a separate pre-call).
-   */
-  private updateDrawLineUniforms (): void {
-    const { config, store } = this
-    if (!this.drawLineUniformStore) return
-
-    const hasHighlighting = config.highlightedLinkIndices !== undefined
-    this.drawLineUniformStore.setUniforms({
-      drawLineUniforms: {
-        transformationMatrix: store.transformationMatrix4x4,
-        pointsTextureSize: store.pointsTextureSize,
-        widthScale: config.linkWidthScale,
-        linkArrowsSizeScale: config.linkArrowsSizeScale,
-        spaceSize: store.adjustedSpaceSize,
-        screenSize: ensureVec2(store.screenSize, [0, 0]),
-        linkVisibilityDistanceRange: ensureVec2(config.linkVisibilityDistanceRange, [0, 0]),
-        linkVisibilityMinTransparency: config.linkVisibilityMinTransparency,
-        linkOpacity: config.linkOpacity,
-        greyoutOpacity: config.linkGreyoutOpacity,
-        curvedWeight: config.curvedLinkWeight,
-        curvedLinkControlPointDistance: config.curvedLinkControlPointDistance,
-        curvedLinkSegments: config.curvedLinks ? config.curvedLinkSegments : 1,
-        scaleLinksOnZoom: config.scaleLinksOnZoom ? 1 : 0,
-        maxPointSize: store.maxPointSize,
-        renderMode: 0.0,
-        hoveredLinkIndex: store.hoveredLinkIndex ?? -1,
-        hoveredLinkColor: ensureVec4(store.hoveredLinkColor, [-1, -1, -1, -1]),
-        hoveredLinkWidthIncrease: config.hoveredLinkWidthIncrease,
-        isLinkHighlightingActive: hasHighlighting ? 1 : 0,
-        linkStatusTextureSize: this.linkStatusTextureSize,
-        focusedLinkIndex: config.focusedLinkIndex ?? -1,
-        focusedLinkWidthIncrease: config.focusedLinkWidthIncrease,
-        linkMinPixelLength: config.linkMinPixelLength,
-      },
-      drawLineFragmentUniforms: {
-        renderMode: 0.0,
-      },
-    })
-  }
-
   private ensureLinkStatusPlaceholder (): void {
     if (this.linkStatusTexture && !this.linkStatusTexture.destroyed) return
     this.linkStatusTexture = this.device.createTexture({
