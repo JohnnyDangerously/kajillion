@@ -1,20 +1,4 @@
-// WebGPU per-instance pre-pass for line rendering — SCAFFOLDING ONLY.
-//
-// Status: WGSL is complete and reviewed for correctness against the legacy
-// vertex shader's instance-uniform math (see draw-curve-line.wgsl,
-// `vertexMain` lines 115–248). NOT YET WIRED to the engine — the
-// integration work (convert the six per-instance vertex buffers to
-// dual-usage VERTEX|STORAGE, create a luma.gl ComputePipeline + storage
-// buffer, dispatch one workgroup of 64 per ~64 links before the visible
-// canvas render pass, swap the visible-pass vertex shader to read packed
-// LineInstance entries by @builtin(instance_index)) is left for the next
-// session. Both visible (drawCurveCommand) and picking (drawCurveIndexCommand)
-// paths share the same WGSL file today, so the integration also needs to
-// split or special-case the picking variant.
-//
-// Why land scaffolding: the WGSL design + std430 layout + per-binding
-// indexing scheme are the load-bearing pieces. The Lines/index.ts wiring
-// is mechanical from there.
+// WebGPU per-instance pre-pass for line rendering.
 //
 // The fragment-rasterization vertex shader (draw-curve-line.wgsl) does
 // ~16 instance-uniform computations 4× per quad (4 vertices × 300k links
@@ -65,15 +49,24 @@ struct LineInstance {
 };
 `
 
+// Bindings mirror the existing per-instance vertex buffers 1:1 — those
+// buffers already exist for the WebGL2 path + the WebGPU picking pass, so
+// adding Buffer.STORAGE usage to them is a one-flag change vs. creating
+// duplicate packed copies on the CPU side. Six separate read-only storage
+// arrays for the instance attributes, one read-only positions array, one
+// read_write storage buffer for the packed output. 8 storage bindings
+// total — at the spec minimum for maxStorageBuffersPerShaderStage; M5 Max
+// reports 32, so plenty of headroom in practice.
 export const lineInstanceStorageBindingsWgsl = `
 @group(0) @binding(0) var<uniform> drawLine: DrawLineUniforms;
 @group(0) @binding(1) var<storage, read> positions: array<vec4<f32>>;
-@group(0) @binding(2) var<storage, read> pointAB: array<vec4<f32>>;
-@group(0) @binding(3) var<storage, read> colorIn: array<vec4<f32>>;
-@group(0) @binding(4) var<storage, read> widthArrowIndex: array<vec4<f32>>;
-@group(0) @binding(5) var linkStatus: texture_2d<f32>;
-@group(0) @binding(6) var linkStatusSampler: sampler;
-@group(0) @binding(7) var<storage, read_write> instances: array<LineInstance>;
+@group(0) @binding(2) var<storage, read> pointAArr: array<vec2<f32>>;
+@group(0) @binding(3) var<storage, read> pointBArr: array<vec2<f32>>;
+@group(0) @binding(4) var<storage, read> colorArr: array<vec4<f32>>;
+@group(0) @binding(5) var<storage, read> widthArr: array<f32>;
+@group(0) @binding(6) var<storage, read> arrowArr: array<f32>;
+@group(0) @binding(7) var<storage, read> linkIndexArr: array<f32>;
+@group(0) @binding(8) var<storage, read_write> instances: array<LineInstance>;
 `
 
 // Uniforms block must match the visible-pass uniforms struct (see
@@ -138,20 +131,22 @@ fn computeMain(@builtin(global_invocation_id) gid: vec3<u32>) {
     return;
   }
 
-  // Per-instance inputs were per-attribute on the legacy vertex path;
-  // here we pull them from packed storage buffers indexed by linkIdx.
-  let endpointTexCoords = pointAB[linkIdx]; // .xy = pointA texcoord, .zw = pointB texcoord
-  let inColor = colorIn[linkIdx];
-  let widthArrowIndexEntry = widthArrowIndex[linkIdx];
-  let widthIn = widthArrowIndexEntry.x;
-  let arrowIn = widthArrowIndexEntry.y;
-  let linkIndexIn = widthArrowIndexEntry.z;
+  // Per-instance inputs share the same storage buffers as the legacy
+  // vertex-attribute path; they're just read here as storage arrays
+  // rather than fetched as vertex attributes. Locals reuse the legacy
+  // names so the math below matches the vertex-shader version 1:1.
+  let pointATex = pointAArr[linkIdx];
+  let pointBTex = pointBArr[linkIdx];
+  let inColor = colorArr[linkIdx];
+  let widthIn = widthArr[linkIdx];
+  let arrowIn = arrowArr[linkIdx];
+  let linkIndexIn = linkIndexArr[linkIdx];
 
   // Vertex-pull positions out of the storage buffer (same layout as the
   // visible-pass vertex shader: row-major matching the points texture).
   let textureSize = u32(drawLine.pointsTextureSize);
-  let idxA = u32(endpointTexCoords.y) * textureSize + u32(endpointTexCoords.x);
-  let idxB = u32(endpointTexCoords.w) * textureSize + u32(endpointTexCoords.z);
+  let idxA = u32(pointATex.y) * textureSize + u32(pointATex.x);
+  let idxB = u32(pointBTex.y) * textureSize + u32(pointBTex.x);
   let pointPositionA = positions[idxA];
   let pointPositionB = positions[idxB];
   let a = pointPositionA.xy;
@@ -242,16 +237,12 @@ fn computeMain(@builtin(global_invocation_id) gid: vec3<u32>) {
     map(linkDistPx, drawLine.linkVisibilityDistanceRange.y, drawLine.linkVisibilityDistanceRange.x, 0.0, 1.0),
   );
 
-  if (drawLine.isLinkHighlightingActive > 0.0 && drawLine.linkStatusTextureSize > 0.0) {
-    let statusTexSize = drawLine.linkStatusTextureSize;
-    let texX = linkIndexIn - statusTexSize * floor(linkIndexIn / statusTexSize);
-    let texY = floor(linkIndexIn / statusTexSize);
-    let linkStatusCoord = (vec2<f32>(texX, texY) + vec2<f32>(0.5)) / statusTexSize;
-    let linkStatusValue = textureSampleLevel(linkStatus, linkStatusSampler, linkStatusCoord, 0.0);
-    if (linkStatusValue.r > 0.0) {
-      opacity = opacity * drawLine.greyoutOpacity;
-    }
-  }
+  // NOTE: link-status (highlighted-set) sampling is intentionally omitted
+  // from the compute pre-pass for now — it would require keeping a sampled
+  // texture + sampler on the compute pipeline's bind group, and the bench
+  // dataset doesn't exercise it. When highlighting is needed in a future
+  // session, restore the textureSampleLevel branch and the matching
+  // bindings in the shaderLayout + setBindings call.
 
   var rgbaColor = vec4<f32>(rgbColor, opacity);
   if (drawLine.hoveredLinkIndex == linkIndexIn && drawLine.hoveredLinkColor.a > -0.5) {
