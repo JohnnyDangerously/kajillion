@@ -1,4 +1,5 @@
-import { Buffer, Framebuffer, Texture, UniformStore } from '@luma.gl/core'
+import { Buffer, ComputePipeline, Framebuffer, Shader, Texture, UniformStore } from '@luma.gl/core'
+import type { Binding, BindingDeclaration } from '@luma.gl/core'
 import { Model } from '@luma.gl/engine'
 import { CoreModule } from '@/graph/modules/core-module'
 
@@ -9,6 +10,7 @@ import forceFrag from '@/graph/modules/ForceManyBody/force-level.frag?raw'
 import forceLevelWgsl from '@/graph/modules/ForceManyBody/force-level.wgsl?raw'
 import forceCenterFrag from '@/graph/modules/ForceManyBody/force-centermass.frag?raw'
 import forceCentermassWgsl from '@/graph/modules/ForceManyBody/force-centermass.wgsl?raw'
+import { forceManyBodyComputeWgsl } from '@/graph/modules/ForceManyBody/force-many-body.compute.wgsl'
 import { createIndexesForBuffer } from '@/graph/modules/Shared/buffer'
 import { getBytesPerRow } from '@/graph/modules/Shared/texture-utils'
 import updateVert from '@/graph/modules/Shared/quad.vert?raw'
@@ -27,6 +29,25 @@ export class ForceManyBody extends CoreModule {
   private calculateLevelsCommand: Model | undefined
   private forceCommand: Model | undefined
   private forceFromItsOwnCentermassCommand: Model | undefined
+
+  // WebGPU compute path: replaces drawForces() — one dispatch consolidates
+  // the 14 fragment passes (one per Barnes-Hut level) plus the centermass
+  // fallback into a single compute pass.
+  private forceComputeShader: Shader | undefined
+  private forceComputePipeline: ComputePipeline | undefined
+  private forceComputeUniformStore: UniformStore<{
+    forceComputeUniforms: {
+      levels: number;
+      alpha: number;
+      repulsion: number;
+      spaceSize: number;
+      theta: number;
+      pointsTextureSize: number;
+    };
+  }> | undefined
+
+  private forceComputeUniformBuffer: Buffer | undefined
+  private forceComputeCompiledLevels: number | undefined
 
   private forceVertexCoordBuffer: Buffer | undefined
 
@@ -170,6 +191,16 @@ export class ForceManyBody extends CoreModule {
       this.calculateLevelsCommand?.setAttributes({
         pointIndices: this.pointIndices,
       })
+    }
+
+    // Compute pipeline must be recompiled when levels changes — MAX_LEVELS
+    // is baked into the WGSL source, and the bind-group layout has exactly
+    // `levels` level-texture slots. Same pattern as force-spring.
+    if (this.forceComputeCompiledLevels !== undefined && this.forceComputeCompiledLevels !== this.levels) {
+      this.forceComputePipeline?.destroy()
+      this.forceComputePipeline = undefined
+      this.forceComputeShader?.destroy()
+      this.forceComputeShader = undefined
     }
 
     this.previousPointsTextureSize = store.pointsTextureSize
@@ -341,6 +372,10 @@ export class ForceManyBody extends CoreModule {
         depthWriteEnabled: false,
       },
     })
+
+    if (device.info?.type === 'webgpu') {
+      this.initForceComputePipeline()
+    }
   }
 
   public run (): void {
@@ -349,7 +384,14 @@ export class ForceManyBody extends CoreModule {
       return
     }
     this.drawLevels()
-    this.drawForces()
+    // On WebGPU the 14 sequential fragment passes + centermass fallback are
+    // consolidated into a single compute dispatch. WebGL2 keeps the fragment
+    // path.
+    if (this.forceComputePipeline) {
+      this.drawForcesCompute()
+    } else {
+      this.drawForces()
+    }
   }
 
   /**
@@ -364,6 +406,11 @@ export class ForceManyBody extends CoreModule {
     this.forceCommand = undefined
     this.forceFromItsOwnCentermassCommand?.destroy()
     this.forceFromItsOwnCentermassCommand = undefined
+    this.forceComputePipeline?.destroy()
+    this.forceComputePipeline = undefined
+    this.forceComputeShader?.destroy()
+    this.forceComputeShader = undefined
+    this.forceComputeCompiledLevels = undefined
 
     // 2. Destroy Framebuffers (before textures they reference)
     for (const target of this.levelTargets.values()) {
@@ -392,6 +439,9 @@ export class ForceManyBody extends CoreModule {
     this.forceUniformStore = undefined
     this.forceCenterUniformStore?.destroy()
     this.forceCenterUniformStore = undefined
+    this.forceComputeUniformBuffer = undefined
+    this.forceComputeUniformStore?.destroy()
+    this.forceComputeUniformStore = undefined
 
     // 5. Destroy Buffers (passed via attributes - NOT owned by Models, must destroy manually)
     if (this.pointIndices && !this.pointIndices.destroyed) {
@@ -402,6 +452,54 @@ export class ForceManyBody extends CoreModule {
       this.forceVertexCoordBuffer.destroy()
     }
     this.forceVertexCoordBuffer = undefined
+  }
+
+  private initForceComputePipeline (): void {
+    const { device } = this
+    if (this.forceComputePipeline) return
+    if (this.levels <= 0) return
+
+    this.forceComputeUniformStore ||= new UniformStore({
+      forceComputeUniforms: {
+        uniformTypes: {
+          levels: 'f32',
+          alpha: 'f32',
+          repulsion: 'f32',
+          spaceSize: 'f32',
+          theta: 'f32',
+          pointsTextureSize: 'f32',
+        },
+      },
+    })
+
+    this.forceComputeUniformBuffer ||= this.forceComputeUniformStore.getManagedUniformBuffer(device, 'forceComputeUniforms')
+
+    this.forceComputeShader = device.createShader({
+      stage: 'compute',
+      source: forceManyBodyComputeWgsl(this.levels),
+    })
+
+    // Build the shader-layout binding list: 4 fixed entries (uniform,
+    // positions, randomValues, velocityOut) + N level textures starting at
+    // location 4. luma 9.2.6's getShaderLayoutFromWGSL doesn't walk compute
+    // entry points, so we have to hand-roll the name→binding mapping.
+    const bindings: BindingDeclaration[] = [
+      { type: 'uniform', name: 'forceComputeUniforms', group: 0, location: 0 },
+      { type: 'texture', name: 'positionsTexture', group: 0, location: 1 },
+      { type: 'texture', name: 'randomValues', group: 0, location: 2 },
+      { type: 'storage', name: 'velocityOut', group: 0, location: 3 },
+    ]
+    for (let i = 0; i < this.levels; i += 1) {
+      bindings.push({ type: 'texture' as const, name: `levelFbo${i}`, group: 0, location: 4 + i })
+    }
+
+    this.forceComputePipeline = device.createComputePipeline({
+      shader: this.forceComputeShader,
+      entryPoint: 'computeMain',
+      shaderLayout: { bindings },
+    })
+
+    this.forceComputeCompiledLevels = this.levels
   }
 
   private drawLevels (): void {
@@ -505,5 +603,53 @@ export class ForceManyBody extends CoreModule {
     }
 
     drawPass.end()
+  }
+
+  private drawForcesCompute (): void {
+    const { device, store, points } = this
+    if (!points) return
+    if (!this.forceComputePipeline || !this.forceComputeUniformStore || !this.forceComputeUniformBuffer) return
+    if (!points.previousPositionTexture || points.previousPositionTexture.destroyed) return
+    if (!points.velocityTexture || points.velocityTexture.destroyed) return
+    if (!this.randomValuesTexture || this.randomValuesTexture.destroyed) return
+    if (this.levels <= 0) return
+
+    this.forceComputeUniformStore.setUniforms({
+      forceComputeUniforms: {
+        levels: this.levels,
+        alpha: store.alpha,
+        repulsion: this.config.simulationRepulsion,
+        spaceSize: store.adjustedSpaceSize,
+        theta: this.config.simulationRepulsionTheta,
+        pointsTextureSize: store.pointsTextureSize ?? 0,
+      },
+    })
+
+    // Build the binding map. The shader expects MAX_LEVELS texture slots —
+    // we always declare exactly `this.levels` slots (matched by the
+    // shaderLayout), so the binding count is exact.
+    const bindings: Record<string, Binding> = {
+      forceComputeUniforms: this.forceComputeUniformBuffer,
+      positionsTexture: points.previousPositionTexture,
+      randomValues: this.randomValuesTexture,
+      velocityOut: points.velocityTexture,
+    }
+    for (let i = 0; i < this.levels; i += 1) {
+      const target = this.levelTargets.get(i)
+      // If a level texture is missing the dispatch can't be valid. Bail —
+      // the next frame's drawLevels() will rebuild whatever's stale.
+      if (!target || target.texture.destroyed) return
+      bindings[`levelFbo${i}`] = target.texture
+    }
+    this.forceComputePipeline.setBindings(bindings)
+
+    const size = store.pointsTextureSize ?? 0
+    if (size === 0) return
+    const groups = Math.ceil(size / 8)
+
+    const pass = device.beginComputePass({ id: 'force.many-body.compute' })
+    pass.setPipeline(this.forceComputePipeline)
+    pass.dispatch(groups, groups, 1)
+    pass.end()
   }
 }
