@@ -27,6 +27,13 @@ import { Drag } from '@/graph/modules/Drag'
 import { createTimerQueryPool, type ITimerQueryPool, type GpuTimingSnapshot } from '@/graph/perf'
 import { MsaaTarget, makeMsaaPassWrapper } from '@/graph/render/msaa-target'
 
+// Below this alpha, force passes throttle to every-other-frame in
+// runSimulationStep. 0.3 keeps the initial "spring + settle" motion at
+// full fidelity (alpha decays from 1 → 0.3 covers ~70% of the visible
+// motion) and only throttles during the long tail where per-frame
+// displacement is sub-pixel anyway.
+const SETTLE_TAIL_ALPHA_THRESHOLD = 0.3
+
 export class Graph {
   /** Current graph configuration. Always fully populated with default values for any unset properties. */
   public config: GraphConfigInterface = createDefaultConfig()
@@ -53,6 +60,8 @@ export class Graph {
   // settled. Set by programmatic state mutations that need a redraw
   // (config changes, setColors, etc.). Auto-cleared after each render.
   private isRenderDirty = true
+  // Counter for settle-tail force throttling (every-other-frame skip).
+  private simFrameCounter = 0
 
   private store = new Store()
   private points: Points | undefined
@@ -1686,8 +1695,26 @@ export class Graph {
     // If forceExecution is true (from step()), always run.
     // Otherwise, respect isSimulationRunning and zoom state.
     const enableSimulationDuringZoom = this.zoomInstance.shouldEnableSimulationDuringZoomOverride ?? this.config.enableSimulationDuringZoom
-    const shouldRunSimulation = forceExecution ||
+    let shouldRunSimulation = forceExecution ||
       (isSimulationRunning && !(this.zoomInstance.isRunning && !enableSimulationDuringZoom))
+
+    // Settle-tail force-pass throttle: once alpha drops below the threshold,
+    // run the force passes every other frame instead of every frame. The
+    // remaining velocity in the velocity texture coasts positions forward
+    // on the skipped frames (Newtonian inertia). At low alpha the
+    // per-frame displacement is tiny, so the visual difference between
+    // every-frame and every-other-frame force updates is imperceptible —
+    // but the saved ~6 ms/frame (force.repulsion + gravity + center +
+    // links) lets the wall-clock FPS climb during the settle tail.
+    //
+    // Disabled by `step()` (forceExecution=true) so manual stepping is
+    // always exact.
+    if (!forceExecution && shouldRunSimulation && this.store.alpha < SETTLE_TAIL_ALPHA_THRESHOLD) {
+      this.simFrameCounter = (this.simFrameCounter + 1) | 0
+      if ((this.simFrameCounter & 1) === 1) {
+        shouldRunSimulation = false
+      }
+    }
 
     // Swap-before-write: every GPU position write is preceded by swapFbo(). The swap makes
     // `previous` point to the freshest data so updatePosition() reads it
