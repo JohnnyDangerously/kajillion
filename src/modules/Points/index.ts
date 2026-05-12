@@ -2456,8 +2456,9 @@ export class Points extends CoreModule {
     const size = this.positionStorageBufferTextureSize
     if (size === 0) return new Float32Array(0)
     // Flush any pending GPU work first so the storage buffer reflects the
-    // latest sim state. Without this, an open command encoder holding a
-    // sync-copy queued earlier this frame may not have executed.
+    // latest sim state. The frame loop calls syncPositionStorageBuffer
+    // every render tick; offline callers (graph.step() in a tight loop)
+    // should call graph.render() before readback to refresh the buffer.
     this.device.submit()
     // luma.gl auto-creates a temporary MAP_READ staging buffer, copies the
     // contents over via its own isolated commandEncoder, and unmaps after.
