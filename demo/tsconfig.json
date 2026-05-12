@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "@kajillion/graph": ["src/"],
+      "@kajillion/graph/*": ["src/*"],
+      "@/graph": ["src/"],
+      "@/graph/*": ["src/*"]
+    },
+    "declaration": false,
+    "noEmit": true
+  },
+  "include": ["./**/*"],
+  "exclude": []
+}

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kajillion · WebGPU demo (baseline)</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #0a0c10; color: #cfd6e6; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    #app { display: grid; grid-template-columns: 1fr 280px; grid-template-rows: auto 1fr; height: 100%; }
+    header { grid-column: 1 / 3; padding: 14px 22px; border-bottom: 1px solid #1a1f2c; display: flex; justify-content: space-between; align-items: baseline; }
+    header h1 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 0.02em; }
+    header .meta { color: #6c7891; font-size: 12px; }
+    #graph-host { position: relative; background: #0a0c10; overflow: hidden; }
+    #graph { width: 100%; height: 100%; }
+    #overlay {
+      position: absolute; top: 14px; right: 14px;
+      background: rgba(10, 12, 16, 0.75);
+      border: 1px solid #1a1f2c; border-radius: 6px;
+      padding: 10px 14px; min-width: 220px;
+      font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px;
+      backdrop-filter: blur(6px);
+      pointer-events: none;
+    }
+    #overlay .row { display: flex; justify-content: space-between; padding: 1px 0; }
+    #overlay .row .k { color: #8893ab; }
+    #overlay .row .v { color: #cfd6e6; font-variant-numeric: tabular-nums; }
+    #overlay .row.big .v { color: #7fb3ff; font-size: 13px; font-weight: 600; }
+    #overlay hr { border: 0; border-top: 1px solid #1a1f2c; margin: 6px 0; }
+    #sidebar { padding: 18px 18px; border-left: 1px solid #1a1f2c; overflow-y: auto; }
+    #sidebar h2 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; color: #6c7891; font-weight: 600; letter-spacing: 0.06em; }
+    #sidebar .group { margin-bottom: 18px; }
+    #sidebar label { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 13px; color: #cfd6e6; }
+    #sidebar label input[type="checkbox"] { margin-left: 8px; }
+    #sidebar select, #sidebar input[type="number"] {
+      background: #1a1f2c; color: #cfd6e6; border: 1px solid #2c3245; border-radius: 4px;
+      padding: 4px 8px; font: inherit; font-size: 12px;
+    }
+    #sidebar button {
+      background: #1d3a6a; color: #d6e4ff; border: 1px solid #2c4f8f; border-radius: 4px;
+      padding: 8px 12px; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+      width: 100%;
+    }
+    #sidebar button:hover:not(:disabled) { background: #244680; }
+    #sidebar button:disabled { opacity: 0.5; cursor: wait; }
+    #sidebar .status { margin-top: 10px; font-size: 11px; color: #8893ab; min-height: 16px; }
+    code { font-family: ui-monospace, SFMono-Regular, monospace; color: #cfd6e6; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Kajillion · WebGPU demo <span style="color:#6c7891">/ baseline measurement</span></h1>
+      <span class="meta">M5 Max · Chrome 148 · n=<code id="meta-n">100000</code></span>
+    </header>
+    <div id="graph-host">
+      <div id="graph"></div>
+      <div id="overlay">
+        <div class="row big"><span class="k">wall fps</span><span class="v" id="m-wall">—</span></div>
+        <div class="row"><span class="k">settled fps</span><span class="v" id="m-idle">—</span></div>
+        <hr/>
+        <div class="row"><span class="k">force.quadtree.build</span><span class="v" id="m-quad">—</span></div>
+        <div class="row"><span class="k">force.repulsion</span><span class="v" id="m-rep">—</span></div>
+        <div class="row"><span class="k">force.link.in/out</span><span class="v" id="m-link">—</span></div>
+        <div class="row"><span class="k">force.gravity</span><span class="v" id="m-grav">—</span></div>
+        <div class="row"><span class="k">render.canvas</span><span class="v" id="m-canvas">—</span></div>
+        <div class="row"><span class="k">render.lines</span><span class="v" id="m-lines">—</span></div>
+        <div class="row"><span class="k">render.points</span><span class="v" id="m-points">—</span></div>
+        <hr/>
+        <div class="row"><span class="k">alpha</span><span class="v" id="m-alpha">—</span></div>
+        <div class="row"><span class="k">DPR</span><span class="v" id="m-dpr">—</span></div>
+      </div>
+    </div>
+    <aside id="sidebar">
+      <div class="group">
+        <h2>Graph</h2>
+        <label>nodes
+          <select id="c-n">
+            <option value="10000">10 k</option>
+            <option value="50000">50 k</option>
+            <option value="100000" selected>100 k</option>
+            <option value="250000">250 k</option>
+          </select>
+        </label>
+        <label>seed
+          <input id="c-seed" type="number" value="42" style="width:80px"/>
+        </label>
+      </div>
+      <div class="group">
+        <h2>Render</h2>
+        <label>WebGPU<input id="c-webgpu" type="checkbox" checked/></label>
+        <label>MSAA 4×<input id="c-msaa" type="checkbox" checked/></label>
+        <label>adaptive DPR<input id="c-adpr" type="checkbox" checked/></label>
+        <label>blend
+          <select id="c-blend">
+            <option value="add" selected>add</option>
+            <option value="normal">normal</option>
+          </select>
+        </label>
+      </div>
+      <div class="group">
+        <h2>Simulation</h2>
+        <label>active<input id="c-sim" type="checkbox" checked/></label>
+      </div>
+      <div class="group">
+        <h2>Baseline</h2>
+        <button id="btn-record">Record 5-repeat baseline</button>
+        <div class="status" id="record-status"></div>
+      </div>
+      <div class="group" style="font-size: 11px; color: #6c7891;">
+        This is a <strong>baseline</strong> measurement page. Numbers here
+        become the reference point against which a future polish pass is
+        compared. Not for publication.
+      </div>
+    </aside>
+  </div>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
