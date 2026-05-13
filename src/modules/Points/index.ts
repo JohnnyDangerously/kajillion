@@ -292,6 +292,15 @@ export class Points extends CoreModule {
         width: pointsTextureSize,
         height: pointsTextureSize,
         format: 'rgba32float',
+        // COPY_SRC is critical: syncPositionStorageBuffer() does a
+        // copyTextureToBuffer FROM this texture into the storage buffer
+        // the vertex shaders read every frame. Without COPY_SRC the
+        // copy silently fails WebGPU validation and the storage buffer
+        // is stuck at its initial seed forever — points render at the
+        // initial random scatter even while the GPU sim is actively
+        // moving currentPositionTexture. luma.gl's default usage is
+        // TEXTURE | COPY_DST | RENDER_ATTACHMENT only.
+        usage: Texture.TEXTURE | Texture.COPY_DST | Texture.RENDER_ATTACHMENT | Texture.COPY_SRC,
       })
       this.currentPositionTexture.copyImageData({
         data: initialState,
@@ -350,6 +359,10 @@ export class Points extends CoreModule {
         width: pointsTextureSize,
         height: pointsTextureSize,
         format: 'rgba32float',
+        // COPY_SRC for the same reason as currentPositionTexture — they
+        // ping-pong via swapFbo() so whichever is the "current" after a
+        // swap needs to be readable by copyTextureToBuffer.
+        usage: Texture.TEXTURE | Texture.COPY_DST | Texture.RENDER_ATTACHMENT | Texture.COPY_SRC,
       })
       this.previousPositionTexture.copyImageData({
         data: initialState,
