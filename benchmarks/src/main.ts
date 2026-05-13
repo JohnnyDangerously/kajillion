@@ -1,4 +1,5 @@
 import { Graph, type GraphConfig, type GpuTimingSnapshot } from '@kajillion/graph'
+import { generateCosmoLab } from './generate-cosmo'
 import { generateBA, type GeneratedGraph } from './generate-graph'
 
 interface BenchParams {
@@ -241,10 +242,13 @@ function renderResults (
   `).join('')
   const nodes = data.nodeCount.toLocaleString()
   const edges = data.edgeCount.toLocaleString()
-  const datasetLine = `${nodes} nodes &middot; ${edges} edges (Barabási–Albert, m=${params.edgesPerNode}, seed=${params.seed})`
+  const dataLabel = new URL(window.location.href).searchParams.get('data') === 'cosmo'
+    ? `cosmo-lab community graph, seed=${params.seed}`
+    : `Barabási–Albert, m=${params.edgesPerNode}, seed=${params.seed}`
+  const datasetLine = `${nodes} nodes &middot; ${edges} edges (${dataLabel})`
   const rawJson = JSON.stringify({
     params,
-    dataset: { nodeCount: data.nodeCount, edgeCount: data.edgeCount },
+    dataset: { nodeCount: data.nodeCount, edgeCount: data.edgeCount, generator: dataLabel },
     power,
     derived: { renderFps: fps, msPerRenderFrame: msPerFrame, wallFps, wallMsPerFrame },
     aggregate: agg,
@@ -402,9 +406,18 @@ async function run (): Promise<void> {
     console.warn('[bench] ⚠︎ Throttle suspected — comparisons to AC-power baselines are invalid.')
   }
 
-  status.textContent = `Generating BA graph (n=${params.nodeCount}, m=${params.edgesPerNode}, seed=${params.seed})…`
+  // Data generator: BA (default) or cosmo-lab's community-structured topology
+  // for apples-to-apples comparison with the cosmo-lab bench.
+  const dataMode = new URL(window.location.href).searchParams.get('data') === 'cosmo' ? 'cosmo' : 'ba'
   const t0 = performance.now()
-  const data = generateBA(params.nodeCount, params.edgesPerNode, params.seed)
+  let data: GeneratedGraph
+  if (dataMode === 'cosmo') {
+    status.textContent = `Generating cosmo-lab community graph (n=${params.nodeCount}, seed=${params.seed})…`
+    data = generateCosmoLab({ count: params.nodeCount, seed: params.seed })
+  } else {
+    status.textContent = `Generating BA graph (n=${params.nodeCount}, m=${params.edgesPerNode}, seed=${params.seed})…`
+    data = generateBA(params.nodeCount, params.edgesPerNode, params.seed)
+  }
   const tGen = performance.now() - t0
   const nodes = data.nodeCount.toLocaleString()
   const edges = data.edgeCount.toLocaleString()
