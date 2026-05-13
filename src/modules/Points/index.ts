@@ -1,6 +1,7 @@
-import { Framebuffer, Buffer, Texture, UniformStore, RenderPass } from '@luma.gl/core'
+import { Framebuffer, Buffer, ComputePipeline, type BindingDeclaration, Shader, Texture, UniformStore, RenderPass } from '@luma.gl/core'
 import { Model } from '@luma.gl/engine'
 import { WebGLDevice } from '@luma.gl/webgl'
+import { syncPositionStorageWgsl } from '@/graph/modules/Points/sync-position-storage.compute.wgsl'
 // import { scaleLinear } from 'd3-scale'
 // import { extent } from 'd3-array'
 import { CoreModule } from '@/graph/modules/core-module'
@@ -97,6 +98,19 @@ export class Points extends CoreModule {
   private drawHighlightedVertexCoordBuffer: Buffer | undefined
   private drawQuadVertexBuffer: Buffer | undefined
   private positionStorageBufferTextureSize = 0
+
+  // Compute pipeline that copies currentPositionTexture → positionStorageBuffer
+  // one texel at a time. Replaces the broken commandEncoder.copyTextureToBuffer
+  // sync path that required 256-byte row alignment — our buffer is packed.
+  private syncPositionPipeline: ComputePipeline | undefined
+
+  private syncPositionShader: Shader | undefined
+
+  private syncPositionUniformStore: UniformStore<{
+    syncPositionUniforms: { pointCount: number; textureSize: number };
+  }> | undefined
+
+  private syncPositionUniformBuffer: Buffer | undefined
   private trackPointsVertexCoordBuffer: Buffer | undefined
   private trackedIndices: number[] | undefined
   private searchTexture: Texture | undefined
@@ -2427,9 +2441,17 @@ export class Points extends CoreModule {
 
   /**
    * WebGPU vertex-pulling sync: copy currentPositionTexture → positionStorageBuffer
-   * so the draw vertex shader can read positions via storage-buffer indexing
-   * instead of textureSampleLevel. No-op on WebGL2. Cheap (~20µs for n=1M on
-   * M-series unified memory).
+   * via a compute pass so the draw vertex shader can read positions via
+   * storage-buffer indexing instead of textureSampleLevel. No-op on WebGL2.
+   *
+   * Why compute and not commandEncoder.copyTextureToBuffer: WebGPU's
+   * copyTextureToBuffer requires `bytesPerRow` to be a multiple of 256
+   * (COPY_BYTES_PER_ROW_ALIGNMENT). Our positionStorageBuffer is allocated
+   * tightly packed (size² × 16 bytes), and forcing the sync to write into a
+   * row-aligned destination would either need a wider buffer + shader-side
+   * padding-aware indexing OR a second compact step. A direct compute pass
+   * sidesteps the alignment requirement entirely — one thread per point,
+   * textureLoad + storage write, no padding involved. ~0.1 ms at n=1M.
    */
   public syncPositionStorageBuffer (): void {
     if (!this.device || this.device.info?.type !== 'webgpu') return
@@ -2437,13 +2459,22 @@ export class Points extends CoreModule {
     if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return
     const size = this.positionStorageBufferTextureSize
     if (size === 0) return
-    this.device.commandEncoder.copyTextureToBuffer({
-      sourceTexture: this.currentPositionTexture,
-      destinationBuffer: this.positionStorageBuffer,
-      width: size,
-      height: size,
-      bytesPerRow: getBytesPerRow('rgba32float', size),
+    const pointCount = this.data.pointsNumber ?? 0
+    if (pointCount === 0) return
+    this.initSyncPositionPipeline()
+    if (!this.syncPositionPipeline || !this.syncPositionUniformStore || !this.syncPositionUniformBuffer) return
+    this.syncPositionUniformStore.setUniforms({
+      syncPositionUniforms: { pointCount, textureSize: size },
     })
+    this.syncPositionPipeline.setBindings({
+      syncPositionUniforms: this.syncPositionUniformBuffer,
+      positionsTexture: this.currentPositionTexture,
+      positionsBuf: this.positionStorageBuffer,
+    })
+    const pass = this.device.beginComputePass({ id: 'sync.position-storage' })
+    pass.setPipeline(this.syncPositionPipeline)
+    pass.dispatch(Math.ceil(pointCount / 64), 1, 1)
+    pass.end()
   }
 
   /**
@@ -2505,6 +2536,30 @@ export class Points extends CoreModule {
     this.currentPositionTexture = tempTexture
     this.currentPositionFbo = tempFbo
     this.areClusterCentroidsUpToDate = false
+  }
+
+  private initSyncPositionPipeline (): void {
+    if (this.syncPositionPipeline || !this.device || this.device.info?.type !== 'webgpu') return
+    this.syncPositionUniformStore ||= new UniformStore({
+      syncPositionUniforms: {
+        uniformTypes: { pointCount: 'u32', textureSize: 'u32' },
+      },
+    })
+    this.syncPositionUniformBuffer ||= this.syncPositionUniformStore.getManagedUniformBuffer(this.device, 'syncPositionUniforms')
+    this.syncPositionShader = this.device.createShader({
+      stage: 'compute',
+      source: syncPositionStorageWgsl(),
+    })
+    const bindings: BindingDeclaration[] = [
+      { type: 'uniform', name: 'syncPositionUniforms', group: 0, location: 0 },
+      { type: 'texture', name: 'positionsTexture', group: 0, location: 1 },
+      { type: 'storage', name: 'positionsBuf', group: 0, location: 2 },
+    ]
+    this.syncPositionPipeline = this.device.createComputePipeline({
+      shader: this.syncPositionShader,
+      entryPoint: 'computeMain',
+      shaderLayout: { bindings },
+    })
   }
 
   private rescaleInitialNodePositions (): void {
