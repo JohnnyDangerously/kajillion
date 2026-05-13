@@ -373,26 +373,33 @@ async function bakeCurrentLayout (): Promise<void> {
   const label = ctlEl.bakeLabel.value.trim() || 'default'
   const pointsOnly = ctlEl.bakePointsOnly.checked
   try {
-    // Wait for the simulation to settle via the RAF-driven frame loop.
-    // The engine's time-based alpha decay produces a clean settle in
-    // ~3-5 s of wall time at default decay=500. Cap at 60 s to avoid
-    // hanging on graphs that never quiet down (e.g. very high-degree
-    // hubs that keep oscillating).
-    //
-    // Why not use graph.step() in a tight loop: tested, but stepping
-    // many times in one tick without intervening renders causes the
-    // sim to over-shoot and collapse positions to numerical zero,
-    // because the texture sync flow assumes one step per render frame.
-    const settleDeadline = performance.now() + 60_000
+    // Reset alpha to 1 so the simulation gets full energy starting NOW,
+    // regardless of how long ago the graph was generated. Without this,
+    // the time-based alpha decay (~500 ms default) may have already
+    // pushed the engine to "settled" before the user clicked Bake — the
+    // wait loop would exit immediately and we'd save initial positions.
+    graph.start(1)
+    // Wait for the RAF-driven frame loop to actually settle. With
+    // decay=500 and a fresh alpha=1, settle is ~1.5 s of wall time at
+    // small n, more at large n (each frame's sim step is slower). Cap
+    // at 90 s to allow 1M to settle properly while still bounding the
+    // wait. The progress reading goes from ~0.22 (alpha=1) to 1.0
+    // (alpha = stopThreshold).
+    const settleDeadline = performance.now() + 90_000
     while (graph.isSimulationRunning && performance.now() < settleDeadline) {
       ctlEl.bakeStatus.textContent = `settling… progress ${graph.progress.toFixed(3)}`
       await delay(200)
     }
     if (graph.isSimulationRunning) {
-      ctlEl.bakeStatus.textContent = 'warning: sim still running at 60 s, baking mid-state'
+      ctlEl.bakeStatus.textContent = 'warning: sim still running at 90 s, baking mid-state'
     } else {
       ctlEl.bakeStatus.textContent = 'settled · reading back…'
     }
+    // Give the engine one more RAF tick so the final syncPositionStorageBuffer
+    // call in renderFrame copies the final currentPositionTexture into the
+    // storage buffer that readback reads from. Without this we can race
+    // and capture the second-to-last state.
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
     const positions = await graph.readbackPointPositions()
     if (positions.length === 0) {
       ctlEl.bakeStatus.textContent = 'error: empty readback (WebGPU only)'
