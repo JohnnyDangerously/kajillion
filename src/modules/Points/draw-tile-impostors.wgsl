@@ -96,7 +96,7 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) rawInstanceIdx: u32) 
   output.position = vec4<f32>(center + input.quadCorner * halfExtent, 0.0, 1.0);
   output.local = input.quadCorner;
   output.tileData = data;
-  output.dotAlpha = clamp((0.18 + density * 0.42) * tileRender.opacity, 0.03, 0.62);
+  output.dotAlpha = clamp((0.18 + density * 0.42) * tileRender.opacity, 0.0, 0.62);
   return output;
 }
 
@@ -114,6 +114,6 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   let core = 1.0 - smoothstep(0.0, 0.58, r2);
   let edge = 1.0 - smoothstep(0.56, 1.0, r2);
   let color = input.tileData.yzw;
-  let alpha = clamp((edge * 0.90 + core * 0.10) * input.dotAlpha, 0.0, 0.48);
+  let alpha = clamp((edge * 0.90 + core * 0.10) * input.dotAlpha, 0.0, 0.32);
   return vec4<f32>(color * alpha, alpha);
 }

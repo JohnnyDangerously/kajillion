@@ -20,6 +20,12 @@ function mulberry32 (seed: number): () => number {
   }
 }
 
+function normal01 (rng: () => number): number {
+  const u = Math.max(rng(), 1e-7)
+  const v = rng()
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)
+}
+
 function skewedPartition (total: number, parts: number, rng: () => number): number[] {
   const raw: number[] = new Array(parts)
   let sum = 0
@@ -60,6 +66,12 @@ export interface CosmoLabOptions {
   bridgeFraction?: number;
   /** Seed for reproducible generation. */
   seed?: number;
+  /**
+   * Initial layout shape. Keep the default `cosmo` for benchmark parity with
+   * cosmo-lab; the demo can opt into `organic` so dense communities do not
+   * start as visible square clouds.
+   */
+  layoutStyle?: 'cosmo' | 'organic';
 }
 
 export function generateCosmoLab (opts: CosmoLabOptions): GeneratedGraph {
@@ -68,6 +80,7 @@ export function generateCosmoLab (opts: CosmoLabOptions): GeneratedGraph {
   const communityCount = Math.max(2, Math.floor(opts.communityCount ?? defaultCommunityCount))
   const intraDensity = opts.intraDensity ?? 1.2
   const bridgeFraction = opts.bridgeFraction ?? 0.02
+  const layoutStyle = opts.layoutStyle ?? 'cosmo'
   const rng = mulberry32(opts.seed ?? 0xc05_03)
 
   const communitySizes = skewedPartition(count, communityCount, rng)
@@ -95,10 +108,26 @@ export function generateCosmoLab (opts: CosmoLabOptions): GeneratedGraph {
     const size = communitySizes[c] ?? 0
     const origin = communityOrigins[c] ?? { cx: 0, cy: 0 }
     const jitter = baseRadius * 0.18
+    const major = jitter * (0.55 + rng() * 0.72)
+    const minor = jitter * (0.18 + rng() * 0.30)
+    const axis = c * goldenAngle + (rng() - 0.5) * 1.4
+    const tail = jitter * (0.25 + rng() * 0.55)
     communityRanges.push({ start: pointIndex, end: pointIndex + size })
     for (let i = 0; i < size; i += 1) {
-      positions[pointIndex * 2] = HALF_SPACE + origin.cx + (rng() - 0.5) * 2 * jitter
-      positions[pointIndex * 2 + 1] = HALF_SPACE + origin.cy + (rng() - 0.5) * 2 * jitter
+      if (layoutStyle === 'organic') {
+        const ordinal = size > 1 ? i / (size - 1) : 0
+        const arm = (rng() < 0.20 ? 1 : 0) * (ordinal - 0.5) * tail
+        const gx = normal01(rng) * major + arm
+        const gy = normal01(rng) * minor + Math.sin(ordinal * Math.PI * 2 + c) * minor * 0.22
+        const swirl = 0.20 * Math.sin(ordinal * Math.PI * 4 + c * 0.7)
+        const ca = Math.cos(axis + swirl)
+        const sa = Math.sin(axis + swirl)
+        positions[pointIndex * 2] = HALF_SPACE + origin.cx + gx * ca - gy * sa
+        positions[pointIndex * 2 + 1] = HALF_SPACE + origin.cy + gx * sa + gy * ca
+      } else {
+        positions[pointIndex * 2] = HALF_SPACE + origin.cx + (rng() - 0.5) * 2 * jitter
+        positions[pointIndex * 2 + 1] = HALF_SPACE + origin.cy + (rng() - 0.5) * 2 * jitter
+      }
       pointIndex += 1
     }
   }
