@@ -1,0 +1,605 @@
+/* Gallery-only skins live here so visual experiments stay out of the base demo CSS. */
+
+:root[data-palette="signal"][data-theme="dark"] {
+  --page-bg: #020202;
+  --graph-bg: #020202;
+  --graph-field:
+    radial-gradient(circle at 50% 48%, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.012) 21%, transparent 38%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.026) 0 1px, transparent 1px 46px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 46px),
+    #020202;
+  --button-active-bg: rgba(255, 70, 18, 0.20);
+  --button-active-border: #ff4a16;
+  --overlay-hot: #ff4a16;
+  --label-bg: #ff430c;
+  --label-fg: #0c0704;
+  --label-border: rgba(255, 104, 52, 0.92);
+}
+
+:root[data-palette="tokyo"][data-theme="dark"] {
+  --page-bg: #000000;
+  --graph-bg: #000000;
+  --graph-field:
+    radial-gradient(circle at 50% 47%, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.012) 25%, transparent 47%),
+    #000000;
+  --button-active-bg: rgba(238, 49, 43, 0.20);
+  --button-active-border: #ef312b;
+  --overlay-hot: #ef312b;
+  --label-bg: transparent;
+  --label-fg: rgba(247, 247, 244, 0.90);
+  --label-border: transparent;
+}
+
+:root[data-palette="insight"][data-theme="dark"] {
+  --page-bg: #000000;
+  --graph-bg: #000000;
+  --graph-field: #000000;
+  --button-active-bg: rgba(28, 134, 214, 0.22);
+  --button-active-border: #1688d9;
+  --overlay-hot: #16a3ff;
+  --label-bg: rgba(0, 0, 0, 0.52);
+  --label-fg: rgba(246, 246, 246, 0.94);
+  --label-border: transparent;
+}
+
+:root[data-palette="insight"][data-theme="dark"] #graph-host::before {
+  content: "This discourse's structure is Diversified. It has a balanced representation of several perspectives.\A\AYou can make it more focused if you develop the ideas around the main keywords — day, negro, dream, freedom — or by identifying the structural gap between the less represented topics below and developing the themes they represent:";
+  position: absolute;
+  left: 48px;
+  top: 48px;
+  z-index: 2;
+  width: 250px;
+  padding: 12px 10px;
+  border-radius: 3px;
+  background: rgba(22, 22, 22, 0.92);
+  color: rgba(230, 230, 230, 0.82);
+  white-space: pre-line;
+  font: 12px/1.38 Arial, Helvetica, sans-serif;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset;
+  pointer-events: none;
+}
+
+:root[data-palette="insight"][data-theme="dark"] #graph-host::after {
+  content: "What is the relation between:\A ■ nation  ■ great  ■ check\A and\A ■ back  ■ mississippi  ■ faith";
+  position: absolute;
+  left: 48px;
+  top: 312px;
+  z-index: 2;
+  width: 250px;
+  padding: 12px 10px;
+  border-radius: 3px;
+  background: rgba(22, 22, 22, 0.92);
+  color: rgba(238, 238, 238, 0.84);
+  white-space: pre-line;
+  font: 12px/1.55 Arial, Helvetica, sans-serif;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset;
+  pointer-events: none;
+}
+
+:root[data-palette="insight"][data-theme="dark"] #overlay {
+  display: none;
+}
+
+:root[data-palette="insight"][data-theme="dark"] header {
+  display: none;
+}
+
+:root[data-palette="fintech"][data-theme="dark"] {
+  --page-bg: #0d1f2b;
+  --graph-bg: #0d1f2b;
+  --graph-field: #0d1f2b;
+  --button-active-bg: rgba(46, 172, 230, 0.18);
+  --button-active-border: #28aee8;
+  --overlay-hot: #28aee8;
+  --label-bg: transparent;
+  --label-fg: rgba(237, 244, 250, 0.92);
+  --label-border: transparent;
+}
+
+:root[data-palette="fintech"][data-theme="dark"] #graph-host::before {
+  content: "Тренды развития сегментов fintech-стартапов и отдельных проектов";
+  position: absolute;
+  left: 44%;
+  top: 22px;
+  z-index: 2;
+  transform: translateX(-50%);
+  color: rgba(246, 247, 250, 0.96);
+  font: 700 19px/1.15 Arial, Helvetica, sans-serif;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+:root[data-palette="fintech"][data-theme="dark"] #graph-host::after {
+  content: "● B2C   ● B2B2C   ● B2B\A - - -  Выход в другой сегмент\A →  Публичная компания";
+  position: absolute;
+  left: 18px;
+  top: 94px;
+  z-index: 2;
+  color: rgba(210, 222, 232, 0.74);
+  white-space: pre-line;
+  font: 10px/1.8 Arial, Helvetica, sans-serif;
+  pointer-events: none;
+}
+
+:root[data-palette="fintech"][data-theme="dark"] #overlay,
+:root[data-palette="fintech"][data-theme="dark"] header {
+  display: none;
+}
+
+:root[data-palette="influence"][data-theme="dark"] {
+  --page-bg: #000000;
+  --graph-bg: #000000;
+  --graph-field:
+    radial-gradient(circle at 50% 50%, rgba(255, 66, 18, 0.050) 0%, transparent 32%),
+    #000000;
+  --button-active-bg: rgba(255, 54, 18, 0.22);
+  --button-active-border: #ff3612;
+  --overlay-hot: #ffcb00;
+  --label-bg: transparent;
+  --label-fg: rgba(248, 248, 245, 0.96);
+  --label-border: transparent;
+}
+
+:root[data-palette="influence"][data-theme="dark"] #overlay,
+:root[data-palette="influence"][data-theme="dark"] header,
+:root[data-palette="influence"][data-theme="dark"] #sidebar {
+  display: none;
+}
+
+:root[data-palette="influence"][data-theme="dark"] #graph-host {
+  inset: 0;
+}
+
+:root[data-palette="talent"][data-theme="dark"] {
+  --page-bg: #172333;
+  --graph-bg: #172333;
+  --graph-field:
+    linear-gradient(110deg, rgba(255,255,255,0.050) 0 18%, transparent 18% 100%),
+    radial-gradient(circle at 54% 48%, rgba(255,255,255,0.030) 0 23%, transparent 24%),
+    #172333;
+  --button-active-bg: rgba(61, 166, 220, 0.20);
+  --button-active-border: #3da6dc;
+  --overlay-hot: #f05d74;
+  --label-bg: rgba(22, 35, 51, 0.58);
+  --label-fg: rgba(245, 249, 253, 0.92);
+  --label-border: rgba(255, 255, 255, 0.10);
+}
+
+:root[data-palette="talent"][data-theme="dark"] #graph {
+  position: relative;
+  z-index: 1;
+}
+
+:root[data-palette="talent"][data-theme="dark"] #graph-host {
+  inset: 0;
+  isolation: isolate;
+}
+
+:root[data-palette="talent"][data-theme="dark"] #cluster-labels {
+  z-index: 3;
+}
+
+:root[data-palette="talent"][data-theme="dark"] #graph-host::before {
+  content: "Cluster\A\A SAMPLE DATASET\A\A CLUSTER BY\A   Business Family\A\A COLOR BY\A ● CPG Global      26.4%\A ● CPG Global      18.4%\A ● Corporate       17.1%\A ● Free Data Global 16.1%\A ● Banking Global   14.0%\A ● Human Capital     5.3%\A ● Management        0.1%\A\A SIZE BY\A   Compensation bonus";
+  position: absolute;
+  left: 18px;
+  top: 20px;
+  z-index: 3;
+  width: 214px;
+  color: rgba(226, 235, 244, 0.76);
+  white-space: pre-line;
+  font: 10px/1.45 Arial, Helvetica, sans-serif;
+  pointer-events: none;
+}
+
+:root[data-palette="talent"][data-theme="dark"] #graph-host::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  z-index: 2;
+  width: min(62vw, 720px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.085);
+  mix-blend-mode: screen;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.020) inset;
+  pointer-events: none;
+}
+
+:root[data-palette="talent"][data-theme="dark"] #overlay,
+:root[data-palette="talent"][data-theme="dark"] header,
+:root[data-palette="talent"][data-theme="dark"] #sidebar {
+  display: none;
+}
+
+:root[data-palette="talent"][data-theme="dark"] #app::before {
+  content: "POPULATION\A 1,351";
+  position: absolute;
+  right: 34px;
+  top: 25px;
+  z-index: 3;
+  color: rgba(238, 246, 251, 0.88);
+  white-space: pre-line;
+  text-align: right;
+  font: 700 11px/1.1 ui-monospace, SFMono-Regular, monospace;
+  pointer-events: none;
+}
+
+:root[data-palette="talent"][data-theme="dark"] #app::after {
+  content: "Total        Average\A 63              47";
+  position: absolute;
+  right: 82px;
+  bottom: 28px;
+  z-index: 3;
+  color: rgba(238, 246, 251, 0.78);
+  white-space: pre-line;
+  text-align: right;
+  font: 700 11px/1.25 ui-monospace, SFMono-Regular, monospace;
+  pointer-events: none;
+}
+
+:root[data-palette="subnet"][data-theme="light"] {
+  --page-bg: #ffffff;
+  --graph-bg: #ffffff;
+  --graph-field: #ffffff;
+  --button-active-bg: #eef4ff;
+  --button-active-border: #2f7df6;
+  --overlay-hot: #275bd6;
+  --label-bg: transparent;
+  --label-fg: rgba(27, 32, 43, 0.82);
+  --label-border: transparent;
+}
+
+:root[data-palette="signal"][data-theme="dark"] .cluster-label {
+  padding: 3px 8px;
+  border-radius: 1px;
+  color: var(--label-fg);
+  background: var(--label-bg);
+  border-color: var(--label-border);
+  text-shadow: none;
+  box-shadow: 0 0 18px rgba(255, 66, 12, 0.18);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+:root[data-palette="signal"][data-theme="dark"] .cluster-label:nth-child(even) {
+  color: #080808;
+  background: rgba(242, 242, 234, 0.94);
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.16);
+}
+
+:root[data-palette="tokyo"][data-theme="dark"] .cluster-label {
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(247, 247, 244, 0.88);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.30);
+  box-shadow: none;
+  font: 650 12px/1 ui-monospace, SFMono-Regular, monospace;
+  letter-spacing: 0.06em;
+}
+
+:root[data-palette="tokyo"][data-theme="dark"] .cluster-label:nth-child(3) {
+  color: #ef312b;
+  text-shadow: 0 0 10px rgba(239, 49, 43, 0.42);
+}
+
+:root[data-palette="tokyo"][data-theme="dark"] .cluster-label:nth-child(4) {
+  font-size: 16px;
+  letter-spacing: 0;
+  opacity: 0.72;
+}
+
+:root[data-palette="insight"][data-theme="dark"] .cluster-label {
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 2px;
+  background: rgba(0,0,0,0.46);
+  color: rgba(255,255,255,0.94);
+  text-shadow: 0 0 5px rgba(0,0,0,0.9);
+  box-shadow: none;
+  font: 500 11px/1.1 Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+:root[data-palette="insight"][data-theme="dark"] .cluster-label:nth-child(1),
+:root[data-palette="insight"][data-theme="dark"] .cluster-label:nth-child(2) {
+  color: #ffc21c;
+}
+
+:root[data-palette="insight"][data-theme="dark"] .cluster-label:nth-child(n+3) {
+  color: #ff6ae8;
+}
+
+:root[data-palette="fintech"][data-theme="dark"] .cluster-label {
+  padding: 0 3px;
+  border: 0;
+  border-radius: 2px;
+  background: rgba(13, 31, 43, 0.64);
+  color: rgba(238, 244, 250, 0.94);
+  text-shadow: 0 1px 5px rgba(0,0,0,0.75);
+  box-shadow: none;
+  font: 700 10px/1.15 Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+:root[data-palette="influence"][data-theme="dark"] .cluster-label {
+  padding: 0 3px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(250, 250, 247, 0.94);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.96), 0 0 7px rgba(0,0,0,0.8);
+  box-shadow: none;
+  font: 800 11px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
+  text-transform: lowercase;
+}
+
+:root[data-palette="influence"][data-theme="dark"] .cluster-label:nth-child(1) {
+  font-size: 28px;
+  text-transform: none;
+}
+
+:root[data-palette="influence"][data-theme="dark"] .cluster-label:nth-child(2),
+:root[data-palette="influence"][data-theme="dark"] .cluster-label:nth-child(3),
+:root[data-palette="influence"][data-theme="dark"] .cluster-label:nth-child(4),
+:root[data-palette="influence"][data-theme="dark"] .cluster-label:nth-child(5) {
+  font-size: 18px;
+}
+
+:root[data-palette="influence"][data-theme="dark"] .cluster-label:nth-child(n+6) {
+  font-size: 9px;
+  opacity: 0.86;
+}
+
+:root[data-palette="talent"][data-theme="dark"] .cluster-label {
+  padding: 2px 5px;
+  border-radius: 2px;
+  background: rgba(20, 31, 46, 0.48);
+  color: rgba(241, 247, 253, 0.92);
+  border-color: rgba(255, 255, 255, 0.10);
+  text-shadow: 0 1px 7px rgba(0,0,0,0.54);
+  box-shadow: none;
+  font: 700 10px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+:root[data-palette="subnet"][data-theme="light"] .cluster-label {
+  padding: 1px 3px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(26, 31, 42, 0.74);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.82);
+  box-shadow: none;
+  backdrop-filter: none;
+  font: 600 10px/1 ui-monospace, SFMono-Regular, monospace;
+  letter-spacing: 0;
+}
+
+:root[data-palette="subnet"][data-theme="light"] #focus-panel {
+  display: none;
+}
+
+:root[data-palette="subnet"][data-theme="light"] #overlay {
+  top: 16px;
+}
+
+.preset-preview.signal::before {
+  border: 2px solid rgba(245,245,237,0.92);
+  background:
+    linear-gradient(20deg, transparent 0 47%, rgba(244,244,238,0.9) 48% 50%, transparent 51% 100%),
+    linear-gradient(76deg, transparent 0 47%, rgba(244,244,238,0.72) 48% 50%, transparent 51% 100%),
+    linear-gradient(132deg, transparent 0 47%, rgba(244,244,238,0.68) 48% 50%, transparent 51% 100%),
+    radial-gradient(circle, transparent 34%, rgba(244,244,238,0.92) 35% 38%, transparent 39%);
+}
+
+.preset-preview.signal::after {
+  width: 34px;
+  height: 10px;
+  right: 6px;
+  bottom: 7px;
+  border-radius: 1px;
+  background: #ff430c;
+  opacity: 1;
+  filter: none;
+}
+
+.preset-preview.tokyo::before {
+  border: 1px solid rgba(246, 246, 242, 0.82);
+  background:
+    linear-gradient(18deg, transparent 0 48%, rgba(246,246,242,0.78) 49% 50%, transparent 51% 100%),
+    linear-gradient(72deg, transparent 0 49%, rgba(246,246,242,0.58) 50% 51%, transparent 52% 100%),
+    linear-gradient(126deg, transparent 0 49%, rgba(246,246,242,0.46) 50% 51%, transparent 52% 100%),
+    radial-gradient(circle at 50% 50%, transparent 0 34%, rgba(246,246,242,0.78) 35% 36%, transparent 37% 100%);
+}
+
+.preset-preview.tokyo::after {
+  width: 56px;
+  height: 56px;
+  right: -2px;
+  bottom: -8px;
+  border-radius: 50%;
+  background:
+    linear-gradient(38deg, transparent 0 44%, rgba(239,49,43,0.86) 45% 47%, transparent 48% 100%),
+    linear-gradient(112deg, transparent 0 44%, rgba(239,49,43,0.72) 45% 47%, transparent 48% 100%),
+    radial-gradient(circle, transparent 0 36%, rgba(239,49,43,0.82) 37% 39%, transparent 40% 100%);
+  opacity: 1;
+  filter: none;
+}
+
+.preset-preview.subnet {
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(36, 54, 86, 0.16) inset;
+}
+
+.preset-preview.insight {
+  background: #000;
+}
+
+.preset-preview.insight::before {
+  width: 70px;
+  height: 70px;
+  left: 5px;
+  top: 0;
+  border-radius: 50%;
+  filter: none;
+  background:
+    radial-gradient(circle at 35% 67%, #ffbb16 0 5%, transparent 6%),
+    radial-gradient(circle at 72% 31%, #ff69e4 0 5%, transparent 6%),
+    radial-gradient(circle at 50% 50%, #373737 0 4%, transparent 5%),
+    repeating-conic-gradient(from 12deg, rgba(84,84,84,0.58) 0deg 3deg, transparent 3deg 15deg),
+    radial-gradient(circle, transparent 0 28%, rgba(100,100,100,0.46) 29% 30%, transparent 31% 100%);
+}
+
+.preset-preview.insight::after {
+  width: 72px;
+  height: 72px;
+  left: 4px;
+  top: 0;
+  border-radius: 50%;
+  background:
+    linear-gradient(30deg, transparent 0 55%, rgba(255,105,228,0.72) 56% 57%, transparent 58% 100%),
+    linear-gradient(135deg, transparent 0 48%, rgba(255,187,22,0.72) 49% 50%, transparent 51% 100%);
+  opacity: 1;
+  filter: none;
+}
+
+.preset-preview.fintech {
+  background: #0d1f2b;
+}
+
+.preset-preview.fintech::before {
+  width: 76px;
+  height: 50px;
+  left: 2px;
+  top: 10px;
+  border-radius: 0;
+  filter: none;
+  background:
+    radial-gradient(circle at 18% 30%, #ef3b88 0 6%, transparent 7%),
+    radial-gradient(circle at 48% 54%, #2faee8 0 6%, transparent 7%),
+    radial-gradient(circle at 78% 34%, #8c42a5 0 6%, transparent 7%),
+    radial-gradient(circle at 83% 70%, #2faee8 0 5%, transparent 6%),
+    linear-gradient(22deg, transparent 0 30%, rgba(239,59,136,0.72) 31% 32%, transparent 33% 100%),
+    linear-gradient(158deg, transparent 0 40%, rgba(47,174,232,0.70) 41% 42%, transparent 43% 100%),
+    linear-gradient(86deg, transparent 0 49%, rgba(140,66,165,0.72) 50% 51%, transparent 52% 100%);
+}
+
+.preset-preview.fintech::after {
+  width: 72px;
+  height: 8px;
+  left: 4px;
+  top: 5px;
+  border-radius: 0;
+  background: rgba(245, 247, 250, 0.90);
+  opacity: 0.9;
+  filter: none;
+}
+
+.preset-preview.influence {
+  background: #000;
+}
+
+.preset-preview.influence::before {
+  width: 78px;
+  height: 70px;
+  left: 1px;
+  top: 2px;
+  border-radius: 50%;
+  filter: none;
+  background:
+    radial-gradient(circle at 50% 50%, #ff3214 0 7%, transparent 8%),
+    radial-gradient(circle at 62% 67%, #ff3214 0 5%, transparent 6%),
+    radial-gradient(circle at 33% 38%, #ffcb00 0 4%, transparent 5%),
+    radial-gradient(circle at 22% 65%, #f6f6f0 0 4%, transparent 5%),
+    radial-gradient(circle at 43% 72%, #05d6f0 0 3%, transparent 4%),
+    radial-gradient(circle at 72% 30%, #b7fbff 0 3%, transparent 4%),
+    repeating-conic-gradient(from 3deg, rgba(255, 68, 18, 0.72) 0deg 1deg, transparent 1deg 6deg),
+    radial-gradient(circle, transparent 0 24%, rgba(255,203,0,0.62) 25% 27%, transparent 28% 100%);
+}
+
+.preset-preview.influence::after {
+  width: 46px;
+  height: 14px;
+  left: 18px;
+  top: 30px;
+  border-radius: 0;
+  background: rgba(255,255,255,0.92);
+  opacity: 1;
+  filter: none;
+  box-shadow: 0 12px 0 rgba(255, 58, 18, 0.72);
+}
+
+.preset-preview.talent {
+  background:
+    linear-gradient(112deg, rgba(255,255,255,0.05) 0 34%, transparent 35% 100%),
+    #172333;
+}
+
+.preset-preview.talent::before {
+  width: 62px;
+  height: 62px;
+  left: 11px;
+  top: 5px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 43% 46%, #2f9ada 0 11%, transparent 12%),
+    radial-gradient(circle at 56% 33%, #f4d033 0 8%, transparent 9%),
+    radial-gradient(circle at 66% 50%, #f05d74 0 9%, transparent 10%),
+    radial-gradient(circle at 35% 62%, #4fbfac 0 8%, transparent 9%),
+    radial-gradient(circle at 51% 64%, #f19745 0 7%, transparent 8%),
+    radial-gradient(circle, rgba(255,255,255,0.12) 0 58%, transparent 59%);
+  filter: none;
+}
+
+.preset-preview.talent::after {
+  width: 18px;
+  height: 64px;
+  left: 4px;
+  top: 5px;
+  border-radius: 0;
+  background:
+    linear-gradient(#dbe6f0 0 2px, transparent 2px 9px) 0 0 / 18px 9px,
+    rgba(255,255,255,0.06);
+  opacity: 0.85;
+  filter: none;
+}
+
+.preset-preview.subnet::before {
+  width: 80px;
+  height: 64px;
+  left: 0;
+  top: 3px;
+  border-radius: 0;
+  filter: none;
+  background:
+    radial-gradient(circle at 18% 38%, #8e5cf7 0 5%, transparent 6%),
+    radial-gradient(circle at 35% 36%, #8e5cf7 0 5%, transparent 6%),
+    radial-gradient(circle at 48% 55%, #43d52c 0 6%, transparent 7%),
+    radial-gradient(circle at 68% 50%, #ffe900 0 6%, transparent 7%),
+    radial-gradient(circle at 77% 70%, #ff4b4b 0 5%, transparent 6%),
+    linear-gradient(24deg, transparent 0 18%, #8e5cf7 19% 20%, transparent 21% 100%),
+    linear-gradient(150deg, transparent 0 45%, #28aa12 46% 48%, transparent 49% 100%),
+    linear-gradient(9deg, transparent 0 56%, #ff9900 57% 60%, transparent 61% 100%);
+}
+
+.preset-preview.subnet::after {
+  width: 28px;
+  height: 28px;
+  right: 3px;
+  top: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #78b7ff 0 30%, transparent 32%);
+  opacity: 1;
+  filter: none;
+}

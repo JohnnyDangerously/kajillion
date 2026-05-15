@@ -10,7 +10,7 @@ export function ensureVec2 (
   fallback: [number, number]
 ): [number, number] {
   if (!arr || arr.length !== 2) return fallback
-  return [arr[0], arr[1]] as [number, number]
+  return arr as [number, number]
 }
 
 /**
@@ -21,5 +21,5 @@ export function ensureVec4 (
   fallback: [number, number, number, number]
 ): [number, number, number, number] {
   if (!arr || arr.length !== 4) return fallback
-  return [arr[0], arr[1], arr[2], arr[3]] as [number, number, number, number]
+  return arr as [number, number, number, number]
 }

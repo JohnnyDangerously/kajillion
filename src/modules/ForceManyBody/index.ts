@@ -20,6 +20,8 @@ type LevelTarget = {
   fbo: Framebuffer;
 }
 
+const MAX_LEVEL_TEXTURE_SIZE = 4096
+
 export class ForceManyBody extends CoreModule {
   private randomValuesTexture: Texture | undefined
   private pointIndices: Buffer | undefined
@@ -86,7 +88,8 @@ export class ForceManyBody extends CoreModule {
     const { device, store } = this
     if (!store.pointsTextureSize) return
 
-    this.levels = Math.log2(store.adjustedSpaceSize)
+    const maxLevelTextureSize = Math.max(2, Math.min(store.adjustedSpaceSize, MAX_LEVEL_TEXTURE_SIZE))
+    this.levels = Math.log2(maxLevelTextureSize)
 
     // Allocate quadtree levels
     for (let level = 0; level < this.levels; level += 1) {

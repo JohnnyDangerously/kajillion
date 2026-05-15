@@ -6,6 +6,7 @@ interface BenchParams {
   nodeCount: number;
   edgesPerNode: number;
   seed: number;
+  dataMode: 'ba' | 'cosmo';
   warmupMs: number;
   measureMs: number;
   pixelRatio: number | undefined;
@@ -14,6 +15,10 @@ interface BenchParams {
   zoomLevel: number | undefined;
   linkBlendMode: 'normal' | 'add';
   linkOpacity: number | undefined;
+  renderLinks: boolean;
+  continuousRender: boolean;
+  pointDefaultSize: number | undefined;
+  linkDefaultWidth: number | undefined;
   pointMinPixelSize: number | undefined;
   linkMinPixelLength: number | undefined;
   useWebGPU: boolean;
@@ -21,6 +26,8 @@ interface BenchParams {
   adaptiveDpr: boolean | undefined;
   msaa: 1 | 4;
   linkWidthScale: number | undefined;
+  frameRateLimit: number | undefined;
+  frameRateHeadroomFps: number | undefined;
 }
 
 interface PassStats {
@@ -31,6 +38,16 @@ interface PassStats {
 }
 
 type AggregateSnapshot = Record<string, PassStats>
+
+interface BenchDiagnostics {
+  deviceType?: string;
+  canvasCssWidth: number;
+  canvasCssHeight: number;
+  canvasBackbufferWidth: number;
+  canvasBackbufferHeight: number;
+  effectivePixelRatioX: number;
+  effectivePixelRatioY: number;
+}
 
 function parseNum (raw: string | null, fallback: number, paramName: string): number {
   if (raw === null || raw === '') return fallback
@@ -56,10 +73,19 @@ function readParams (): BenchParams {
   const u = new URL(window.location.href)
   const p = u.searchParams
   const label = p.get('label')
+  const dataMode = p.get('data') === 'cosmo' ? 'cosmo' : 'ba'
+  const adaptiveDprRaw = p.get('adaptiveDpr')
+  const adaptiveDpr =
+    adaptiveDprRaw === '1' || adaptiveDprRaw === 'true'
+      ? true
+      : adaptiveDprRaw === '0' || adaptiveDprRaw === 'false'
+        ? false
+        : undefined
   return {
     nodeCount: parseNum(p.get('n'), 100000, 'n'),
     edgesPerNode: parseNum(p.get('m'), 3, 'm'),
     seed: parseNum(p.get('seed'), 42, 'seed'),
+    dataMode,
     warmupMs: parseNum(p.get('warmup'), 2000, 'warmup'),
     measureMs: parseNum(p.get('measure'), 8000, 'measure'),
     pixelRatio: parseOptionalNum(p.get('pixelRatio'), 'pixelRatio'),
@@ -68,13 +94,41 @@ function readParams (): BenchParams {
     zoomLevel: parseOptionalNum(p.get('zoomLevel'), 'zoomLevel'),
     linkBlendMode: p.get('linkBlendMode') === 'add' ? 'add' : 'normal',
     linkOpacity: parseOptionalNum(p.get('linkOpacity'), 'linkOpacity'),
+    renderLinks: p.get('renderLinks') !== '0' && p.get('renderLinks') !== 'false',
+    continuousRender: p.get('continuousRender') === '1' || p.get('continuousRender') === 'true',
+    pointDefaultSize: parseOptionalNum(p.get('pointDefaultSize'), 'pointDefaultSize'),
+    linkDefaultWidth: parseOptionalNum(p.get('linkDefaultWidth'), 'linkDefaultWidth'),
     pointMinPixelSize: parseOptionalNum(p.get('pointMinPixelSize'), 'pointMinPixelSize'),
     linkMinPixelLength: parseOptionalNum(p.get('linkMinPixelLength'), 'linkMinPixelLength'),
     useWebGPU: p.get('useWebGPU') === '1' || p.get('useWebGPU') === 'true',
     nosim: p.get('nosim') === '1' || p.get('nosim') === 'true',
-    adaptiveDpr: p.get('adaptiveDpr') === '1' || p.get('adaptiveDpr') === 'true' ? true : undefined,
+    adaptiveDpr,
     msaa: p.get('msaa') === '4' ? 4 : 1,
     linkWidthScale: parseOptionalNum(p.get('linkWidthScale'), 'linkWidthScale'),
+    frameRateLimit: parseOptionalNum(p.get('frameRateLimit') ?? p.get('fpsCap'), 'frameRateLimit'),
+    frameRateHeadroomFps: parseOptionalNum(p.get('frameRateHeadroomFps') ?? p.get('fpsHeadroom'), 'frameRateHeadroomFps'),
+  }
+}
+
+function captureDiagnostics (
+  graph: Graph,
+  graphDiv: HTMLDivElement
+): BenchDiagnostics {
+  const canvas = graphDiv.querySelector('canvas')
+  const cssWidth = canvas?.clientWidth ?? 0
+  const cssHeight = canvas?.clientHeight ?? 0
+  const backbufferWidth = canvas?.width ?? 0
+  const backbufferHeight = canvas?.height ?? 0
+  const effectivePixelRatioX = cssWidth > 0 ? backbufferWidth / cssWidth : 0
+  const effectivePixelRatioY = cssHeight > 0 ? backbufferHeight / cssHeight : 0
+  return {
+    deviceType: (graph as unknown as { device?: { info?: { type?: string } } }).device?.info?.type,
+    canvasCssWidth: cssWidth,
+    canvasCssHeight: cssHeight,
+    canvasBackbufferWidth: backbufferWidth,
+    canvasBackbufferHeight: backbufferHeight,
+    effectivePixelRatioX,
+    effectivePixelRatioY,
   }
 }
 
@@ -156,7 +210,7 @@ function deriveFps (rawSnapshots: GpuTimingSnapshot[], measureMs: number): numbe
   // Render passes run every render frame; force passes run only when sim is active.
   // FPS = render-pass sample count / measure window in seconds.
   const renderCounts = rawSnapshots.map(s => {
-    const candidates = ['render.points', 'render.lines'].map(k => s[k]?.sampleCount ?? 0)
+    const candidates = ['render.canvas', 'render.points', 'render.lines'].map(k => s[k]?.sampleCount ?? 0)
     return Math.max(...candidates, 0)
   })
   const medianCount = median(renderCounts)
@@ -223,6 +277,7 @@ function renderResults (
   data: GeneratedGraph,
   rawSnapshots: GpuTimingSnapshot[],
   wallFpsList: number[],
+  diagnostics: BenchDiagnostics[],
   power: PowerInfo
 ): void {
   const entries = Object.entries(agg).sort((a, b) => b[1].median - a[1].median)
@@ -251,6 +306,7 @@ function renderResults (
     dataset: { nodeCount: data.nodeCount, edgeCount: data.edgeCount, generator: dataLabel },
     power,
     derived: { renderFps: fps, msPerRenderFrame: msPerFrame, wallFps, wallMsPerFrame },
+    diagnostics,
     aggregate: agg,
     runs: rawSnapshots,
     wallFps: wallFpsList,
@@ -301,16 +357,17 @@ async function runOnce (
   params: BenchParams,
   status: HTMLElement,
   runIdx: number
-): Promise<{ snapshot: GpuTimingSnapshot; wallFps: number }> {
+): Promise<{ snapshot: GpuTimingSnapshot; wallFps: number; diagnostics: BenchDiagnostics }> {
   const config: GraphConfig = {
     spaceSize: 4096,
     backgroundColor: '#0f1115',
     pointDefaultColor: '#7fb3ff',
-    pointDefaultSize: 2,
+    pointDefaultSize: params.pointDefaultSize ?? 2,
     linkDefaultColor: '#2c3e63',
-    linkDefaultWidth: 0.5,
+    linkDefaultWidth: params.linkDefaultWidth ?? 0.5,
     linkOpacity: 0.5,
-    renderLinks: true,
+    renderLinks: params.renderLinks,
+    disableIdleFrameSkip: params.continuousRender,
     curvedLinks: false,
     fitViewOnInit: true,
     enableSimulation: !params.nosim,
@@ -325,13 +382,15 @@ async function runOnce (
     config.initialZoomLevel = params.zoomLevel
   }
   config.linkBlendMode = params.linkBlendMode
-  if (params.adaptiveDpr) config.adaptivePixelRatio = true
+  if (params.adaptiveDpr !== undefined) config.adaptivePixelRatio = params.adaptiveDpr
   if (params.linkOpacity !== undefined) config.linkOpacity = params.linkOpacity
   if (params.pointMinPixelSize !== undefined) config.pointMinPixelSize = params.pointMinPixelSize
   if (params.linkMinPixelLength !== undefined) config.linkMinPixelLength = params.linkMinPixelLength
   if (params.useWebGPU) config.useWebGPU = true
   if (params.msaa === 4) config.msaa = 4
   if (params.linkWidthScale !== undefined) config.linkWidthScale = params.linkWidthScale
+  if (params.frameRateLimit !== undefined) config.frameRateLimit = params.frameRateLimit
+  if (params.frameRateHeadroomFps !== undefined) config.frameRateHeadroomFps = params.frameRateHeadroomFps
 
   /* eslint-disable no-console */
   let stage = 'construct'
@@ -373,8 +432,9 @@ async function runOnce (
     const wallFps = wallElapsedMs > 0 ? (rafCount * 1000) / wallElapsedMs : 0
 
     const snapshot = graph.getGpuTimings() ?? {}
+    const diagnostics = captureDiagnostics(graph, graphDiv)
     graph.destroy()
-    return { snapshot, wallFps }
+    return { snapshot, wallFps, diagnostics }
   } catch (err) {
     console.error(`[bench] failed at stage='${stage}':`, err)
     if (err instanceof Error) {
@@ -408,10 +468,9 @@ async function run (): Promise<void> {
 
   // Data generator: BA (default) or cosmo-lab's community-structured topology
   // for apples-to-apples comparison with the cosmo-lab bench.
-  const dataMode = new URL(window.location.href).searchParams.get('data') === 'cosmo' ? 'cosmo' : 'ba'
   const t0 = performance.now()
   let data: GeneratedGraph
-  if (dataMode === 'cosmo') {
+  if (params.dataMode === 'cosmo') {
     status.textContent = `Generating cosmo-lab community graph (n=${params.nodeCount}, seed=${params.seed})…`
     data = generateCosmoLab({ count: params.nodeCount, seed: params.seed })
   } else {
@@ -425,15 +484,17 @@ async function run (): Promise<void> {
 
   const snapshots: GpuTimingSnapshot[] = []
   const wallFpsList: number[] = []
+  const diagnosticsList: BenchDiagnostics[] = []
   for (let i = 0; i < params.repeat; i += 1) {
-    const { snapshot, wallFps } = await runOnce(data, graphDiv, params, status, i)
+    const { snapshot, wallFps, diagnostics } = await runOnce(data, graphDiv, params, status, i)
     snapshots.push(snapshot)
     wallFpsList.push(wallFps)
+    diagnosticsList.push(diagnostics)
   }
 
   const agg = aggregate(snapshots)
   status.textContent = 'Done.'
-  renderResults(agg, resultsDiv, params, data, snapshots, wallFpsList, power)
+  renderResults(agg, resultsDiv, params, data, snapshots, wallFpsList, diagnosticsList, power)
   console.log('[kajillion-bench] aggregate', agg)
   await postResults({
     timestamp: new Date().toISOString(),
@@ -442,7 +503,8 @@ async function run (): Promise<void> {
     viewport: { width: window.innerWidth, height: window.innerHeight },
     power,
     params,
-    dataset: { nodeCount: data.nodeCount, edgeCount: data.edgeCount },
+    dataset: { nodeCount: data.nodeCount, edgeCount: data.edgeCount, generator: params.dataMode },
+    diagnostics: diagnosticsList,
     aggregate: agg,
     runs: snapshots,
     wallFps: wallFpsList,

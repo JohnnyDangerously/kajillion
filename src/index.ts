@@ -1,6 +1,6 @@
 import { select, Selection } from 'd3-selection'
 import 'd3-transition'
-import { easeQuadInOut, easeQuadIn, easeQuadOut } from 'd3-ease'
+import { easeQuadIn } from 'd3-ease'
 import { D3ZoomEvent } from 'd3-zoom'
 import { D3DragEvent } from 'd3-drag'
 import { Device, Framebuffer, luma, type RenderPass } from '@luma.gl/core'
@@ -10,7 +10,14 @@ import { webgl2Adapter } from '@luma.gl/webgl'
 // flag is off, which is the default.
 
 import { applyConfig, createDefaultConfig, resetConfigToDefaults, GraphConfigInterface, type GraphConfig } from '@/graph/config'
-import { getRgbaColor, getMaxPointSize, readPixels, extractIndicesFromPixels, sanitizeHtml } from '@/graph/helper'
+import {
+  getRgbaColor,
+  getMaxPointSize,
+  readPixels,
+  readRgba32FloatFramebufferAsync,
+  extractIndicesFromPixels,
+  sanitizeHtml,
+} from '@/graph/helper'
 import { ForceCenter } from '@/graph/modules/ForceCenter'
 import { ForceGravity } from '@/graph/modules/ForceGravity'
 import { ForceLink, LinkDirection } from '@/graph/modules/ForceLink'
@@ -33,6 +40,61 @@ import { MsaaTarget, makeMsaaPassWrapper } from '@/graph/render/msaa-target'
 // motion) and only throttles during the long tail where per-frame
 // displacement is sub-pixel anyway.
 const SETTLE_TAIL_ALPHA_THRESHOLD = 0.3
+const INTERPOLATED_FORCE_THROTTLE_POINTS = 100000
+const INTERPOLATED_FORCE_THROTTLE_ALPHA = 0.82
+const responsiveCameraEase = (t: number): number => {
+  const x = Math.max(0, Math.min(1, t / 0.82))
+  return x < 0.5 ? 2 * x * x : 1 - ((-2 * x + 2) ** 2) / 2
+}
+
+export interface FramePacingStats {
+  estimatedRefreshHz: number;
+  roundedRefreshHz: number;
+  targetFps: number;
+  rafCallbacks: number;
+  renderedFrames: number;
+  skippedFrames: number;
+  skipRatio: number;
+}
+
+export interface DebugFrameTraceEvent {
+  t: number;
+  name: string;
+  raf: number;
+  rendered: number;
+  skipped: number;
+  alpha: number;
+  sim: boolean;
+  zoom: boolean;
+  drag: boolean;
+  dirty: boolean;
+  dirtyFrames: number;
+  eventType?: string;
+  camera: { x: number; y: number; k: number };
+  screen: [number, number];
+  canvas?: { clientWidth: number; clientHeight: number; width: number; height: number };
+  data?: Record<string, unknown>;
+}
+
+interface WebGpuPointPickerGrid {
+  positions: Float32Array;
+  cellSize: number;
+  columns: number;
+  rows: number;
+  buckets: Int32Array[];
+}
+
+interface WebGpuLinkPickerGrid {
+  positions: Float32Array;
+  links: Float32Array;
+  cellSize: number;
+  columns: number;
+  rows: number;
+  cellOffsets: Int32Array;
+  cellEntries: Int32Array;
+  visitMarks: Uint32Array;
+  visitToken: number;
+}
 
 export class Graph {
   /** Current graph configuration. Always fully populated with default values for any unset properties. */
@@ -60,6 +122,10 @@ export class Graph {
   // settled. Set by programmatic state mutations that need a redraw
   // (config changes, setColors, etc.). Auto-cleared after each render.
   private isRenderDirty = true
+  private renderDirtyFrameCount = 1
+  private isPointImpostorAutoActive = false
+  private readonly debugFrameTrace: DebugFrameTraceEvent[] = []
+  private readonly debugFrameTraceLimit = 900
   // Counter for settle-tail force throttling (every-other-frame skip).
   private simFrameCounter = 0
 
@@ -89,6 +155,22 @@ export class Graph {
   private msaaTarget: MsaaTarget | undefined
   private lastPhysicsTickMs = Number.NEGATIVE_INFINITY
   private lastSimTickMs = 0
+  private lastRafFrameMs = 0
+  private estimatedRefreshHz = 60
+  private nextRenderEligibleMs = 0
+  private rafCallbackCount = 0
+  private renderedFrameCount = 0
+  private skippedFrameCount = 0
+  private positionEpoch = 0
+  private cachedWebGpuPointPositions: Float32Array | undefined
+  private cachedWebGpuPointPositionsEpoch = -1
+  private isWebGpuPointPositionsReadbackInFlight = false
+  private isWebGpuPointPositionsReadbackQueued = false
+  private lastWebGpuPointPositionsReadbackMs = 0
+  private webGpuPointPickerGrid: WebGpuPointPickerGrid | undefined
+  private webGpuLinkPickerGrid: WebGpuLinkPickerGrid | undefined
+  private linkHoverTValues: Float32Array | undefined
+  private linkHoverTValuesSegments = -1
 
   private currentEvent: D3ZoomEvent<HTMLCanvasElement, undefined> | D3DragEvent<HTMLCanvasElement, undefined, Hovered> | MouseEvent | undefined
   /**
@@ -149,6 +231,7 @@ export class Graph {
     devicePromise?: Promise<Device>
   ) {
     if (config) applyConfig(this.config, config)
+    this.zoomInstance.updateScaleExtent()
 
     if (devicePromise) {
       this.deviceInitPromise = devicePromise
@@ -170,10 +253,16 @@ export class Graph {
       this.device = device
       this.isReady = true
       const deviceCanvasContext = this.validateDevice(device)
+      if (device.info?.type !== 'webgpu' && this.config.msaa !== 1) {
+        console.warn('[kajillion] msaa > 1 is WebGPU-only; using msaa=1 for this device.')
+        this.config.msaa = 1
+      }
 
       // If external device was provided, sync its useDevicePixels with config.pixelRatio
       if (devicePromise) {
-        deviceCanvasContext.setProps({ useDevicePixels: this.config.pixelRatio })
+        this.applyEffectivePixelRatio(this.config.pixelRatio)
+      } else {
+        this.store.effectivePixelRatio = this.sanitizePixelRatio(this.config.pixelRatio)
       }
 
       this.store.div = div
@@ -196,6 +285,7 @@ export class Graph {
       this.store.adjustSpaceSize(this.config.spaceSize, this.device.limits.maxTextureDimension2D)
       this.store.setWebGLMaxTextureSize(this.device.limits.maxTextureDimension2D)
       this.store.updateScreenSize(w, h)
+      this.zoomInstance.updateTranslateExtent()
 
       this.canvasD3Selection = select<HTMLCanvasElement, undefined>(this.canvas)
       this.canvasD3Selection
@@ -203,15 +293,20 @@ export class Graph {
           this._isMouseOnCanvas = true
           this._lastMouseX = event.clientX
           this._lastMouseY = event.clientY
+          this.markRenderDirty()
+          this.traceDebugFrame('mouse-enter', { x: event.clientX, y: event.clientY })
         })
         .on('mousemove.cosmos', (event) => {
           this._isMouseOnCanvas = true
           this._lastMouseX = event.clientX
           this._lastMouseY = event.clientY
+          this.markRenderDirty()
         })
         .on('mouseleave.cosmos', (event) => {
           this._isMouseOnCanvas = false
           this.currentEvent = event
+          this.markRenderDirty()
+          this.traceDebugFrame('mouse-leave', { x: event.clientX, y: event.clientY })
 
           // Clear point hover state and trigger callback if needed
           if (this.store.hoveredPoint !== undefined && this.config.onPointMouseOut) {
@@ -237,20 +332,30 @@ export class Graph {
         .on('keydown.cosmos', (event) => { if (event.code === 'Space') this.store.isSpaceKeyPressed = true })
         .on('keyup.cosmos', (event) => { if (event.code === 'Space') this.store.isSpaceKeyPressed = false })
       this.zoomInstance.behavior
-        .on('start.detect', (e: D3ZoomEvent<HTMLCanvasElement, undefined>) => { this.currentEvent = e })
+        .on('start.detect', (e: D3ZoomEvent<HTMLCanvasElement, undefined>) => {
+          this.currentEvent = e
+          this.markRenderDirty()
+          this.traceDebugFrame('zoom-start')
+        })
         .on('zoom.detect', (e: D3ZoomEvent<HTMLCanvasElement, undefined>) => {
           const userDriven = !!e.sourceEvent
           if (userDriven) this.updateMousePosition(e.sourceEvent)
           this.currentEvent = e
+          this.markRenderDirty()
+          this.traceDebugFrame('zoom', { userDriven })
         })
         .on('end.detect', (e: D3ZoomEvent<HTMLCanvasElement, undefined>) => {
           this.currentEvent = e
+          this.markRenderDirty()
+          this.traceDebugFrame('zoom-end')
           // Force hover detection on next frame since zoom may have changed what's under the mouse
           this._shouldForceHoverDetection = true
         })
       this.dragInstance.behavior
         .on('start.detect', (e: D3DragEvent<HTMLCanvasElement, undefined, Hovered>) => {
           this.currentEvent = e
+          this.markRenderDirty()
+          this.traceDebugFrame('drag-start')
           this.updateCanvasCursor()
         })
         .on('drag.detect', (e: D3DragEvent<HTMLCanvasElement, undefined, Hovered>) => {
@@ -258,9 +363,13 @@ export class Graph {
             this.updateMousePosition(e)
           }
           this.currentEvent = e
+          this.markRenderDirty()
+          this.traceDebugFrame('drag')
         })
         .on('end.detect', (e: D3DragEvent<HTMLCanvasElement, undefined, Hovered>) => {
           this.currentEvent = e
+          this.markRenderDirty()
+          this.traceDebugFrame('drag-end')
           this.updateCanvasCursor()
         })
       this.canvasD3Selection
@@ -274,7 +383,7 @@ export class Graph {
       // so we fall back to 1 here as the neutral zoom level when no initial zoom is configured.
       this.setZoomLevel(this.config.initialZoomLevel ?? 1)
 
-      this.store.maxPointSize = getMaxPointSize(device, this.config.pixelRatio)
+      this.store.maxPointSize = getMaxPointSize(device, this.store.effectivePixelRatio)
 
       // Initialize simulation state based on enableSimulation config
       // If simulation is disabled, start with isSimulationRunning = false
@@ -365,6 +474,41 @@ export class Graph {
   }
 
   /**
+   * Returns render-loop pacing diagnostics. Useful for distinguishing display
+   * refresh limits from engine/GPU limits on high-refresh monitors.
+   */
+  public getFramePacingStats (): FramePacingStats {
+    const total = this.renderedFrameCount + this.skippedFrameCount
+    return {
+      estimatedRefreshHz: this.estimatedRefreshHz,
+      roundedRefreshHz: this.getRoundedRefreshHz(),
+      targetFps: this.getTargetRenderFps(),
+      rafCallbacks: this.rafCallbackCount,
+      renderedFrames: this.renderedFrameCount,
+      skippedFrames: this.skippedFrameCount,
+      skipRatio: total > 0 ? this.skippedFrameCount / total : 0,
+    }
+  }
+
+  public getDebugFrameTrace (): DebugFrameTraceEvent[] {
+    return this.debugFrameTrace.map(event => ({
+      ...event,
+      camera: { ...event.camera },
+      screen: [...event.screen] as [number, number],
+      canvas: event.canvas ? { ...event.canvas } : undefined,
+      data: event.data ? { ...event.data } : undefined,
+    }))
+  }
+
+  public clearDebugFrameTrace (): void {
+    this.debugFrameTrace.length = 0
+  }
+
+  public markDebugFlash (label = 'manual'): void {
+    this.traceDebugFrame('flash-marker', { label })
+  }
+
+  /**
    * Clears all in-flight GPU timer queries and the rolling sample window.
    * Call this just before starting a measurement period (e.g. after a warmup
    * window has elapsed) so that subsequent `getGpuTimings()` calls reflect
@@ -444,6 +588,7 @@ export class Graph {
     this.isForceManyBodyUpdateNeeded = true
     this.isForceLinkUpdateNeeded = true
     this.isForceCenterUpdateNeeded = true
+    this.markPointPositionsChanged(true)
   }
 
   /**
@@ -575,6 +720,7 @@ export class Graph {
     this.isLinkWidthUpdateNeeded = true
     this.isLinkArrowUpdateNeeded = true
     this.isForceLinkUpdateNeeded = true
+    this.markLinksChanged()
   }
 
   /**
@@ -797,6 +943,12 @@ export class Graph {
 
     if (this.ensureDevice(() => this.zoomToPointByIndex(index, duration, scale, canZoomOut, enableSimulation))) return
     if (!this.device || !this.points || !this.canvasD3Selection) return
+    if (this.device.info?.type === 'webgpu') {
+      this.zoomToPointByIndexAsync(index, duration, scale, canZoomOut, enableSimulation).catch((error) => {
+        console.warn('[kajillion] WebGPU zoomToPointByIndex failed', error)
+      })
+      return
+    }
     const { store: { screenSize } } = this
     const positionPixels = readPixels(this.device, this.points.currentPositionFbo as Framebuffer)
     if (index === undefined) return
@@ -818,7 +970,7 @@ export class Graph {
         .duration(duration / 2)
         .call(this.zoomInstance.behavior.transform, middle)
         .transition()
-        .ease(easeQuadOut)
+        .ease(responsiveCameraEase)
         .duration(duration / 2)
         .call(this.zoomInstance.behavior.transform, transform)
     }
@@ -857,6 +1009,7 @@ export class Graph {
     } else {
       this.canvasD3Selection
         .transition()
+        .ease(responsiveCameraEase)
         .duration(duration)
         .call(this.zoomInstance.behavior.scaleTo, value)
     }
@@ -880,12 +1033,14 @@ export class Graph {
     if (this.graph.pointsNumber === undefined) return []
     const positions: number[] = []
     positions.length = this.graph.pointsNumber * 2
-    // WebGPU has no sync pixel-readback; fall back to the last-set CPU positions.
-    // Accurate before the simulation runs (e.g. for fitViewOnInit) and degrades
-    // gracefully as the sim moves things. For settled-state positions on
-    // WebGPU, use the async `readbackPointPositions()` below.
+    // WebGPU has no sync pixel-readback. Return the latest async CPU snapshot
+    // and kick a refresh if it is stale; fall back to uploaded positions only
+    // during boot before the first snapshot resolves.
     if (this.device.info?.type === 'webgpu') {
-      const cached = this.graph.inputPointPositions
+      if (this.cachedWebGpuPointPositionsEpoch < this.positionEpoch) {
+        this.requestWebGpuPointPositionsSnapshot()
+      }
+      const cached = this.cachedWebGpuPointPositions ?? this.graph.inputPointPositions
       if (!cached) return positions
       for (let i = 0; i < this.graph.pointsNumber; i += 1) {
         positions[i * 2] = cached[i * 2] ?? 0
@@ -924,7 +1079,12 @@ export class Graph {
     if (this._isDestroyed || !this.device || !this.points) return new Float32Array(0)
     if (this.graph.pointsNumber === undefined) return new Float32Array(0)
     if (this.device.info?.type === 'webgpu') {
-      return this.points.readbackPointPositions()
+      const requestEpoch = this.positionEpoch
+      const positions = await this.points.readbackPointPositions()
+      if (!this._isDestroyed && positions.length > 0) {
+        this.cacheWebGpuPointPositions(positions, requestEpoch)
+      }
+      return positions
     }
     // WebGL2: the synchronous getPointPositions already reads from the
     // FBO. Wrap it as an async result for API parity.
@@ -953,6 +1113,12 @@ export class Graph {
 
     if (this.ensureDevice(() => this.fitView(duration, padding, enableSimulation))) return
 
+    if (this.device?.info?.type === 'webgpu') {
+      this.fitViewAsync(duration, padding, enableSimulation).catch((error) => {
+        console.warn('[kajillion] WebGPU fitView failed', error)
+      })
+      return
+    }
     this.setZoomTransformByPointPositions(new Float32Array(this.getPointPositions()), duration, undefined, padding, enableSimulation)
   }
 
@@ -967,6 +1133,12 @@ export class Graph {
     if (this._isDestroyed) return
 
     if (this.ensureDevice(() => this.fitViewByPointIndices(indices, duration, padding, enableSimulation))) return
+    if (this.device?.info?.type === 'webgpu') {
+      this.fitViewByPointIndicesAsync(indices, duration, padding, enableSimulation).catch((error) => {
+        console.warn('[kajillion] WebGPU fitViewByPointIndices failed', error)
+      })
+      return
+    }
     const positionsArray = this.getPointPositions()
     const positions = new Float32Array(indices.length * 2)
     for (const [i, index] of indices.entries()) {
@@ -1011,7 +1183,7 @@ export class Graph {
     const transform = this.zoomInstance.getTransform(positions, scale, padding)
     this.canvasD3Selection
       ?.transition()
-      .ease(easeQuadInOut)
+      .ease(responsiveCameraEase)
       .duration(duration)
       .call(this.zoomInstance.behavior.transform, transform)
   }
@@ -1030,11 +1202,30 @@ export class Graph {
   public findPointsInRect (rect: [[number, number], [number, number]]): number[] {
     if (this._isDestroyed) return []
     if (!this.isReady || !this.device || !this.points) return []
+    if (this.device.info?.type === 'webgpu') return this.findPointsInRectOnCpu(rect)
 
     const h = this.store.screenSize[1]
     this.store.searchArea = [[rect[0][0], (h - rect[1][1])], [rect[1][0], (h - rect[0][1])]]
     if (!this.points.findPointsInRect()) return []
     return extractIndicesFromPixels(readPixels(this.device, this.points.searchFbo as Framebuffer))
+  }
+
+  /**
+   * Async version of `findPointsInRect`. On WebGPU this runs the existing GPU
+   * selection mask pass and reads back the mask, avoiding CPU geometry tests.
+   */
+  public async findPointsInRectAsync (rect: [[number, number], [number, number]]): Promise<number[]> {
+    if (this._isDestroyed) return []
+    if (!this.isReady) await this.ready
+    if (this._isDestroyed || !this.device || !this.points) return []
+    if (this.device.info?.type !== 'webgpu') return this.findPointsInRect(rect)
+
+    const h = this.store.screenSize[1]
+    this.store.searchArea = [[rect[0][0], (h - rect[1][1])], [rect[1][0], (h - rect[0][1])]]
+    if (!this.points.findPointsInRect() || !this.points.searchFbo) return []
+    this.device.submit()
+    const pixels = await readRgba32FloatFramebufferAsync(this.device, this.points.searchFbo)
+    return extractIndicesFromPixels(pixels)
   }
 
   /**
@@ -1056,12 +1247,38 @@ export class Graph {
       console.warn('Polygon path requires at least 3 points to form a polygon.')
       return []
     }
+    if (this.device.info?.type === 'webgpu') return this.findPointsInPolygonOnCpu(polygonPath)
 
     const h = this.store.screenSize[1]
     const convertedPath = polygonPath.map(([x, y]) => [x, h - y] as [number, number])
     this.points.updatePolygonPath(convertedPath)
     if (!this.points.findPointsInPolygon()) return []
     return extractIndicesFromPixels(readPixels(this.device, this.points.searchFbo as Framebuffer))
+  }
+
+  /**
+   * Async version of `findPointsInPolygon`. On WebGPU this runs the GPU
+   * polygon selection mask pass and reads back the mask, avoiding CPU
+   * point-in-polygon tests.
+   */
+  public async findPointsInPolygonAsync (polygonPath: [number, number][]): Promise<number[]> {
+    if (this._isDestroyed) return []
+    if (!this.isReady) await this.ready
+    if (this._isDestroyed || !this.device || !this.points) return []
+
+    if (polygonPath.length < 3) {
+      console.warn('Polygon path requires at least 3 points to form a polygon.')
+      return []
+    }
+    if (this.device.info?.type !== 'webgpu') return this.findPointsInPolygon(polygonPath)
+
+    const h = this.store.screenSize[1]
+    const convertedPath = polygonPath.map(([x, y]) => [x, h - y] as [number, number])
+    this.points.updatePolygonPath(convertedPath)
+    if (!this.points.findPointsInPolygon() || !this.points.searchFbo) return []
+    this.device.submit()
+    const pixels = await readRgba32FloatFramebufferAsync(this.device, this.points.searchFbo)
+    return extractIndicesFromPixels(pixels)
   }
 
   /**
@@ -1510,8 +1727,13 @@ export class Graph {
       this.lines?.updateArrow()
     }
     if (prevConfig.curvedLinkSegments !== this.config.curvedLinkSegments ||
-      prevConfig.curvedLinks !== this.config.curvedLinks) {
+      prevConfig.curvedLinks !== this.config.curvedLinks ||
+      prevConfig.curvedLinkWeight !== this.config.curvedLinkWeight ||
+      prevConfig.curvedLinkControlPointDistance !== this.config.curvedLinkControlPointDistance ||
+      prevConfig.linkBundlingStrength !== this.config.linkBundlingStrength ||
+      prevConfig.linkBundlingCellSize !== this.config.linkBundlingCellSize) {
       this.lines?.updateCurveLineGeometry()
+      this.markLinksChanged()
     }
 
     if (prevConfig.backgroundColor !== this.config.backgroundColor) {
@@ -1545,22 +1767,34 @@ export class Graph {
         prevConfig.outlinedPointIndices !== this.config.outlinedPointIndices) {
       this.points?.updatePointStatus()
     }
+    if (prevConfig.activePointIndices !== this.config.activePointIndices) {
+      this.points?.updateActivePointMask()
+      this.markRenderDirty()
+    }
     if (prevConfig.highlightedLinkIndices !== this.config.highlightedLinkIndices) {
       this.lines?.updateLinkStatus()
     }
-    if (prevConfig.pixelRatio !== this.config.pixelRatio) {
-      // Update device's canvas context useDevicePixels
-      if (this.device?.canvasContext) {
-        this.device.canvasContext.setProps({ useDevicePixels: this.config.pixelRatio })
-
-        // Recalculate maxPointSize with new pixelRatio
-        this.store.maxPointSize = getMaxPointSize(this.device, this.config.pixelRatio)
+    if (prevConfig.activeLinkIndices !== this.config.activeLinkIndices) {
+      this.lines?.updateActiveLinkMask()
+      this.markRenderDirty()
+    }
+    if (prevConfig.pixelRatio !== this.config.pixelRatio ||
+        prevConfig.adaptivePixelRatio !== this.config.adaptivePixelRatio) {
+      if (this.config.adaptivePixelRatio) {
+        this._lastAppliedDpr = undefined
+        this.maybeApplyAdaptiveDpr(performance.now())
+      } else {
+        this.applyEffectivePixelRatio(this.config.pixelRatio)
       }
     }
     if (prevConfig.spaceSize !== this.config.spaceSize) {
       this.store.adjustSpaceSize(this.config.spaceSize, this.device?.limits.maxTextureDimension2D ?? 4096)
       this.resizeCanvas(true)
       this.update(this.store.isSimulationRunning ? this.store.alpha : 0)
+    }
+    if (prevConfig.constrainCameraToGraph !== this.config.constrainCameraToGraph ||
+        prevConfig.cameraBoundsPadding !== this.config.cameraBoundsPadding) {
+      this.zoomInstance.updateTranslateExtent()
     }
     if (prevConfig.showFPSMonitor !== this.config.showFPSMonitor) {
       if (this.config.showFPSMonitor) {
@@ -1580,6 +1814,10 @@ export class Graph {
     }
     if (prevConfig.enableZoom !== this.config.enableZoom || prevConfig.enableDrag !== this.config.enableDrag) {
       this.updateZoomDragBehaviors()
+    }
+    if (prevConfig.minZoomLevel !== this.config.minZoomLevel ||
+        prevConfig.maxZoomLevel !== this.config.maxZoomLevel) {
+      this.zoomInstance.updateScaleExtent()
     }
 
     if (prevConfig.onLinkClick !== this.config.onLinkClick ||
@@ -1609,6 +1847,487 @@ export class Graph {
       return true
     }
     return false
+  }
+
+  private getCurrentEventType (): string | undefined {
+    const event = this.currentEvent
+    if (!event) return undefined
+    const maybeSource = (event as D3ZoomEvent<HTMLCanvasElement, undefined>).sourceEvent
+    if (maybeSource?.type) return `${event.type}:${maybeSource.type}`
+    return event.type
+  }
+
+  private traceDebugFrame (name: string, data?: Record<string, unknown>): void {
+    if (!this.config.debugFrameTrace) return
+    const { x, y, k } = this.zoomInstance.eventTransform
+    const canvas = this.canvas
+      ? {
+        clientWidth: this.canvas.clientWidth,
+        clientHeight: this.canvas.clientHeight,
+        width: this.canvas.width,
+        height: this.canvas.height,
+      }
+      : undefined
+    this.debugFrameTrace.push({
+      t: performance.now(),
+      name,
+      raf: this.rafCallbackCount,
+      rendered: this.renderedFrameCount,
+      skipped: this.skippedFrameCount,
+      alpha: this.store.alpha,
+      sim: this.store.isSimulationRunning,
+      zoom: this.zoomInstance.isRunning,
+      drag: this.dragInstance.isActive,
+      dirty: this.isRenderDirty,
+      dirtyFrames: this.renderDirtyFrameCount,
+      eventType: this.getCurrentEventType(),
+      camera: { x, y, k },
+      screen: [...this.store.screenSize] as [number, number],
+      canvas,
+      data,
+    })
+    if (this.debugFrameTrace.length > this.debugFrameTraceLimit) {
+      this.debugFrameTrace.splice(0, this.debugFrameTrace.length - this.debugFrameTraceLimit)
+    }
+  }
+
+  private markPointPositionsChanged (invalidateKnownPickerData = false): void {
+    this.positionEpoch += 1
+    if (invalidateKnownPickerData) {
+      this.cachedWebGpuPointPositions = undefined
+      this.cachedWebGpuPointPositionsEpoch = -1
+      this.webGpuPointPickerGrid = undefined
+      this.webGpuLinkPickerGrid = undefined
+    }
+  }
+
+  private markLinksChanged (): void {
+    this.webGpuLinkPickerGrid = undefined
+  }
+
+  private markRenderDirty (frames = 3): void {
+    this.isRenderDirty = true
+    this.renderDirtyFrameCount = Math.max(this.renderDirtyFrameCount, frames)
+  }
+
+  private shouldRenderPointImpostors (): boolean {
+    if (this.device?.info?.type !== 'webgpu') return false
+    if (!this.graph.pointsNumber || this.graph.pointsNumber <= 0) return false
+    if (this.config.renderLodMode === 'impostor') return true
+    if (this.config.renderLodMode !== 'auto') {
+      this.isPointImpostorAutoActive = false
+      return false
+    }
+    if (this.graph.pointsNumber < this.config.impostorAutoMinPoints) {
+      this.isPointImpostorAutoActive = false
+      return false
+    }
+    const zoomLevel = this.zoomInstance.eventTransform.k
+    const enterZoom = this.config.impostorAutoMaxZoom
+    const exitZoom = enterZoom * 1.18
+    this.isPointImpostorAutoActive = this.isPointImpostorAutoActive
+      ? zoomLevel <= exitZoom
+      : zoomLevel <= enterZoom
+    return this.isPointImpostorAutoActive
+  }
+
+  private cacheWebGpuPointPositions (positions: Float32Array, epoch: number): void {
+    this.cachedWebGpuPointPositions = positions
+    this.cachedWebGpuPointPositionsEpoch = epoch
+    this.lastWebGpuPointPositionsReadbackMs = performance.now()
+    this.rebuildWebGpuPointPickerGrid(positions)
+    this.webGpuLinkPickerGrid = undefined
+  }
+
+  private requestWebGpuPointPositionsSnapshot (force = false): void {
+    if (this._isDestroyed || this.device?.info?.type !== 'webgpu' || !this.points) return
+    const now = performance.now()
+    if (!force && now - this.lastWebGpuPointPositionsReadbackMs < 250) return
+    if (this.isWebGpuPointPositionsReadbackInFlight) {
+      this.isWebGpuPointPositionsReadbackQueued = true
+      return
+    }
+    this.isWebGpuPointPositionsReadbackInFlight = true
+    const requestEpoch = this.positionEpoch
+    this.points.readbackPointPositions()
+      .then((positions) => {
+        if (!this._isDestroyed && positions.length > 0) {
+          this.cacheWebGpuPointPositions(positions, requestEpoch)
+        }
+      })
+      .catch((error) => {
+        console.warn('[kajillion] WebGPU point-position snapshot failed', error)
+      })
+      .finally(() => {
+        this.isWebGpuPointPositionsReadbackInFlight = false
+        if (this.isWebGpuPointPositionsReadbackQueued) {
+          this.isWebGpuPointPositionsReadbackQueued = false
+          this.requestWebGpuPointPositionsSnapshot(true)
+        }
+      })
+  }
+
+  private rebuildWebGpuPointPickerGrid (positions: Float32Array): void {
+    const n = this.graph.pointsNumber ?? 0
+    if (n === 0 || positions.length < n * 2) {
+      this.webGpuPointPickerGrid = undefined
+      return
+    }
+    const spaceSize = this.store.adjustedSpaceSize || this.config.spaceSize || 4096
+    const cellSize = Math.max(32, spaceSize / 128)
+    const columns = Math.max(1, Math.ceil(spaceSize / cellSize))
+    const rows = columns
+    const bucketArrays: number[][] = Array.from({ length: columns * rows }, () => [])
+    for (let i = 0; i < n; i += 1) {
+      const x = positions[i * 2] ?? NaN
+      const y = positions[i * 2 + 1] ?? NaN
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+      const cx = Math.min(columns - 1, Math.max(0, Math.floor(x / cellSize)))
+      const cy = Math.min(rows - 1, Math.max(0, Math.floor(y / cellSize)))
+      bucketArrays[cy * columns + cx]?.push(i)
+    }
+    this.webGpuPointPickerGrid = {
+      positions,
+      cellSize,
+      columns,
+      rows,
+      buckets: bucketArrays.map(bucket => Int32Array.from(bucket)),
+    }
+  }
+
+  private rebuildWebGpuLinkPickerGrid (positions: Float32Array): void {
+    const links = this.graph.links
+    const linksNumber = this.graph.linksNumber ?? 0
+    const pointsNumber = this.graph.pointsNumber ?? 0
+    if (!links || linksNumber === 0 || pointsNumber === 0 || positions.length < pointsNumber * 2) {
+      this.webGpuLinkPickerGrid = undefined
+      return
+    }
+
+    const spaceSize = this.store.adjustedSpaceSize || this.config.spaceSize || 4096
+    const cellSize = Math.max(64, spaceSize / 64)
+    const columns = Math.max(1, Math.ceil(spaceSize / cellSize))
+    const rows = Math.max(1, Math.ceil(spaceSize / cellSize))
+    const cellCount = columns * rows
+    const counts = new Int32Array(cellCount)
+    const clampCellX = (value: number): number => Math.min(columns - 1, Math.max(0, Math.floor(value / cellSize)))
+    const clampCellY = (value: number): number => Math.min(rows - 1, Math.max(0, Math.floor(value / cellSize)))
+    const visitLinkCells = (sx: number, sy: number, tx: number, ty: number, visitor: (cell: number) => void): void => {
+      const startCx = clampCellX(sx)
+      const startCy = clampCellY(sy)
+      const endCx = clampCellX(tx)
+      const endCy = clampCellY(ty)
+      const steps = Math.max(1, Math.abs(endCx - startCx), Math.abs(endCy - startCy))
+      let previousCell = -1
+      for (let step = 0; step <= steps; step += 1) {
+        const t = step / steps
+        const cx = clampCellX(sx + (tx - sx) * t)
+        const cy = clampCellY(sy + (ty - sy) * t)
+        const cell = cy * columns + cx
+        if (cell === previousCell) continue
+        visitor(cell)
+        previousCell = cell
+      }
+    }
+
+    for (let i = 0; i < linksNumber; i += 1) {
+      const source = links[i * 2]
+      const target = links[i * 2 + 1]
+      if (source === undefined || target === undefined) continue
+      const sx = positions[source * 2]
+      const sy = positions[source * 2 + 1]
+      const tx = positions[target * 2]
+      const ty = positions[target * 2 + 1]
+      if (sx === undefined || sy === undefined || tx === undefined || ty === undefined) continue
+      if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(tx) || !Number.isFinite(ty)) continue
+      this.visitLinkHoverPathSegments(sx, sy, tx, ty, i, (ax, ay, bx, by) => {
+        visitLinkCells(ax, ay, bx, by, (cell) => { counts[cell] = (counts[cell] ?? 0) + 1 })
+      })
+    }
+
+    const cellOffsets = new Int32Array(cellCount + 1)
+    let totalEntries = 0
+    for (let cell = 0; cell < cellCount; cell += 1) {
+      cellOffsets[cell] = totalEntries
+      totalEntries += counts[cell] ?? 0
+    }
+    cellOffsets[cellCount] = totalEntries
+
+    const cellEntries = new Int32Array(totalEntries)
+    const cursors = new Int32Array(cellOffsets)
+    for (let i = 0; i < linksNumber; i += 1) {
+      const source = links[i * 2]
+      const target = links[i * 2 + 1]
+      if (source === undefined || target === undefined) continue
+      const sx = positions[source * 2]
+      const sy = positions[source * 2 + 1]
+      const tx = positions[target * 2]
+      const ty = positions[target * 2 + 1]
+      if (sx === undefined || sy === undefined || tx === undefined || ty === undefined) continue
+      if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(tx) || !Number.isFinite(ty)) continue
+      this.visitLinkHoverPathSegments(sx, sy, tx, ty, i, (ax, ay, bx, by) => {
+        visitLinkCells(ax, ay, bx, by, (cell) => {
+          const offset = cursors[cell] ?? 0
+          cellEntries[offset] = i
+          cursors[cell] = offset + 1
+        })
+      })
+    }
+
+    this.webGpuLinkPickerGrid = {
+      positions,
+      links,
+      cellSize,
+      columns,
+      rows,
+      cellOffsets,
+      cellEntries,
+      visitMarks: new Uint32Array(linksNumber),
+      visitToken: 1,
+    }
+  }
+
+  private getLinkHoverSegmentCount (): number {
+    return this.config.curvedLinks || this.config.linkBundlingStrength > 0
+      ? Math.max(1, Math.ceil(this.config.curvedLinkSegments))
+      : 1
+  }
+
+  private getLinkHoverTValues (): Float32Array {
+    const segments = this.getLinkHoverSegmentCount()
+    if (this.linkHoverTValues && this.linkHoverTValuesSegments === segments) {
+      return this.linkHoverTValues
+    }
+    const values = new Float32Array(segments + 1)
+    for (let i = 0; i < segments; i += 1) {
+      const d = -0.5 + i / segments
+      const u = d * 2
+      const signedPow = u < 0 ? -(u * u) : u * u
+      values[i] = (signedPow + 1) / 2
+    }
+    values[segments] = 1
+    this.linkHoverTValues = values
+    this.linkHoverTValuesSegments = segments
+    return values
+  }
+
+  private hash11 (value: number): number {
+    const x = Math.fround(Math.sin(Math.fround(value * 12.9898)) * 43758.5453)
+    return Math.fround(x - Math.floor(x))
+  }
+
+  private visitLinkHoverPathSegments (
+    sx: number,
+    sy: number,
+    tx: number,
+    ty: number,
+    linkIndex: number,
+    visitor: (ax: number, ay: number, bx: number, by: number) => void
+  ): void {
+    const tValues = this.getLinkHoverTValues()
+    const dx = tx - sx
+    const dy = ty - sy
+    const linkDist = Math.sqrt(dx * dx + dy * dy)
+    const invLinkDist = linkDist > 1e-6 ? 1 / linkDist : 0
+    const yBasisX = -dy * invLinkDist
+    const yBasisY = dx * invLinkDist
+    const isCurved = this.config.curvedLinks
+    const useBundling = !isCurved && this.config.linkBundlingStrength > 0 && linkDist > 1e-6
+    const controlX = (sx + tx) * 0.5 + yBasisX * linkDist * this.config.curvedLinkControlPointDistance
+    const controlY = (sy + ty) * 0.5 + yBasisY * linkDist * this.config.curvedLinkControlPointDistance
+    const curvedWeight = this.config.curvedLinkWeight
+    const bundleCellSize = Math.max(64, this.config.linkBundlingCellSize)
+    const midX = (sx + tx) * 0.5
+    const midY = (sy + ty) * 0.5
+    const laneCellX = (Math.floor(midX / bundleCellSize) + 0.5) * bundleCellSize
+    const laneCellY = (Math.floor(midY / bundleCellSize) + 0.5) * bundleCellSize
+    const xDirX = dx * invLinkDist
+    const xDirY = dy * invLinkDist
+    const laneProjection = (midX - laneCellX) * xDirX + (midY - laneCellY) * xDirY
+    const laneTargetX = laneCellX + xDirX * laneProjection
+    const laneTargetY = laneCellY + xDirY * laneProjection
+    let displacementX = laneTargetX - midX
+    let displacementY = laneTargetY - midY
+    const displacementLen = Math.sqrt(displacementX * displacementX + displacementY * displacementY)
+    const maxNudge = Math.min(bundleCellSize * 0.36, linkDist * 0.18)
+    if (displacementLen > maxNudge) {
+      const displacementScale = maxNudge / Math.max(displacementLen, 1e-6)
+      displacementX *= displacementScale
+      displacementY *= displacementScale
+    }
+    const strand = (this.hash11(linkIndex + Math.floor(midX / bundleCellSize) * 17 + Math.floor(midY / bundleCellSize) * 131) - 0.5) *
+      Math.min(bundleCellSize * 0.025, linkDist * 0.012)
+
+    let previousX = sx
+    let previousY = sy
+    for (let segment = 1; segment < tValues.length; segment += 1) {
+      const t = tValues[segment] ?? 1
+      let currentX: number
+      let currentY: number
+      if (isCurved) {
+        const oneMinusT = 1 - t
+        const oneMinusTSq = oneMinusT * oneMinusT
+        const tSq = t * t
+        const weightedT = 2 * oneMinusT * t * curvedWeight
+        const divisor = oneMinusTSq + weightedT + tSq
+        currentX = (oneMinusTSq * sx + weightedT * controlX + tSq * tx) / divisor
+        currentY = (oneMinusTSq * sy + weightedT * controlY + tSq * ty) / divisor
+      } else {
+        currentX = sx + dx * t
+        currentY = sy + dy * t
+        if (useBundling) {
+          const envelope = Math.pow(Math.max(0, Math.sin(Math.PI * Math.max(0, Math.min(1, t)))), 1.35)
+          currentX += (displacementX * this.config.linkBundlingStrength + yBasisX * strand) * envelope
+          currentY += (displacementY * this.config.linkBundlingStrength + yBasisY * strand) * envelope
+        }
+      }
+      visitor(previousX, previousY, currentX, currentY)
+      previousX = currentX
+      previousY = currentY
+    }
+  }
+
+  private distanceToLinkHoverPathScreenSquared (
+    px: number,
+    py: number,
+    sx: number,
+    sy: number,
+    tx: number,
+    ty: number,
+    linkIndex: number,
+    transformX: number,
+    transformY: number,
+    k: number,
+    offsetX: number,
+    offsetY: number,
+    spaceSize: number
+  ): number {
+    let bestDistanceSq = Infinity
+    this.visitLinkHoverPathSegments(sx, sy, tx, ty, linkIndex, (ax, ay, bx, by) => {
+      const x1 = transformX + (offsetX + ax) * k
+      const y1 = transformY + (offsetY + spaceSize - ay) * k
+      const x2 = transformX + (offsetX + bx) * k
+      const y2 = transformY + (offsetY + spaceSize - by) * k
+      const distanceSq = this.distanceToScreenSegmentSquared(px, py, x1, y1, x2, y2)
+      if (distanceSq < bestDistanceSq) bestDistanceSq = distanceSq
+    })
+    return bestDistanceSq
+  }
+
+  private async fitViewAsync (duration = 250, padding = 0.1, enableSimulation = true): Promise<void> {
+    try {
+      const positions = await this.readbackPointPositions()
+      if (this._isDestroyed || positions.length === 0) return
+      this.setZoomTransformByPointPositions(positions, duration, undefined, padding, enableSimulation)
+    } catch (error) {
+      console.warn('[kajillion] WebGPU fitView readback failed', error)
+    }
+  }
+
+  private async fitViewByPointIndicesAsync (indices: number[], duration = 250, padding = 0.1, enableSimulation = true): Promise<void> {
+    try {
+      const positionsArray = await this.readbackPointPositions()
+      if (this._isDestroyed || positionsArray.length === 0) return
+      const positions = new Float32Array(indices.length * 2)
+      for (const [i, index] of indices.entries()) {
+        positions[i * 2] = positionsArray[index * 2] ?? 0
+        positions[i * 2 + 1] = positionsArray[index * 2 + 1] ?? 0
+      }
+      this.setZoomTransformByPointPositions(positions, duration, undefined, padding, enableSimulation)
+    } catch (error) {
+      console.warn('[kajillion] WebGPU fitViewByPointIndices readback failed', error)
+    }
+  }
+
+  private async zoomToPointByIndexAsync (index: number, duration = 700, scale = 3, canZoomOut = true, enableSimulation = true): Promise<void> {
+    try {
+      if (!this.canvasD3Selection) return
+      const positions = await this.readbackPointPositions()
+      if (this._isDestroyed || positions.length === 0) return
+      const posX = positions[index * 2]
+      const posY = positions[index * 2 + 1]
+      if (posX === undefined || posY === undefined) return
+      const { store: { screenSize } } = this
+      const distance = this.zoomInstance.getDistanceToPoint([posX, posY])
+      const zoomLevel = canZoomOut ? scale : Math.max(this.getZoomLevel(), scale)
+      if (distance < Math.min(screenSize[0], screenSize[1])) {
+        this.setZoomTransformByPointPositions(new Float32Array([posX, posY]), duration, zoomLevel, undefined, enableSimulation)
+      } else {
+        this.zoomInstance.shouldEnableSimulationDuringZoomOverride = enableSimulation
+        const transform = this.zoomInstance.getTransform([posX, posY], zoomLevel)
+        const middle = this.zoomInstance.getMiddlePointTransform([posX, posY])
+        this.canvasD3Selection
+          .transition()
+          .ease(easeQuadIn)
+          .duration(duration / 2)
+          .call(this.zoomInstance.behavior.transform, middle)
+          .transition()
+          .ease(responsiveCameraEase)
+          .duration(duration / 2)
+          .call(this.zoomInstance.behavior.transform, transform)
+      }
+    } catch (error) {
+      console.warn('[kajillion] WebGPU zoomToPointByIndex readback failed', error)
+    }
+  }
+
+  private getBestKnownWebGpuPointPositions (): Float32Array | undefined {
+    if (this.cachedWebGpuPointPositionsEpoch < this.positionEpoch) {
+      this.requestWebGpuPointPositionsSnapshot()
+    }
+    return this.cachedWebGpuPointPositions ?? this.graph.inputPointPositions
+  }
+
+  private findPointsInRectOnCpu (rect: [[number, number], [number, number]]): number[] {
+    const positions = this.getBestKnownWebGpuPointPositions()
+    const n = this.graph.pointsNumber ?? 0
+    if (!positions || n === 0) return []
+    const minX = Math.min(rect[0][0], rect[1][0])
+    const maxX = Math.max(rect[0][0], rect[1][0])
+    const minY = Math.min(rect[0][1], rect[1][1])
+    const maxY = Math.max(rect[0][1], rect[1][1])
+    const result: number[] = []
+    for (let i = 0; i < n; i += 1) {
+      const x = positions[i * 2]
+      const y = positions[i * 2 + 1]
+      if (x === undefined || y === undefined) continue
+      const [screenX, screenY] = this.zoomInstance.convertSpaceToScreenPosition([x, y])
+      if (screenX >= minX && screenX <= maxX && screenY >= minY && screenY <= maxY) {
+        result.push(i)
+      }
+    }
+    return result
+  }
+
+  private findPointsInPolygonOnCpu (polygonPath: [number, number][]): number[] {
+    const positions = this.getBestKnownWebGpuPointPositions()
+    const n = this.graph.pointsNumber ?? 0
+    if (!positions || n === 0) return []
+    const result: number[] = []
+    for (let i = 0; i < n; i += 1) {
+      const x = positions[i * 2]
+      const y = positions[i * 2 + 1]
+      if (x === undefined || y === undefined) continue
+      const screenPosition = this.zoomInstance.convertSpaceToScreenPosition([x, y])
+      if (this.isScreenPointInPolygon(screenPosition, polygonPath)) {
+        result.push(i)
+      }
+    }
+    return result
+  }
+
+  private isScreenPointInPolygon (point: [number, number], polygon: [number, number][]): boolean {
+    let inside = false
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+      const xi = polygon[i]?.[0] ?? 0
+      const yi = polygon[i]?.[1] ?? 0
+      const xj = polygon[j]?.[0] ?? 0
+      const yj = polygon[j]?.[1] ?? 0
+      const intersects = ((yi > point[1]) !== (yj > point[1])) &&
+        point[0] < ((xj - xi) * (point[1] - yi)) / ((yj - yi) || Number.EPSILON) + xi
+      if (intersects) inside = !inside
+    }
+    return inside
   }
 
   /**
@@ -1657,7 +2376,7 @@ export class Graph {
         adapters,
         createCanvasContext: {
           canvas,
-          useDevicePixels: this.config.pixelRatio,
+          useDevicePixels: this.sanitizePixelRatio(this.config.pixelRatio),
           autoResize: true,
           width: undefined,
           height: undefined,
@@ -1726,20 +2445,22 @@ export class Graph {
     let shouldRunSimulation = forceExecution ||
       (isSimulationRunning && !(this.zoomInstance.isRunning && !enableSimulationDuringZoom))
 
-    // Settle-tail force-pass throttle: once alpha drops below the threshold,
-    // run the force passes every other frame instead of every frame. The
-    // remaining velocity in the velocity texture coasts positions forward
-    // on the skipped frames (Newtonian inertia). At low alpha the
-    // per-frame displacement is tiny, so the visual difference between
-    // every-frame and every-other-frame force updates is imperceptible —
-    // but the saved ~6 ms/frame (force.repulsion + gravity + center +
-    // links) lets the wall-clock FPS climb during the settle tail.
+    // Force-pass throttle: skipped frames intentionally do not replay velocity
+    // because re-integrating stale force output made dense layouts shimmer
+    // after refresh. WebGPU draw shaders interpolate previous/current render
+    // positions for dense graphs, so render cadence stays smooth while the
+    // expensive Barnes-Hut rebuild runs less often.
     //
     // Disabled by `step()` (forceExecution=true) so manual stepping is
     // always exact.
-    if (!forceExecution && shouldRunSimulation && this.store.alpha < SETTLE_TAIL_ALPHA_THRESHOLD) {
+    const pointCount = this.graph.pointsNumber ?? 0
+    const forceThrottleAlpha = pointCount >= INTERPOLATED_FORCE_THROTTLE_POINTS
+      ? INTERPOLATED_FORCE_THROTTLE_ALPHA
+      : SETTLE_TAIL_ALPHA_THRESHOLD
+    const forceThrottleStride = 2
+    if (!forceExecution && shouldRunSimulation && this.store.alpha < forceThrottleAlpha) {
       this.simFrameCounter = (this.simFrameCounter + 1) | 0
-      if ((this.simFrameCounter & 1) === 1) {
+      if ((this.simFrameCounter % forceThrottleStride) !== 0) {
         shouldRunSimulation = false
       }
     }
@@ -1838,6 +2559,7 @@ export class Graph {
         this.store.hoveredPoint?.index,
         this.store.hoveredPoint?.position
       )
+      this.markPointPositionsChanged()
     }
 
     // Track points (runs regardless of simulation state)
@@ -1876,13 +2598,107 @@ export class Graph {
     }
 
     this.requestAnimationFrameId = window.requestAnimationFrame((now) => {
-      this.renderFrame(now)
+      this.rafCallbackCount += 1
+      this.updateRefreshEstimate(now)
+      if (this.shouldRenderOnThisRaf(now)) {
+        this.renderedFrameCount += 1
+        this.renderFrame(now)
+      } else {
+        this.skippedFrameCount += 1
+        this.traceDebugFrame('pacing-skip', {
+          targetFps: this.getTargetRenderFps(),
+          nextRenderEligibleMs: this.nextRenderEligibleMs,
+        })
+      }
 
       // Continue the loop (even after simulation ends)
       if (!this._isDestroyed) {
         this.frame()
       }
     })
+  }
+
+  private updateRefreshEstimate (now: number): void {
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+      this.lastRafFrameMs = now
+      return
+    }
+    if (this.lastRafFrameMs > 0) {
+      const dt = now - this.lastRafFrameMs
+      if (dt > 3 && dt < 40) {
+        const hz = 1000 / dt
+        if (hz >= 30 && hz <= 360) {
+          this.estimatedRefreshHz = this.estimatedRefreshHz * 0.92 + hz * 0.08
+        }
+      } else if (dt >= 250) {
+        this.nextRenderEligibleMs = 0
+      }
+    }
+    this.lastRafFrameMs = now
+  }
+
+  private getRoundedRefreshHz (): number {
+    const common = [60, 72, 75, 90, 100, 120, 144, 165, 180, 240]
+    let best = common[0]!
+    let bestDiff = Math.abs(this.estimatedRefreshHz - best)
+    for (const hz of common) {
+      const diff = Math.abs(this.estimatedRefreshHz - hz)
+      if (diff < bestDiff) {
+        best = hz
+        bestDiff = diff
+      }
+    }
+    return best
+  }
+
+  private getTargetRenderFps (): number {
+    const rawFrameRateLimit = this.config.frameRateLimit
+    const frameRateLimit = Number.isFinite(rawFrameRateLimit) ? rawFrameRateLimit : 0
+    if (frameRateLimit > 0) return frameRateLimit
+
+    const rawHeadroom = this.config.frameRateHeadroomFps
+    const headroom = Number.isFinite(rawHeadroom) ? rawHeadroom : 0
+    if (headroom <= 0) return 0
+
+    const refreshHz = this.getRoundedRefreshHz()
+    if (refreshHz <= 60) return 0
+    return Math.max(30, refreshHz - headroom)
+  }
+
+  private sanitizePixelRatio (ratio: number): number {
+    return Number.isFinite(ratio) && ratio > 0 ? ratio : 1
+  }
+
+  private applyEffectivePixelRatio (ratio: number): boolean {
+    const effectiveRatio = this.sanitizePixelRatio(ratio)
+    if (this._lastAppliedDpr === effectiveRatio && this.store.effectivePixelRatio === effectiveRatio) {
+      return false
+    }
+    this._lastAppliedDpr = effectiveRatio
+    this.store.effectivePixelRatio = effectiveRatio
+    if (this.device?.canvasContext) {
+      this.device.canvasContext.setProps({ useDevicePixels: effectiveRatio })
+      this.store.maxPointSize = getMaxPointSize(this.device, effectiveRatio)
+    }
+    return true
+  }
+
+  private shouldRenderOnThisRaf (now: number): boolean {
+    const targetFps = this.getTargetRenderFps()
+    if (targetFps <= 0) return true
+
+    const intervalMs = 1000 / targetFps
+    const epsilonMs = 0.25
+    if (this.nextRenderEligibleMs === 0) {
+      this.nextRenderEligibleMs = now + intervalMs
+      return true
+    }
+    if (now + epsilonMs < this.nextRenderEligibleMs) return false
+
+    do {
+      this.nextRenderEligibleMs += intervalMs
+    } while (now >= this.nextRenderEligibleMs)
+    return true
   }
 
   /**
@@ -1893,12 +2709,12 @@ export class Graph {
    * ratio, so 2.0 → 1.0 during pan typically gives a 4× render speedup on
    * retina displays.
    */
-  private maybeApplyAdaptiveDpr (nowMs: number): void {
-    if (!this.device?.canvasContext) return
+  private maybeApplyAdaptiveDpr (nowMs: number): boolean {
+    if (!this.device?.canvasContext) return false
     const setting = this.config.adaptivePixelRatio
-    if (!setting) return
-    const interactionDpr = typeof setting === 'number' ? setting : 1.0
-    const fullDpr = this.config.pixelRatio
+    if (!setting) return false
+    const interactionDpr = this.sanitizePixelRatio(typeof setting === 'number' ? setting : 1.0)
+    const fullDpr = this.sanitizePixelRatio(this.config.pixelRatio)
     const isInteracting =
       this.dragInstance.isActive ||
       this.zoomInstance.isRunning ||
@@ -1909,9 +2725,17 @@ export class Graph {
     const settleMs = this.config.adaptivePixelRatioSettleMs ?? 150
     const settled = nowMs - this._lastInteractionMs > settleMs
     const desired = settled ? fullDpr : interactionDpr
-    if (this._lastAppliedDpr === desired) return
-    this._lastAppliedDpr = desired
-    this.device.canvasContext.setProps({ useDevicePixels: desired })
+    const changed = this.applyEffectivePixelRatio(desired)
+    if (!changed) return false
+    this.traceDebugFrame('dpr-change', {
+      desired,
+      fullDpr,
+      interactionDpr,
+      settled,
+      nowMs,
+      lastInteractionMs: this._lastInteractionMs,
+    })
+    return true
   }
 
   /**
@@ -2007,6 +2831,11 @@ export class Graph {
   private renderFrame (now?: number): void {
     if (this._isDestroyed) return
     if (!this.store.pointsTextureSize) return
+    this.traceDebugFrame('render-enter', { now })
+
+    this.timerQueryPool?.tick()
+    const dprChanged = this.maybeApplyAdaptiveDpr(now ?? performance.now())
+    this.resizeCanvas(dprChanged)
 
     // Idle-frame skip: when the simulation has fully settled (alpha dropped
     // below alphaStopThreshold) AND there's no user-input event this frame
@@ -2023,18 +2852,42 @@ export class Graph {
     // Programmatic state changes (setColors, setSizes, etc.) must call
     // `this.markDirty()` to force a re-render on the next frame.
     const isSettled = !this.store.isSimulationRunning
-    const isIdle = isSettled && !this.currentEvent && !this.dragInstance.isActive && !this.isRenderDirty
+    const isIdle = !this.config.disableIdleFrameSkip &&
+      isSettled &&
+      !this.currentEvent &&
+      !this.zoomInstance.isRunning &&
+      !this.dragInstance.isActive &&
+      !this.isRenderDirty &&
+      !dprChanged
     if (isIdle) {
+      this.traceDebugFrame('idle-skip', { dprChanged, isSettled })
       return
     }
-    this.isRenderDirty = false
+    if (this.renderDirtyFrameCount > 0) this.renderDirtyFrameCount -= 1
+    this.isRenderDirty = this.renderDirtyFrameCount > 0
+    this.traceDebugFrame('render-active', { dprChanged, isSettled })
 
     this.fpsMonitor?.begin()
-    this.timerQueryPool?.tick()
-    this.resizeCanvas()
-    this.maybeApplyAdaptiveDpr(now ?? performance.now())
     if (!this.dragInstance.isActive) {
       this.findHoveredItem()
+    }
+
+    const shouldCaptureRenderPositions =
+      this.device?.info?.type === 'webgpu' &&
+      this.store.isSimulationRunning &&
+      !!this.points?.positionStorageBuffer &&
+      !!this.points?.previousRenderPositionStorageBuffer
+    if (shouldCaptureRenderPositions) {
+      if (this.points?.isPositionStorageBufferDirty) {
+        this.timerQueryPool?.begin('sync.position-storage')
+        this.points.syncPositionStorageBuffer()
+        this.timerQueryPool?.end()
+      }
+      this.timerQueryPool?.begin('sync.position-prev')
+      this.points?.captureRenderPreviousPositions()
+      this.timerQueryPool?.end()
+    } else {
+      this.points?.setRenderPositionInterpolation(1)
     }
 
     // Run simulation step (respects isSimulationRunning).
@@ -2045,6 +2898,7 @@ export class Graph {
     // if user passes e.g. parseInt(emptyString) which yields NaN.
     const rawTickRate = this.config.physicsTickRate
     const tickRate = Number.isFinite(rawTickRate) ? rawTickRate : 0
+    const positionEpochBeforeSimulation = this.positionEpoch
     if (tickRate <= 0) {
       this.runSimulationStep(false)
     } else {
@@ -2055,12 +2909,28 @@ export class Graph {
         this.runSimulationStep(false)
       }
     }
+    const simulationAdvanced = this.positionEpoch !== positionEpochBeforeSimulation
+    if (shouldCaptureRenderPositions) {
+      const pointCount = this.graph.pointsNumber ?? 0
+      const forceThrottleAlpha = pointCount >= INTERPOLATED_FORCE_THROTTLE_POINTS
+        ? INTERPOLATED_FORCE_THROTTLE_ALPHA
+        : SETTLE_TAIL_ALPHA_THRESHOLD
+      const shouldInterpolateTailStep =
+        simulationAdvanced &&
+        this.store.isSimulationRunning &&
+        this.store.alpha < forceThrottleAlpha
+      this.points?.setRenderPositionInterpolation(shouldInterpolateTailStep ? 0.5 : 1)
+    }
 
     // WebGPU vertex-pulling: refresh the position storage buffer from the
     // ping-ponged currentPositionTexture before draw. Vertex shaders read this
     // buffer directly instead of paying for textureSampleLevel from the vertex
     // stage (a TBDR slow path that cost ~750ms/frame at n=100k before this).
-    this.points?.syncPositionStorageBuffer()
+    if (this.points?.isPositionStorageBufferDirty) {
+      this.timerQueryPool?.begin('sync.position-storage')
+      this.points.syncPositionStorageBuffer()
+      this.timerQueryPool?.end()
+    }
 
     // Create a single render pass for drawing (points, lines, etc.)
     // Simulation will use separate render passes later
@@ -2079,6 +2949,36 @@ export class Graph {
 
       const isWebGPU = this.device.info?.type === 'webgpu'
       const msaaActive = isWebGPU && this.config.msaa > 1
+      const shouldRenderPointImpostors = this.shouldRenderPointImpostors()
+      let lineCullingReady = false
+      if (shouldDrawLinks) {
+        this.timerQueryPool?.begin('render.lines.cull')
+        lineCullingReady = this.lines?.prepareGpuCulledDraw() ?? false
+        this.timerQueryPool?.end()
+      }
+      let pointImpostorsReady = false
+      if (shouldRenderPointImpostors) {
+        this.timerQueryPool?.begin('render.points.tile-bin')
+        pointImpostorsReady = this.points?.renderImpostorDensity() ?? false
+        this.timerQueryPool?.end()
+      }
+      let pointCullingReady = false
+      if (!pointImpostorsReady) {
+        this.timerQueryPool?.begin('render.points.cull')
+        pointCullingReady = this.points?.prepareGpuCulledDraw() ?? false
+        this.timerQueryPool?.end()
+      }
+      this.traceDebugFrame('render-pass-ready', {
+        isWebGPU,
+        msaaActive,
+        shouldDrawLinks,
+        lineCullingReady,
+        shouldRenderPointImpostors,
+        pointImpostorsReady,
+        pointCullingReady,
+        canvasWidth: this.canvas.width,
+        canvasHeight: this.canvas.height,
+      })
 
       if (msaaActive) {
         // MSAA requires a *single* render pass for all canvas content: the
@@ -2091,8 +2991,12 @@ export class Graph {
         // one resolve, one timestamp slot.
         this.timerQueryPool?.begin('render.canvas')
         const pass = this.beginMsaaCanvasPass(canvasFramebuffer, true, backgroundColor)
-        if (shouldDrawLinks) this.lines?.draw(pass)
-        this.points?.draw(pass)
+        if (shouldDrawLinks) this.lines?.draw(pass, lineCullingReady)
+        if (pointImpostorsReady && this.points?.drawImpostorComposite(pass)) {
+          if (this.config.impostorExactOverlay) this.points?.drawImpostorExactOverlay(pass)
+        } else {
+          this.points?.draw(pass, pointCullingReady)
+        }
         pass.end()
         this.timerQueryPool?.end()
       } else {
@@ -2116,14 +3020,18 @@ export class Graph {
         if (shouldDrawLinks) {
           this.timerQueryPool?.begin('render.lines')
           const linesPass = startPass()
-          this.lines?.draw(linesPass)
+          this.lines?.draw(linesPass, lineCullingReady)
           linesPass.end()
           this.timerQueryPool?.end()
         }
 
         this.timerQueryPool?.begin('render.points')
         const pointsPass = startPass()
-        this.points?.draw(pointsPass)
+        if (pointImpostorsReady && this.points?.drawImpostorComposite(pointsPass)) {
+          if (this.config.impostorExactOverlay) this.points?.drawImpostorExactOverlay(pointsPass)
+        } else {
+          this.points?.draw(pointsPass, pointCullingReady)
+        }
         pointsPass.end()
         this.timerQueryPool?.end()
       }
@@ -2135,14 +3043,17 @@ export class Graph {
         this.points?.swapFbo()
         this.points?.drag()
         this.points?.trackPoints()
+        this.markPointPositionsChanged()
       }
 
       this.device.submit()
+      this.traceDebugFrame('submit')
     }
 
     this.fpsMonitor?.end(now ?? performance.now())
 
     this.currentEvent = undefined
+    this.traceDebugFrame('render-exit')
   }
 
   private stopFrames (): void {
@@ -2171,6 +3082,7 @@ export class Graph {
     this.lastSimTickMs = 0
     this.lastPhysicsTickMs = Number.NEGATIVE_INFINITY
     this.config.onSimulationEnd?.()
+    this.requestWebGpuPointPositionsSnapshot(true)
     // Force hover detection on next frame since points may have moved under stationary mouse
     this._shouldForceHoverDetection = true
   }
@@ -2211,6 +3123,8 @@ export class Graph {
 
   private onMouseMove (event: MouseEvent): void {
     this.currentEvent = event
+    this.markRenderDirty()
+    this.traceDebugFrame('mouse-move', { x: event.clientX, y: event.clientY })
     this.updateMousePosition(event)
     this.isRightClickMouse = event.which === 3
     this.config.onMouseMove?.(
@@ -2257,12 +3171,24 @@ export class Graph {
     if (forceResize || prevW !== w || prevH !== h) {
       const { k } = this.zoomInstance.eventTransform
       const centerPosition = this.zoomInstance.convertScreenToSpacePosition([prevW / 2, prevH / 2])
+      this.traceDebugFrame('resize', {
+        forceResize,
+        prevW,
+        prevH,
+        w,
+        h,
+        centerX: centerPosition[0],
+        centerY: centerPosition[1],
+        k,
+      })
 
       this.store.updateScreenSize(w, h)
+      this.zoomInstance.updateTranslateExtent()
       // Note: canvas.width and canvas.height are managed by luma.gl's autoResize
       // We only update our internal state and dependent components
+      const nextTransform = this.zoomInstance.constrainTransform(this.zoomInstance.getTransform(centerPosition, k))
       this.canvasD3Selection
-        ?.call(this.zoomInstance.behavior.transform, this.zoomInstance.getTransform(centerPosition, k))
+        ?.call(this.zoomInstance.behavior.transform, nextTransform)
       this.points?.updateSampledPointsGrid()
       this.lines?.updateSampledLinksGrid()
       // Only update link index FBO if link hovering is enabled
@@ -2292,6 +3218,19 @@ export class Graph {
 
   private findHoveredItem (): void {
     if (this._isDestroyed || !this._isMouseOnCanvas) return
+    const pointHoveringEnabled = !!(
+      this.config.enableDrag ||
+      this.config.renderHoveredPointRing ||
+      this.config.onPointClick ||
+      this.config.onPointContextMenu ||
+      this.config.onPointMouseOver ||
+      this.config.onPointMouseOut
+    )
+    if (!pointHoveringEnabled && !this.store.isLinkHoveringEnabled) {
+      if (this.store.hoveredPoint !== undefined) this.store.hoveredPoint = undefined
+      if (this.store.hoveredLinkIndex !== undefined) this.store.hoveredLinkIndex = undefined
+      return
+    }
     if (this._findHoveredItemExecutionCount < MAX_HOVER_DETECTION_DELAY) {
       this._findHoveredItemExecutionCount += 1
       return
@@ -2318,17 +3257,10 @@ export class Graph {
 
     // Two-phase hover detection: first update state, then fire callbacks.
     // This guarantees mouseout fires before mouseover when transitioning
-    // between element types (e.g. link → point).
-    const point = this.findHoveredPoint()
-    let link = { mouseover: false, mouseout: false }
-
-    if (this.graph.linksNumber && this.store.isLinkHoveringEnabled) {
-      link = this.findHoveredLine()
-    } else if (this.store.hoveredLinkIndex !== undefined) {
-      // Clear stale hoveredLinkIndex when there are no links
-      link.mouseout = true
-      this.store.hoveredLinkIndex = undefined
-    }
+    // between element types (e.g. link -> point).
+    const { point, link } = this.device?.info?.type === 'webgpu'
+      ? this.findHoveredItemOnGpu()
+      : this.findHoveredItemOnCpu()
 
     // Fire mouseout events first
     if (point.mouseout) this.config.onPointMouseOut?.(this.currentEvent)
@@ -2352,11 +3284,38 @@ export class Graph {
     this.updateCanvasCursor()
   }
 
+  private findHoveredItemOnCpu (): { point: { mouseover: boolean; mouseout: boolean }; link: { mouseover: boolean; mouseout: boolean } } {
+    const point = this.findHoveredPoint()
+    let link = { mouseover: false, mouseout: false }
+
+    if (this.graph.linksNumber && this.store.isLinkHoveringEnabled) {
+      link = this.findHoveredLine()
+    } else if (this.store.hoveredLinkIndex !== undefined) {
+      link.mouseout = true
+      this.store.hoveredLinkIndex = undefined
+    }
+
+    return { point, link }
+  }
+
+  private findHoveredItemOnGpu (): { point: { mouseover: boolean; mouseout: boolean }; link: { mouseover: boolean; mouseout: boolean } } {
+    const point = this.findHoveredPointOnCpu()
+    let link = { mouseover: false, mouseout: false }
+
+    if (this.graph.linksNumber && this.store.isLinkHoveringEnabled && !this.store.hoveredPoint) {
+      link = this.findHoveredLineOnCpu()
+    } else if (this.store.hoveredLinkIndex !== undefined) {
+      link.mouseout = true
+      this.store.hoveredLinkIndex = undefined
+    }
+
+    return { point, link }
+  }
+
   /** Detect hovered point and update store state. Returns flags for deferred callback firing. */
   private findHoveredPoint (): { mouseover: boolean; mouseout: boolean } {
     if (this._isDestroyed || !this.device || !this.points) return { mouseover: false, mouseout: false }
-    // Pixel readback isn't wired for WebGPU yet; skip until async readback lands.
-    if (this.device.info?.type === 'webgpu') return { mouseover: false, mouseout: false }
+    if (this.device.info?.type === 'webgpu') return this.findHoveredPointOnCpu()
     this.points.findHoveredPoint()
     let isMouseover = false
     let isMouseout = false
@@ -2383,9 +3342,101 @@ export class Graph {
     return { mouseover: isMouseover, mouseout: isMouseout }
   }
 
+  private findHoveredPointOnCpu (): { mouseover: boolean; mouseout: boolean } {
+    if (this.cachedWebGpuPointPositionsEpoch < this.positionEpoch && !this.store.isSimulationRunning) {
+      this.requestWebGpuPointPositionsSnapshot()
+    }
+    const positions = this.cachedWebGpuPointPositions ?? this.graph.inputPointPositions
+    if (!positions) {
+      return { mouseover: false, mouseout: false }
+    }
+    if (!this.webGpuPointPickerGrid || this.webGpuPointPickerGrid.positions !== positions) {
+      this.rebuildWebGpuPointPickerGrid(positions)
+    }
+    const grid = this.webGpuPointPickerGrid
+    if (!grid) return { mouseover: false, mouseout: false }
+
+    const mouseX = this.store.mousePosition[0] ?? NaN
+    const mouseY = this.store.mousePosition[1] ?? NaN
+    if (!Number.isFinite(mouseX) || !Number.isFinite(mouseY)) return { mouseover: false, mouseout: false }
+
+    const screenMouseX = this.store.screenMousePosition[0] ?? 0
+    const screenMouseY = this.store.screenSize[1] - (this.store.screenMousePosition[1] ?? this.store.screenSize[1])
+    const k = Math.max(0.001, this.zoomInstance.eventTransform.k)
+    const maxScreenRadius = Math.max(8, this.store.maxPointSize + 6)
+    const radiusSpace = Math.max(grid.cellSize, (maxScreenRadius / k) * 1.5)
+    const minCx = Math.max(0, Math.floor((mouseX - radiusSpace) / grid.cellSize))
+    const maxCx = Math.min(grid.columns - 1, Math.floor((mouseX + radiusSpace) / grid.cellSize))
+    const minCy = Math.max(0, Math.floor((mouseY - radiusSpace) / grid.cellSize))
+    const maxCy = Math.min(grid.rows - 1, Math.floor((mouseY + radiusSpace) / grid.cellSize))
+    const sizes = this.graph.pointSizes
+    const imageSizes = this.graph.pointImageSizes
+    const screenWidth = this.store.screenSize[0] ?? 0
+    const screenHeight = this.store.screenSize[1] ?? 0
+    const spaceSize = this.store.adjustedSpaceSize
+    const offsetX = (screenWidth - spaceSize) / 2
+    const offsetY = (screenHeight - spaceSize) / 2
+    const transform = this.zoomInstance.eventTransform
+    let bestIndex = -1
+    let bestDistanceSq = Infinity
+    let bestX = 0
+    let bestY = 0
+
+    for (let cy = minCy; cy <= maxCy; cy += 1) {
+      for (let cx = minCx; cx <= maxCx; cx += 1) {
+        const bucket = grid.buckets[cy * grid.columns + cx]
+        if (!bucket) continue
+        // eslint-disable-next-line unicorn/no-for-loop -- Indexing avoids iterator overhead in pointer-move hit testing.
+        for (let bucketIndex = 0; bucketIndex < bucket.length; bucketIndex += 1) {
+          const index = bucket[bucketIndex] ?? -1
+          if (index < 0) continue
+          const px = grid.positions[index * 2]
+          const py = grid.positions[index * 2 + 1]
+          if (px === undefined || py === undefined) continue
+          const sx = transform.x + (offsetX + px) * k
+          const sy = transform.y + (offsetY + spaceSize - py) * k
+          const dx = sx - screenMouseX
+          const dy = sy - screenMouseY
+          const distanceSq = dx * dx + dy * dy
+          const pointSize = Math.max(sizes?.[index] ?? this.config.pointDefaultSize, imageSizes?.[index] ?? 0) * this.config.pointSizeScale
+          const scaledSize = this.config.scalePointsOnZoom
+            ? pointSize * k
+            : pointSize * Math.min(5.0, Math.max(1.0, k * 0.01))
+          const hitRadius = Math.min(scaledSize, this.store.maxPointSize) / 2 + 4
+          if (distanceSq <= hitRadius * hitRadius && distanceSq < bestDistanceSq) {
+            bestIndex = index
+            bestDistanceSq = distanceSq
+            bestX = px
+            bestY = py
+          }
+        }
+      }
+    }
+
+    let isMouseover = false
+    let isMouseout = false
+    if (bestIndex >= 0) {
+      if (this.store.hoveredPoint === undefined || this.store.hoveredPoint.index !== bestIndex) {
+        isMouseover = true
+      }
+      this.store.hoveredPoint = {
+        index: bestIndex,
+        position: [bestX, bestY],
+      }
+    } else {
+      if (this.store.hoveredPoint) isMouseout = true
+      this.store.hoveredPoint = undefined
+    }
+
+    return { mouseover: isMouseover, mouseout: isMouseout }
+  }
+
   /** Detect hovered link and update store state. Returns flags for deferred callback firing. */
   private findHoveredLine (): { mouseover: boolean; mouseout: boolean } {
-    if (this._isDestroyed || !this.lines) return { mouseover: false, mouseout: false }
+    if (this._isDestroyed || !this.lines || !this.device) return { mouseover: false, mouseout: false }
+    if (this.device.info?.type === 'webgpu') {
+      return this.findHoveredLineOnCpu()
+    }
     if (this.store.hoveredPoint) {
       const wasLinkHovered = this.store.hoveredLinkIndex !== undefined
       if (wasLinkHovered) {
@@ -2397,7 +3448,6 @@ export class Graph {
     let isMouseover = false
     let isMouseout = false
 
-    if (!this.device) return { mouseover: false, mouseout: false }
     const pixels = readPixels(this.device, this.lines.hoveredLineIndexFbo!)
     const hoveredLineIndex = pixels[0] as number
 
@@ -2410,6 +3460,157 @@ export class Graph {
     }
 
     return { mouseover: isMouseover, mouseout: isMouseout }
+  }
+
+  private findHoveredLineOnCpu (): { mouseover: boolean; mouseout: boolean } {
+    if (this.store.hoveredPoint) {
+      const wasLinkHovered = this.store.hoveredLinkIndex !== undefined
+      if (wasLinkHovered) this.store.hoveredLinkIndex = undefined
+      return { mouseover: false, mouseout: wasLinkHovered }
+    }
+    if (this.cachedWebGpuPointPositionsEpoch < this.positionEpoch && !this.store.isSimulationRunning) {
+      this.requestWebGpuPointPositionsSnapshot()
+    }
+    const positions = this.cachedWebGpuPointPositions ?? this.graph.inputPointPositions
+    const links = this.graph.links
+    const linksNumber = this.graph.linksNumber ?? 0
+    if (!positions || !links || linksNumber === 0) {
+      const wasLinkHovered = this.store.hoveredLinkIndex !== undefined
+      this.store.hoveredLinkIndex = undefined
+      return { mouseover: false, mouseout: wasLinkHovered }
+    }
+    if (!this.webGpuLinkPickerGrid || this.webGpuLinkPickerGrid.positions !== positions || this.webGpuLinkPickerGrid.links !== links) {
+      this.rebuildWebGpuLinkPickerGrid(positions)
+    }
+    const grid = this.webGpuLinkPickerGrid
+    if (!grid) {
+      const wasLinkHovered = this.store.hoveredLinkIndex !== undefined
+      this.store.hoveredLinkIndex = undefined
+      return { mouseover: false, mouseout: wasLinkHovered }
+    }
+
+    const mouseX = this.store.mousePosition[0] ?? NaN
+    const mouseY = this.store.mousePosition[1] ?? NaN
+    if (!Number.isFinite(mouseX) || !Number.isFinite(mouseY)) {
+      const wasLinkHovered = this.store.hoveredLinkIndex !== undefined
+      this.store.hoveredLinkIndex = undefined
+      return { mouseover: false, mouseout: wasLinkHovered }
+    }
+    const screenMouseX = this.store.screenMousePosition[0] ?? 0
+    const screenMouseY = this.store.screenSize[1] - (this.store.screenMousePosition[1] ?? this.store.screenSize[1])
+    const k = Math.max(0.001, this.zoomInstance.eventTransform.k)
+    const maxPickRadiusPx = (
+      this.store.maxPointSize * 2 +
+      5 +
+      this.config.hoveredLinkWidthIncrease +
+      this.config.focusedLinkWidthIncrease +
+      0.5
+    ) / 2
+    const radiusSpace = Math.max(grid.cellSize, (Math.max(4, maxPickRadiusPx) / k) * 2)
+    const minCx = Math.max(0, Math.floor((mouseX - radiusSpace) / grid.cellSize))
+    const maxCx = Math.min(grid.columns - 1, Math.floor((mouseX + radiusSpace) / grid.cellSize))
+    const minCy = Math.max(0, Math.floor((mouseY - radiusSpace) / grid.cellSize))
+    const maxCy = Math.min(grid.rows - 1, Math.floor((mouseY + radiusSpace) / grid.cellSize))
+    const screenWidth = this.store.screenSize[0] ?? 0
+    const screenHeight = this.store.screenSize[1] ?? 0
+    const spaceSize = this.store.adjustedSpaceSize
+    const offsetX = (screenWidth - spaceSize) / 2
+    const offsetY = (screenHeight - spaceSize) / 2
+    const transform = this.zoomInstance.eventTransform
+    const linkWidths = this.graph.linkWidths
+    const linkArrows = this.graph.linkArrows
+    const widthScale = this.config.linkWidthScale
+    const zoomWidthScale = this.config.scaleLinksOnZoom ? k : Math.min(5.0, Math.max(1.0, k * 0.01))
+    let bestIndex = -1
+    let bestDistanceSq = Infinity
+
+    let visitToken = grid.visitToken + 1
+    if (visitToken > 0xffff_fffe) {
+      grid.visitMarks.fill(0)
+      visitToken = 1
+    }
+    grid.visitToken = visitToken
+
+    for (let cy = minCy; cy <= maxCy; cy += 1) {
+      for (let cx = minCx; cx <= maxCx; cx += 1) {
+        const cell = cy * grid.columns + cx
+        const start = grid.cellOffsets[cell] ?? 0
+        const end = grid.cellOffsets[cell + 1] ?? start
+        for (let entryIndex = start; entryIndex < end; entryIndex += 1) {
+          const i = grid.cellEntries[entryIndex] ?? -1
+          if (i < 0 || i >= linksNumber || grid.visitMarks[i] === visitToken) continue
+          grid.visitMarks[i] = visitToken
+          const source = links[i * 2]
+          const target = links[i * 2 + 1]
+          if (source === undefined || target === undefined) continue
+          const sx = positions[source * 2]
+          const sy = positions[source * 2 + 1]
+          const tx = positions[target * 2]
+          const ty = positions[target * 2 + 1]
+          if (sx === undefined || sy === undefined || tx === undefined || ty === undefined) continue
+          const dxWorld = tx - sx
+          const dyWorld = ty - sy
+          const worldDistance = Math.sqrt(dxWorld * dxWorld + dyWorld * dyWorld)
+          if (this.config.linkMinPixelLength > 0 && worldDistance * k < this.config.linkMinPixelLength) continue
+          const distanceSq = this.distanceToLinkHoverPathScreenSquared(
+            screenMouseX,
+            screenMouseY,
+            sx,
+            sy,
+            tx,
+            ty,
+            i,
+            transform.x,
+            transform.y,
+            k,
+            offsetX,
+            offsetY,
+            spaceSize
+          )
+          const hasArrow = (linkArrows?.[i] ?? +this.config.linkDefaultArrows) > 0.5
+          const rawWidth = (linkWidths?.[i] ?? this.config.linkDefaultWidth) * widthScale
+          const arrowWidth = hasArrow ? rawWidth * 2 * this.config.linkArrowsSizeScale : rawWidth
+          const cap = hasArrow ? this.store.maxPointSize * 2 : this.store.maxPointSize
+          let widthPx = Math.min(Math.max(rawWidth, arrowWidth) * zoomWidthScale, cap)
+          widthPx += 5 + 0.5
+          if (this.store.hoveredLinkIndex === i) widthPx += this.config.hoveredLinkWidthIncrease
+          if (this.config.focusedLinkIndex === i) widthPx += this.config.focusedLinkWidthIncrease
+          const threshold = widthPx / 2
+          if (distanceSq <= threshold * threshold && distanceSq < bestDistanceSq) {
+            bestDistanceSq = distanceSq
+            bestIndex = i
+          }
+        }
+      }
+    }
+
+    let isMouseover = false
+    let isMouseout = false
+    if (bestIndex >= 0) {
+      if (this.store.hoveredLinkIndex !== bestIndex) isMouseover = true
+      this.store.hoveredLinkIndex = bestIndex
+    } else {
+      if (this.store.hoveredLinkIndex !== undefined) isMouseout = true
+      this.store.hoveredLinkIndex = undefined
+    }
+    return { mouseover: isMouseover, mouseout: isMouseout }
+  }
+
+  private distanceToScreenSegmentSquared (px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+    const dx = x2 - x1
+    const dy = y2 - y1
+    const lenSq = dx * dx + dy * dy
+    if (lenSq === 0) {
+      const ox = px - x1
+      const oy = py - y1
+      return ox * ox + oy * oy
+    }
+    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq))
+    const cx = x1 + t * dx
+    const cy = y1 + t * dy
+    const ox = px - cx
+    const oy = py - cy
+    return ox * ox + oy * oy
   }
 
   private updateCanvasCursor (): void {

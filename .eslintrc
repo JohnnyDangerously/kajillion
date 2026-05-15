@@ -145,9 +145,33 @@
       }
     },
     {
+      "files": ["src/stories/geospatial/moscow-metro-stations/moscow-metro-coords.ts"],
+      "rules": {
+        "max-len": "off"
+      }
+    },
+    {
       "files": ["benchmarks/**/*.ts"],
       "rules": {
         "no-console": "off"
+      }
+    },
+    {
+      "files": ["demo/src/**/*.ts"],
+      "rules": {
+        "import/order": "off",
+        "@typescript-eslint/no-use-before-define": "off",
+        "@typescript-eslint/explicit-function-return-type": "off",
+        "@typescript-eslint/naming-convention": "off",
+        "@typescript-eslint/no-unused-vars": "off",
+        "no-unmodified-loop-condition": "off",
+        "no-void": "off"
+      }
+    },
+    {
+      "files": ["src/modules/Lines/index.ts", "src/modules/Points/index.ts"],
+      "rules": {
+        "@typescript-eslint/member-ordering": "off"
       }
     }
   ]

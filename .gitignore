@@ -8,3 +8,5 @@ yarn.lock
 storybook-static
 benchmarks/results/
 benchmarks/screenshots/
+demo/replays/
+.claude/

@@ -1,23 +1,10 @@
-// WGSL counterpart to draw-curve-line.vert + draw-curve-line.frag.
-// One file, both entry points, used when useWebGPU = true.
+// Straight-link WebGPU draw path for curvedLinks=false.
 //
-// Triangle-strip geometry (per-link instance) sweeping a curved Bezier
-// ribbon between two point indices. The vertex shader samples both endpoint
-// positions, builds a rational quadratic Bezier control point for the
-// curved case, calculates the link width (with hover/focus widening and
-// optional zoom-aware scaling), applies link visibility/greyout fading,
-// and emits a varying per-segment used to draw either the link body or an
-// arrow head in the fragment shader. The fragment shader doubles as a
-// link picker when renderMode > 0 (writes the link index instead of colour).
-
-// Rational quadratic Bezier (conic parametric curve), inlined from
-// conic-curve-module.ts since WGSL has no shadertools-style module include.
-fn conicParametricCurve(A: vec2<f32>, B: vec2<f32>, ControlPoint: vec2<f32>, t: f32, w: f32) -> vec2<f32> {
-  let oneMinusT = 1.0 - t;
-  let divident = oneMinusT * oneMinusT * A + 2.0 * oneMinusT * t * w * ControlPoint + t * t * B;
-  let divisor = oneMinusT * oneMinusT + 2.0 * oneMinusT * t * w + t * t;
-  return divident / divisor;
-}
+// The curved shader supports rational Bezier ribbons even when host config
+// collapses curvedLinkSegments to 1. At large edge counts that still leaves
+// unnecessary conic-curve math in the vertex path. This shader preserves the
+// same bindings, uniforms, attributes, fragment behavior, and picking mode,
+// but expands each link as a simple screen-facing ribbon between endpoints.
 
 struct DrawLineUniforms {
   transformationMatrix: mat4x4<f32>,
@@ -56,18 +43,11 @@ struct DrawLineUniforms {
 
 struct DrawLineFragmentUniforms {
   renderMode: f32,
-  // Specialization flag — host sets to 1 only when the dataset contains at
-  // least one arrowed link. The fragment shader's arrow-AA path is dead-
-  // stripped by the compiler when this is constant zero, which is the
-  // default for graphs that don't customize linkArrows per-instance.
   hasArrowedLinks: f32,
 };
 
 @group(0) @binding(0) var<uniform> drawLine: DrawLineUniforms;
 @group(0) @binding(1) var<uniform> drawLineFragment: DrawLineFragmentUniforms;
-// Vertex-pulling: read endpoint positions from a storage buffer indexed
-// by (texY * pointsTextureSize + texX). The legacy texture-sample path
-// cost ~600ms/frame at n=100k due to vertex-stage texture sampling.
 @group(0) @binding(2) var<storage, read> positions: array<vec4<f32>>;
 @group(0) @binding(3) var linkStatus: texture_2d<f32>;
 @group(0) @binding(4) var linkStatusSampler: sampler;
@@ -136,6 +116,39 @@ fn linkLodWeight(scale: f32) -> f32 {
   return clamp(drawLine.linkLodStrength, 0.0, 1.0) * overview;
 }
 
+fn softLaneOffset(a: vec2<f32>, b: vec2<f32>, yBasis: vec2<f32>, linkIndex: f32, t: f32) -> vec2<f32> {
+  if (drawLine.linkBundlingStrength <= 0.0) {
+    return vec2<f32>(0.0);
+  }
+
+  let xBasis = b - a;
+  let linkDist = length(xBasis);
+  if (linkDist <= 1e-6) {
+    return vec2<f32>(0.0);
+  }
+
+  let cellSize = max(64.0, drawLine.linkBundlingCellSize);
+  let mid = (a + b) * 0.5;
+  let laneCell = (floor(mid / cellSize) + vec2<f32>(0.5)) * cellSize;
+  let xDir = xBasis / linkDist;
+  let laneTarget = laneCell + xDir * dot(mid - laneCell, xDir);
+  var displacement = laneTarget - mid;
+
+  let maxNudge = min(cellSize * 0.36, linkDist * 0.18);
+  let displacementLen = length(displacement);
+  if (displacementLen > maxNudge) {
+    displacement = displacement * (maxNudge / max(displacementLen, 1e-6));
+  }
+
+  // Keep exact endpoints. Middle vertices get the most correction, with a
+  // tiny deterministic strand offset so compatible edges read as lanes rather
+  // than one over-smoothed tube.
+  let envelope = pow(max(0.0, sin(3.14159265 * clamp(t, 0.0, 1.0))), 1.35);
+  let strand = (hash11(linkIndex + floor(mid.x / cellSize) * 17.0 + floor(mid.y / cellSize) * 131.0) - 0.5) *
+    min(cellSize * 0.025, linkDist * 0.012);
+  return (displacement * drawLine.linkBundlingStrength + yBasis * strand) * envelope;
+}
+
 @vertex
 fn vertexMain(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
@@ -147,18 +160,12 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   output.smoothing = 0.0;
   output.arrowWidthFactor = 0.0;
 
-  // Storage-buffer vertex-pulling. pointA/pointB are (texX, texY) tex coords;
-  // the linear storage index is texY * pointsTextureSize + texX, matching the
-  // texture's row-major layout that the sim writes via copyTextureToBuffer.
   let textureSize = u32(drawLine.pointsTextureSize);
   let idxA = u32(input.pointA.y) * textureSize + u32(input.pointA.x);
   let idxB = u32(input.pointB.y) * textureSize + u32(input.pointB.x);
-  let pointPositionA = mix(previousPositions[idxA], positions[idxA], drawLine.renderPositionMix);
-  let pointPositionB = mix(previousPositions[idxB], positions[idxB], drawLine.renderPositionMix);
-  let a = pointPositionA.xy;
-  let b = pointPositionB.xy;
+  let a = mix(previousPositions[idxA], positions[idxA], drawLine.renderPositionMix).xy;
+  let b = mix(previousPositions[idxB], positions[idxB], drawLine.renderPositionMix).xy;
 
-  // Frustum cull: if both endpoints sit off the same screen edge, skip.
   let aNorm = (2.0 * a / drawLine.spaceSize - vec2<f32>(1.0)) * (drawLine.spaceSize / drawLine.screenSize);
   let bNorm = (2.0 * b / drawLine.spaceSize - vec2<f32>(1.0)) * (drawLine.spaceSize / drawLine.screenSize);
   let aNDC = (drawLine.transformationMatrix * vec4<f32>(aNorm, 1.0, 1.0)).xy;
@@ -172,21 +179,10 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
     return output;
   }
 
-  // Calculate direction vector and its perpendicular
   let xBasis = b - a;
-  let yBasis = normalize(vec2<f32>(-xBasis.y, xBasis.x));
-
-  // Calculate link distance and control point for curved link
   let linkDist = length(xBasis);
-  let h = drawLine.curvedLinkControlPointDistance;
-  let controlPoint = (a + b) / 2.0 + yBasis * linkDist * h;
-
   let scale = drawLine.transformationMatrix[0][0];
-
-  // Convert link distance to screen pixels
   let linkDistPx = linkDist * scale;
-
-  // Hard-skip rendering when the link's screen length falls below the threshold.
   if (drawLine.linkMinPixelLength > 0.0 && linkDistPx < drawLine.linkMinPixelLength) {
     output.position = vec4<f32>(2.0, 2.0, 2.0, 1.0);
     return output;
@@ -199,9 +195,9 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   if (drawLine.renderMode <= 0.0 && lodWeight > 0.0 && !isImportantLink) {
     let minSampleRate = clamp(drawLine.linkLodMinSampleRate, 0.02, 1.0);
     let sampleRate = mix(1.0, minSampleRate, lodWeight);
-    let hSample = hash11(input.linkIndices + 37.0);
+    let h = hash11(input.linkIndices + 37.0);
     let feather = max(0.015, 0.14 * lodWeight * (1.0 - sampleRate));
-    let sampleAlpha = 1.0 - smoothstep(sampleRate, min(1.0, sampleRate + feather), hSample);
+    let sampleAlpha = 1.0 - smoothstep(sampleRate, min(1.0, sampleRate + feather), h);
     if (sampleAlpha <= 0.001) {
       output.position = vec4<f32>(2.0, 2.0, 2.0, 1.0);
       return output;
@@ -212,34 +208,22 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
     lodAlpha = sampleAlpha * alphaComp;
   }
 
-  // Calculate line width using the width scale
   var linkWidth = input.width * drawLine.widthScale * lodWidthComp;
   let k: f32 = 2.0;
-  // Arrow width is proportionally larger than the line width
   var arrowWidth = linkWidth * k;
   arrowWidth = arrowWidth * drawLine.linkArrowsSizeScale;
-
-  // Ensure arrow width difference is non-negative
   let arrowWidthDifference = max(0.0, arrowWidth - linkWidth);
-
-  // Calculate arrow width in pixels
   let arrowWidthPx = calculateArrowWidth(arrowWidth);
 
-  // Calculate arrow length proportional to its width (0.866 ~= sqrt(3)/2)
-  output.arrowLength = min(0.3, (0.866 * arrowWidthPx * 2.0) / linkDist);
-
   output.useArrow = input.arrow;
+  output.arrowLength = min(0.3, (0.866 * arrowWidthPx * 2.0) / max(linkDist, 1e-6));
   if (output.useArrow > 0.5) {
     linkWidth = linkWidth + arrowWidthDifference;
   }
+  output.arrowWidthFactor = arrowWidthDifference / max(linkWidth, 1e-6);
 
-  output.arrowWidthFactor = arrowWidthDifference / linkWidth;
-
-  // Calculate final link width in pixels with smoothing
   var linkWidthPx = calculateLinkWidth(linkWidth, output.useArrow);
-
   if (drawLine.renderMode > 0.0) {
-    // Add 5 pixels padding for better hover detection
     linkWidthPx = linkWidthPx + 5.0 / scale;
     if (drawLine.hoveredLinkIndex == output.linkIndex) {
       linkWidthPx = linkWidthPx + drawLine.hoveredLinkWidthIncrease / scale;
@@ -256,22 +240,16 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
     }
   }
   let smoothingPx = 0.5 / scale;
-  output.smoothing = smoothingPx / linkWidthPx;
+  output.smoothing = smoothingPx / max(linkWidthPx, 1e-6);
   linkWidthPx = linkWidthPx + smoothingPx;
 
-  // Calculate final color with opacity based on link distance
   let rgbColor = input.color.rgb;
-  // Adjust opacity based on link distance.
-  // Range stored as [near, far]: .x (= .r) is the near distance (fully opaque end),
-  // .y (= .g) is the far distance (faded end). map() arguments here are
-  // intentionally (far, near, 0, 1) so longer links get lower opacity.
   var opacity = input.color.a * drawLine.linkOpacity * max(
     drawLine.linkVisibilityMinTransparency,
     map(linkDistPx, drawLine.linkVisibilityDistanceRange.y, drawLine.linkVisibilityDistanceRange.x, 0.0, 1.0),
   );
   opacity = min(1.0, opacity * lodAlpha);
 
-  // Apply greyed-out opacity from link status texture
   if (drawLine.isLinkHighlightingActive > 0.0 && drawLine.linkStatusTextureSize > 0.0) {
     let statusTexSize = drawLine.linkStatusTextureSize;
     let texX = input.linkIndices - statusTexSize * floor(input.linkIndices / statusTexSize);
@@ -283,51 +261,27 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
     }
   }
 
-  // Pass final color to fragment shader
   var rgbaColor = vec4<f32>(rgbColor, opacity);
-
-  // Apply hover color if this is the hovered link and hover color is defined
   if (drawLine.hoveredLinkIndex == output.linkIndex && drawLine.hoveredLinkColor.a > -0.5) {
     rgbaColor = vec4<f32>(drawLine.hoveredLinkColor.rgb, rgbaColor.a * drawLine.hoveredLinkColor.a);
   }
   output.rgbaColor = rgbaColor;
 
-  // Calculate position on the curved path
-  let t = input.position.x;
-  let w = drawLine.curvedWeight;
-
-  let tPrev = t - 1.0 / drawLine.curvedLinkSegments;
-  let tNext = t + 1.0 / drawLine.curvedLinkSegments;
-
-  var pointCurr = conicParametricCurve(a, b, controlPoint, t, w);
-
-  let pointPrev = conicParametricCurve(a, b, controlPoint, max(0.0, tPrev), w);
-  let pointNext = conicParametricCurve(a, b, controlPoint, min(tNext, 1.0), w);
-
-  let xBasisCurved = pointNext - pointPrev;
-  let yBasisCurved = normalize(vec2<f32>(-xBasisCurved.y, xBasisCurved.x));
-
-  pointCurr = pointCurr + yBasisCurved * linkWidthPx * input.position.y;
-
-  // Transform to clip space coordinates
+  let yBasis = normalize(vec2<f32>(-xBasis.y, xBasis.x));
+  let laneOffset = softLaneOffset(a, b, yBasis, input.linkIndices, input.position.x);
+  let pointCurr = mix(a, b, input.position.x) + laneOffset + yBasis * linkWidthPx * input.position.y;
   var p = 2.0 * pointCurr / drawLine.spaceSize - vec2<f32>(1.0);
   p = p * (drawLine.spaceSize / drawLine.screenSize);
-
   let finalPosition = drawLine.transformationMatrix * vec4<f32>(p, 1.0, 1.0);
   output.position = vec4<f32>(finalPosition.xy, 0.0, 1.0);
   return output;
 }
-
-// ---------- Fragment shader ----------
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   var opacity: f32 = 1.0;
   let color = input.rgbaColor.rgb;
 
-  // Uniform-gated fast path: when zero links in the dataset are arrowed
-  // (the default for plain edge data), the compiler dead-strips the whole
-  // arrow-AA branch and leaves only the cheap single-smoothstep line AA.
   if (drawLineFragment.hasArrowedLinks > 0.0 && input.useArrow > 0.5) {
     let end_arrow = 0.5 + input.arrowLength / 2.0;
     let start_arrow = end_arrow - input.arrowLength;
@@ -361,6 +315,5 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
       return vec4<f32>(-1.0, 0.0, 0.0, 0.0);
     }
   }
-  // Premultiplied alpha output (pairs with blend: one, one-minus-src-alpha).
   return vec4<f32>(color * opacity, opacity);
 }

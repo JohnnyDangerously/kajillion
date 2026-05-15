@@ -63,6 +63,7 @@ export class Store {
   public isDarkenGreyout = false
   // Whether link hovering is enabled based on configured event handlers
   public isLinkHoveringEnabled = false
+  public effectivePixelRatio = defaultConfigValues.pixelRatio
   private alphaTarget = 0
   private scalePointX = scaleLinear()
   private scalePointY = scaleLinear()
@@ -220,7 +221,7 @@ export class Store {
     }
 
     // Handle WebGL limits - ensure result is still >= minSpaceSize
-    if (configSpaceSize >= webglMaxTextureSize) {
+    if (configSpaceSize > webglMaxTextureSize) {
       this.adjustedSpaceSize = Math.max(webglMaxTextureSize / 2, minSpaceSize)
       console.warn(`The \`spaceSize\` has been reduced to ${this.adjustedSpaceSize} due to WebGL limits`)
     } else this.adjustedSpaceSize = configSpaceSize

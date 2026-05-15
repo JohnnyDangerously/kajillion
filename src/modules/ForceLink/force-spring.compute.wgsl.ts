@@ -60,7 +60,9 @@ fn computeMain(@builtin(global_invocation_id) gid: vec3<u32>) {
         }
         let bundle = textureLoad(linkBundleTexture, vec2<i32>(i32(iCount), i32(jCount)), 0);
         let biasStrength = bundle.b;
-        var randomMinLinkDist = bundle.a * (forceLink.linkDistRandomVariationRange.g - forceLink.linkDistRandomVariationRange.r) + forceLink.linkDistRandomVariationRange.r;
+        var randomMinLinkDist = bundle.a *
+          (forceLink.linkDistRandomVariationRange.g - forceLink.linkDistRandomVariationRange.r) +
+          forceLink.linkDistRandomVariationRange.r;
         randomMinLinkDist = randomMinLinkDist * forceLink.linkDistance;
 
         iCount = iCount + 1.0;

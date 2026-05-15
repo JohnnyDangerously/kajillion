@@ -5,6 +5,8 @@ import { type Hovered } from '@/graph/modules/Store'
 import { defaultConfigValues } from '@/graph/variables'
 import { PointShape } from '@/graph/modules/GraphData'
 
+export type RenderLodMode = 'exact' | 'phantom' | 'impostor' | 'auto'
+
 export interface GraphConfigInterface {
   /**
    * If set to `false`, the simulation will not run.
@@ -135,6 +137,14 @@ export interface GraphConfigInterface {
   highlightedPointIndices?: number[];
 
   /**
+   * Optional active point draw list for WebGPU interaction filtering. When set,
+   * WebGPU culling/indirect draw paths draw only these point indices without
+   * rebuilding point buffers. Set to `undefined` to draw all points.
+   * Default value: `undefined`
+   */
+  activePointIndices?: number[];
+
+  /**
    * Array of point indices to draw an outline ring around. The outline ring is a circle
    * rendered around the point regardless of the point's shape. When a point is both
    * outlined and greyed out (not highlighted), the ring color is dimmed to match.
@@ -186,6 +196,14 @@ export interface GraphConfigInterface {
    * Default value: `undefined`
    */
   highlightedLinkIndices?: number[];
+
+  /**
+   * Optional active link draw list for WebGPU interaction filtering. When set,
+   * WebGPU culling/indirect draw paths draw only these link indices without
+   * replacing topology via `setLinks()`. Set to `undefined` to draw all links.
+   * Default value: `undefined`
+   */
+  activeLinkIndices?: number[];
 
   /**
    * Set focus on a link by index. The focused link will be rendered with extra width.
@@ -252,6 +270,26 @@ export interface GraphConfigInterface {
    */
   curvedLinkControlPointDistance: number;
   /**
+   * Gently pulls the middle of straight links toward shared screen/world-space lanes.
+   *
+   * This is a lightweight, single-pass visual decluttering mode: endpoints remain exact,
+   * while intermediate vertices are nudged with a sine falloff so similar nearby links
+   * read as soft corridors instead of fully merged KDE-style bundles.
+   *
+   * Set to `0` to disable.
+   *
+   * Default value: `0`
+   */
+  linkBundlingStrength: number;
+  /**
+   * World-space cell size used by `linkBundlingStrength` to pick soft lane anchors.
+   * Larger values create broader, calmer lanes; smaller values keep edges closer to
+   * their original straight paths.
+   *
+   * Default value: `320`
+   */
+  linkBundlingCellSize: number;
+  /**
    * The default link arrow value that controls whether or not to display link arrows.
    * Default value: `false`
    */
@@ -292,7 +330,7 @@ export interface GraphConfigInterface {
    * This setting is applied at engine initialization. Changing it via `setConfig` will
    * not take effect until the line pipeline is recreated.
    *
-   * Default value: `'normal'`
+   * Default value: `'add'`
    */
   linkBlendMode: 'normal' | 'add';
   /**
@@ -315,6 +353,219 @@ export interface GraphConfigInterface {
    * Default value: `0.5`
    */
   pointMinPixelSize: number;
+  /**
+   * High-level render LOD strategy.
+   *
+   * - `'exact'`: draw the exact primitive renderer. Low-level point/link LOD
+   *   strength uniforms are forced off, even if configured.
+   * - `'phantom'`: use stable perceptual sampling plus alpha/size/width
+   *   compensation in the exact primitive shaders.
+   * - `'impostor'`: render points through a low-resolution density field and
+   *   composite that field back to the canvas. This is intended for dense
+   *   overview zooms where individual point identity is perceptually lost.
+   * - `'auto'`: lets the engine choose the best available LOD strategy. Dense
+   *   WebGPU datasets promote to impostors; smaller or non-WebGPU datasets
+   *   use the exact/phantom primitive path.
+   *
+   * This is intentionally separate from the low-level point/link LOD tuning
+   * fields so applications can switch strategies without coupling to shader
+   * implementation details.
+   *
+   * Default value: `'exact'`
+   */
+  renderLodMode: RenderLodMode;
+  /**
+   * Downscale factor for the point density impostor render target.
+   * Higher values draw fewer composite pixels and look softer; lower values
+   * preserve sharper local structure.
+   *
+   * Default value: `4`
+   */
+  impostorDensityScale: number;
+  /**
+   * Screen-space tile size, in device pixels, for the GPU tile-binning
+   * impostor renderer. The renderer draws at most one impostor quad per tile.
+   *
+   * Default value: `7`
+   */
+  impostorTileSize: number;
+  /**
+   * Number of stable point-like micro splats rendered per occupied tile in the
+   * tile-binning impostor renderer. Higher values improve perceived point
+   * detail while keeping draw cost bounded by `tiles * impostorMicroSplats`.
+   *
+   * Default value: `6`
+   */
+  impostorMicroSplats: number;
+  /**
+   * Opacity multiplier for tile-binned impostor micro-splats. This should stay
+   * lower than normal point opacity when an exact overlay is enabled; the tile
+   * layer is density support, not the primary visual truth.
+   *
+   * Default value: `0.18`
+   */
+  impostorTileOpacity: number;
+  /**
+   * When enabled, `renderLodMode: 'impostor'` renders a stable sampled exact
+   * point layer over the tile-binned impostor layer. This preserves real node
+   * texture while the tile layer fills in dense regions.
+   *
+   * Default value: `true`
+   */
+  impostorExactOverlay: boolean;
+  /**
+   * Draws the exact overlay as a deterministic point-id sample instead of
+   * compacting a small per-tile anchor set. This costs more vertex work, but
+   * avoids dense-tile anchor churn when the scene is in motion.
+   *
+   * Default value: `false`
+   */
+  impostorStableOverlay: boolean;
+  /**
+   * Stable sampled fraction for the exact anchor layer drawn over tile
+   * impostors. Lower values keep high-count views fast while preserving real
+   * point texture.
+   *
+   * Default value: `0.18`
+   */
+  impostorExactOverlaySampleRate: number;
+  /**
+   * Point opacity multiplier for the exact anchor layer over tile impostors.
+   *
+   * Default value: `0.36`
+   */
+  impostorExactOverlayOpacity: number;
+  /**
+   * Point size multiplier for the exact anchor layer over tile impostors.
+   *
+   * Default value: `0.38`
+   */
+  impostorExactOverlaySizeScale: number;
+  /**
+   * Tiles at or below this point count are treated as sparse: their real points
+   * are drawn in the exact anchor pass and the fake tile layer is suppressed.
+   *
+   * Default value: `5`
+   */
+  impostorSparseTileThreshold: number;
+  /**
+   * Opacity multiplier for exact anchors in sparse tiles.
+   *
+   * Default value: `0.78`
+   */
+  impostorSparseAnchorOpacity: number;
+  /**
+   * Maximum compacted exact anchors stored per tile. Sparse tiles draw up to
+   * this many real points; dense tiles use it as a hard cap for sampled anchors.
+   *
+   * Default value: `5`
+   */
+  impostorAnchorsPerTile: number;
+  /**
+   * Multiplier applied to point splat size in the density impostor pass.
+   * Values above 1 make dense regions read as coherent glow fields instead of
+   * isolated pinpricks.
+   *
+   * Default value: `1.6`
+   */
+  impostorPointSizeScale: number;
+  /**
+   * Tone-mapping strength for compositing the density impostor texture.
+   *
+   * Default value: `1.1`
+   */
+  impostorCompositeStrength: number;
+  /**
+   * Minimum point count where `renderLodMode: 'auto'` switches from primitive
+   * rendering to the density impostor renderer.
+   *
+   * Default value: `75000`
+   */
+  impostorAutoMinPoints: number;
+  /**
+   * Maximum zoom level where `renderLodMode: 'auto'` may use point impostors.
+   * Above this zoom, the renderer promotes back to exact point sprites so
+   * close inspection shows real selectable nodes instead of aggregate dust.
+   *
+   * Default value: `0.28`
+   */
+  impostorAutoMaxZoom: number;
+  /**
+   * Strength of perceptual point LOD. This uses stable hashed sampling plus
+   * alpha/size compensation so dense regions preserve apparent density while
+   * drawing fewer point sprites at far zoom.
+   *
+   * `0` disables point LOD. `1` applies the full configured sampling curve.
+   *
+   * Default value: `0`
+   */
+  pointLodStrength: number;
+  /**
+   * Camera-scale range controlling point LOD, expressed as
+   * `[farScale, nearScale]`. At or below `farScale`, point sampling reaches
+   * `pointLodMinSampleRate`; at or above `nearScale`, all points are drawn.
+   * Between the two, the transition is smooth and stable.
+   *
+   * Default value: `[0.12, 0.65]`
+   */
+  pointLodZoomRange: number[];
+  /**
+   * Minimum fraction of point sprites drawn when point LOD is fully active.
+   * The selected subset is stable and nested, so it does not reshuffle each frame.
+   *
+   * Default value: `0.45`
+   */
+  pointLodMinSampleRate: number;
+  /**
+   * Amount of sprite-size compensation applied to surviving point samples.
+   * `0` keeps point size unchanged; `1` uses the full compensation curve.
+   *
+   * Default value: `0.55`
+   */
+  pointLodSizeCompensation: number;
+  /**
+   * Amount of opacity compensation applied to surviving point samples.
+   * `0` keeps alpha unchanged; `1` uses the full compensation curve.
+   *
+   * Default value: `0.75`
+   */
+  pointLodOpacityCompensation: number;
+  /**
+   * Strength of perceptual link LOD. This uses stable hashed sampling plus
+   * opacity/width compensation so the edge field reads as similarly dense
+   * while reducing clutter and fragment work at overview zoom.
+   *
+   * `0` disables link LOD. `1` applies the full configured sampling curve.
+   *
+   * Default value: `0`
+   */
+  linkLodStrength: number;
+  /**
+   * Camera-scale range controlling link LOD, expressed as
+   * `[farScale, nearScale]`. At or below `farScale`, link sampling reaches
+   * `linkLodMinSampleRate`; at or above `nearScale`, all links are drawn.
+   *
+   * Default value: `[0.10, 0.60]`
+   */
+  linkLodZoomRange: number[];
+  /**
+   * Minimum fraction of links drawn when link LOD is fully active.
+   *
+   * Default value: `0.35`
+   */
+  linkLodMinSampleRate: number;
+  /**
+   * Amount of width compensation applied to surviving link samples.
+   *
+   * Default value: `0.35`
+   */
+  linkLodWidthCompensation: number;
+  /**
+   * Amount of opacity compensation applied to surviving link samples.
+   *
+   * Default value: `0.65`
+   */
+  linkLodOpacityCompensation: number;
 
   /**
    * Decay coefficient. Lower = the simulation cools down faster after each interaction.
@@ -351,6 +602,47 @@ export interface GraphConfigInterface {
    * Default value: `0`
    */
   physicsTickRate: number;
+  /**
+   * Maximum render-loop rate in frames per second.
+   *
+   * `0` means "native rAF": render once per `requestAnimationFrame` callback,
+   * which lets high-refresh displays run above 60 Hz when the browser provides
+   * higher-rate callbacks. Values above the display refresh rate cannot force
+   * visible presentation faster than the browser/compositor, but they do avoid
+   * imposing an artificial 60 Hz ceiling.
+   *
+   * Use a positive value to intentionally pace the whole render/simulation loop
+   * below native refresh. This can reduce GPU load and improve 1% lows when the
+   * scene is near saturation, but rAF-based pages can only present on vsync, so
+   * targets very close to native refresh may effectively behave as native.
+   *
+   * Default value: `0`
+   */
+  frameRateLimit: number;
+  /**
+   * Optional refresh-aware render headroom in frames per second.
+   *
+   * Applied only when `frameRateLimit` is `0`. The engine estimates the display
+   * refresh rate from rAF timestamps, snaps it to a common refresh bucket, and
+   * targets `refreshHz - frameRateHeadroomFps`. For example, `3` on a 144 Hz
+   * display targets roughly 141 fps.
+   *
+   * This is a soft browser cap, not exact native swapchain pacing. The engine
+   * can only skip rAF callbacks, so very small headroom values may behave like
+   * native cadence. It is disabled on 60 Hz and lower displays because tiny
+   * under-caps there usually add jitter without useful headroom.
+   *
+   * Default value: `0`
+   */
+  frameRateHeadroomFps: number;
+  /**
+   * Enables an in-memory frame/input trace for diagnosing visual artifacts such
+   * as pan/zoom flashes. When enabled, call `getDebugFrameTrace()` on the Graph
+   * instance from the browser console to inspect the recent event ring buffer.
+   *
+   * Default value: `false`
+   */
+  debugFrameTrace: boolean;
   /**
    * Alpha threshold at which the simulation is considered "settled" and stops running force passes.
    * When `alpha` drops below this value, `onSimulationEnd` fires and the six force passes
@@ -685,6 +977,20 @@ export interface GraphConfigInterface {
    */
   enableGpuTimings: boolean;
   /**
+   * Disable settled-frame render skipping.
+   *
+   * This is primarily a benchmark/diagnostic escape hatch. Normal applications
+   * should leave it off so a settled graph does not redraw identical pixels.
+   * When enabled, the render loop keeps submitting canvas passes even after the
+   * simulation is stopped, which makes `enableSimulation: false` render-only GPU
+   * timing sweeps measurable. It can also be useful for WebGPU viewer surfaces
+   * where a static presented canvas may flash on the first interaction after a
+   * long idle period.
+   *
+   * Default value: `false`
+   */
+  disableIdleFrameSkip: boolean;
+  /**
    * Pixel ratio for the canvas. Higher values use more GPU memory but provide better quality on high-DPI displays.
    * Default value: `window.devicePixelRatio || 2`
    */
@@ -696,9 +1002,11 @@ export interface GraphConfigInterface {
    * `pixelRatio`. Fragment work is quadratic in pixel ratio, so 2.0 → 1.0
    * during pan typically gives a 4× render cost reduction on retina displays.
    *
-   * - `false` (default): always use `pixelRatio`.
+   * - `false`: always use `pixelRatio`.
    * - `true`: use 1.0 during interaction.
    * - `number`: use this value during interaction.
+   *
+   * Default value: `true`
    */
   adaptivePixelRatio: boolean | number;
   /**
@@ -741,6 +1049,42 @@ export interface GraphConfigInterface {
    * Default value: `true`
    */
   enableZoom: boolean;
+  /**
+   * Minimum allowed camera zoom level.
+   *
+   * Default value: `0.001`
+   */
+  minZoomLevel: number;
+  /**
+   * Maximum allowed camera zoom level.
+   *
+   * `Infinity` preserves the historical unconstrained zoom behavior. Viewer
+   * demos often want a finite cap so fast wheel gestures cannot zoom into a
+   * sub-node empty patch and present an all-background frame.
+   *
+   * Default value: `Infinity`
+   */
+  maxZoomLevel: number;
+  /**
+   * Constrains pan/zoom translation to the graph's configured `spaceSize`.
+   *
+   * This is useful for demos and viewer-style canvases where a fast pan or
+   * wheel gesture should not be able to fling the camera into empty space.
+   * Library default stays unbounded for applications that manage their own
+   * camera limits.
+   *
+   * Default value: `false`
+   */
+  constrainCameraToGraph: boolean;
+  /**
+   * Extra pan/zoom margin around `spaceSize`, expressed as a fraction of the
+   * adjusted graph space. For example, `0.35` leaves 35% of the graph-space
+   * size as overscroll padding on each side when `constrainCameraToGraph` is
+   * enabled.
+   *
+   * Default value: `0.35`
+   */
+  cameraBoundsPadding: number;
   /**
    * Controls whether the simulation remains active during interactive (user-driven) zoom operations.
    * When set to `true`, the simulation continues running while zooming.

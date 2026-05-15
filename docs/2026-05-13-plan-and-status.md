@@ -178,6 +178,46 @@ the same machinery internally.
 - Demo: settle-quality knob (lower friction late in settle for
   prettier asymmetric layouts).
 
+### Visual exploration memory
+- **Hive plots / layered axis plots.** Keep this as an exploratory visual
+  direction, not a committed product mode. The appeal is a hybrid between
+  graph and aggregate multi-edge system: nodes arranged on explicit axes or
+  layers, with many relationships visible as a combined flow/structure rather
+  than a full force-directed hairball. This may pair well with Kajillion's
+  soft-lane / edge-conflation ideas because it can show the combined effect
+  of many edges without drifting all the way into organic vein-like bundling.
+  Candidate use: alternate overview mode for layered, typed, or temporal
+  relationships where a normal galaxy graph is beautiful but too ambiguous.
+- **Sticky zoom / reveal levels.** Future usability mode inspired by
+  Cosmograph-style "sprawl-out" navigation: wheel/trackpad zoom snaps through
+  semantic levels instead of continuously scaling forever. Example sequence:
+  focused person -> immediate network -> communities -> whole graph. Each
+  step can reveal more nodes/edges and repack labels, so the user feels the
+  graph unfolding rather than just getting smaller. This is not an engine
+  priority until replay/perf capture is in place, because the effect must be
+  measured for pacing and perceptual stability.
+- **Motion personality.** Explore a small amount of tasteful physical motion:
+  slight expansion/sprawl during first reveal, damped settling after focus,
+  and sticky camera easing. Keep it interaction-driven and deterministic for
+  demos; avoid returning to arbitrary live-force jitter once the graph is
+  presented as settled.
+- **Perceptual scheduling roadmap.** See
+  [2026-05-14-perceptual-scheduling-roadmap.md](./research/2026-05-14-perceptual-scheduling-roadmap.md).
+  North star: show the whole graph immediately as an impression, then
+  crystallize detail where attention lands. Use density before nodes, bundles
+  before individual edges, clusters before labels, halos before geometry, and
+  motion/attention-gated LOD swaps. The immediate technical hook is visual
+  mass conservation: when exact nodes or edges appear, the aggregate density
+  or bundle layer should dim by a matching perceived luminance so the scene
+  feels like it sharpened rather than popped.
+- **Selectable foreground vs visual mass.** Keep the product option open for
+  a three-layer graph where distant/background dots are non-selectable visual
+  mass, while promoted high-connectors, average connectors, and second-degree
+  connectors become selectable as the user zooms or follows connection
+  strength. This would let Kajillion show a graph that feels much larger than
+  the active interaction set, then progressively promote nodes into full
+  equal-size objects at the appropriate semantic zoom level.
+
 ## Open questions / risks
 
 - **Apple-only validation.** All numbers are M5 Max. Need at least one

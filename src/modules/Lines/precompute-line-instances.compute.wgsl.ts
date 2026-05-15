@@ -87,6 +87,8 @@ struct DrawLineUniforms {
   curvedWeight: f32,
   curvedLinkControlPointDistance: f32,
   curvedLinkSegments: f32,
+  linkBundlingStrength: f32,
+  linkBundlingCellSize: f32,
   scaleLinksOnZoom: f32,
   maxPointSize: f32,
   renderMode: f32,
@@ -98,6 +100,11 @@ struct DrawLineUniforms {
   focusedLinkIndex: f32,
   focusedLinkWidthIncrease: f32,
   linkMinPixelLength: f32,
+  linkLodStrength: f32,
+  linkLodZoomRange: vec2<f32>,
+  linkLodMinSampleRate: f32,
+  linkLodWidthCompensation: f32,
+  linkLodOpacityCompensation: f32,
 };
 `
 

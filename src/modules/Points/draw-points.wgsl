@@ -23,6 +23,12 @@ struct DrawVertexUniforms {
   imageCount: f32,
   imageAtlasCoordsTextureSize: f32,
   pointMinPixelSize: f32,
+  pointLodStrength: f32,
+  pointLodZoomRange: vec2<f32>,
+  pointLodMinSampleRate: f32,
+  pointLodSizeCompensation: f32,
+  pointLodOpacityCompensation: f32,
+  renderPositionMix: f32,
 };
 
 struct DrawFragmentUniforms {
@@ -60,6 +66,7 @@ struct DrawFragmentUniforms {
 // sampling. The texture itself is preserved at @binding(3) because
 // non-draw shaders (find-hovered-point etc.) still sample it.
 @group(0) @binding(9) var<storage, read> pointStatusBuf: array<vec4<f32>>;
+@group(0) @binding(10) var<storage, read> previousPositions: array<vec4<f32>>;
 
 struct VertexInput {
   @location(0) quadCorner: vec2<f32>,
@@ -82,6 +89,7 @@ struct VertexOutput {
   @location(6) imageSizeVarying: f32,
   @location(7) overallSize: f32,
   @location(8) pointCoord: vec2<f32>,
+  @location(9) lodAlpha: f32,
 };
 
 fn calculatePointSize(pointSize: f32) -> f32 {
@@ -93,6 +101,21 @@ fn calculatePointSize(pointSize: f32) -> f32 {
     pSize = pointSize * drawVertex.ratio * min(5.0, max(1.0, scale * 0.01));
   }
   return min(pSize, drawVertex.maxPointSize * drawVertex.ratio);
+}
+
+fn hash01(index: u32) -> f32 {
+  var x = index + 1u;
+  x = (x ^ (x >> 16u)) * 0x7feb352du;
+  x = (x ^ (x >> 15u)) * 0x846ca68bu;
+  x = x ^ (x >> 16u);
+  return f32(x & 0x00ffffffu) / 16777216.0;
+}
+
+fn pointLodWeight(scale: f32) -> f32 {
+  let farScale = min(drawVertex.pointLodZoomRange.x, drawVertex.pointLodZoomRange.y);
+  let nearScale = max(drawVertex.pointLodZoomRange.x, drawVertex.pointLodZoomRange.y);
+  let overview = 1.0 - smoothstep(farScale, nearScale, scale);
+  return clamp(drawVertex.pointLodStrength, 0.0, 1.0) * overview;
 }
 
 const outlineRingScale: f32 = 1.3;
@@ -108,6 +131,7 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> 
   output.shapeSize = 0.0;
   output.imageSizeVarying = 0.0;
   output.overallSize = 0.0;
+  output.lodAlpha = 1.0;
 
   let uv = (input.pointIndices + vec2<f32>(0.5)) / drawVertex.pointsTextureSize;
 
@@ -136,7 +160,7 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> 
   // Position via storage-buffer vertex-pulling. The sim writes
   // currentPositionTexture; renderFrame copies it to `positions` once per
   // frame before draw. Indexing by instance avoids per-vertex texture sampling.
-  let pointPosition = positions[instanceIdx];
+  let pointPosition = mix(previousPositions[instanceIdx], positions[instanceIdx], drawVertex.renderPositionMix);
   let point = pointPosition.rg;
 
   // Transform point position to normalized device coordinates
@@ -155,8 +179,8 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> 
   }
 
   // Calculate sizes for shape and image
-  let shapeSizeValue = calculatePointSize(input.size * drawVertex.sizeScale);
-  let imageSizeValue = calculatePointSize(input.imageSize * drawVertex.sizeScale);
+  var shapeSizeValue = calculatePointSize(input.size * drawVertex.sizeScale);
+  var imageSizeValue = calculatePointSize(input.imageSize * drawVertex.sizeScale);
 
   // Use the larger of the two sizes for the overall point size
   var overallSizeValue = max(shapeSizeValue, imageSizeValue);
@@ -165,6 +189,28 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> 
   if (output.isOutlined > 0.0) {
     overallSizeValue = overallSizeValue * outlineRingScale;
     overallSizeValue = min(overallSizeValue, drawVertex.maxPointSize * drawVertex.ratio);
+  }
+
+  let scale = drawVertex.transformationMatrix[0][0];
+  let lodWeight = pointLodWeight(scale);
+  let minSampleRate = clamp(drawVertex.pointLodMinSampleRate, 0.02, 1.0);
+  let sampleRate = mix(1.0, minSampleRate, lodWeight);
+  if (lodWeight > 0.0 && output.isOutlined <= 0.0 && input.imageIndex < 0.0) {
+    let h = hash01(instanceIdx);
+    let feather = max(0.015, 0.12 * lodWeight * (1.0 - sampleRate));
+    let sampleAlpha = 1.0 - smoothstep(sampleRate, min(1.0, sampleRate + feather), h);
+    if (sampleAlpha <= 0.001) {
+      output.position = vec4<f32>(2.0, 2.0, 2.0, 1.0);
+      return output;
+    }
+
+    let representation = 1.0 / max(sampleRate, 0.02);
+    let sizeComp = mix(1.0, min(1.85, sqrt(representation)), lodWeight * drawVertex.pointLodSizeCompensation);
+    let alphaComp = mix(1.0, min(2.75, representation), lodWeight * drawVertex.pointLodOpacityCompensation);
+    shapeSizeValue = shapeSizeValue * sizeComp;
+    imageSizeValue = imageSizeValue * sizeComp;
+    overallSizeValue = overallSizeValue * sizeComp;
+    output.lodAlpha = sampleAlpha * alphaComp;
   }
 
   // Hard-skip rendering when the final sprite size is below the configured threshold.
@@ -465,6 +511,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   } else {
     finalPointAlpha = finalPointAlpha * drawFragment.pointOpacity;
   }
+  finalPointAlpha = min(1.0, finalPointAlpha * input.lodAlpha);
 
   // Blend image color above point color
   var fragColor = vec4<f32>(

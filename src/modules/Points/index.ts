@@ -2,6 +2,15 @@ import { Framebuffer, Buffer, ComputePipeline, type BindingDeclaration, Shader, 
 import { Model } from '@luma.gl/engine'
 import { WebGLDevice } from '@luma.gl/webgl'
 import { syncPositionStorageWgsl } from '@/graph/modules/Points/sync-position-storage.compute.wgsl'
+import { updatePositionComputeWgsl } from '@/graph/modules/Points/update-position.compute.wgsl'
+import { dragPointComputeWgsl } from '@/graph/modules/Points/drag-point.compute.wgsl'
+import { clearTileImpostorsComputeWgsl } from '@/graph/modules/Points/clear-tile-impostors.compute.wgsl'
+import { binTileImpostorsComputeWgsl } from '@/graph/modules/Points/bin-tile-impostors.compute.wgsl'
+import { resolveTileImpostorsComputeWgsl } from '@/graph/modules/Points/resolve-tile-impostors.compute.wgsl'
+import { clearVisiblePointsComputeWgsl } from '@/graph/modules/Points/clear-visible-points.compute.wgsl'
+import { cullVisiblePointsComputeWgsl } from '@/graph/modules/Points/cull-visible-points.compute.wgsl'
+import { clearHybridAnchorsComputeWgsl } from '@/graph/modules/Points/clear-hybrid-anchors.compute.wgsl'
+import { fillHybridAnchorsComputeWgsl } from '@/graph/modules/Points/fill-hybrid-anchors.compute.wgsl'
 // import { scaleLinear } from 'd3-scale'
 // import { extent } from 'd3-array'
 import { CoreModule } from '@/graph/modules/core-module'
@@ -10,6 +19,12 @@ import { defaultConfigValues } from '@/graph/variables'
 import drawPointsFrag from '@/graph/modules/Points/draw-points.frag?raw'
 import drawPointsVert from '@/graph/modules/Points/draw-points.vert?raw'
 import drawPointsWgsl from '@/graph/modules/Points/draw-points.wgsl?raw'
+import { drawCulledPointsWgsl } from '@/graph/modules/Points/draw-culled-points.wgsl'
+import drawDensityImpostorsWgsl from '@/graph/modules/Points/draw-density-impostors.wgsl?raw'
+import compositeDensityImpostorsWgsl from '@/graph/modules/Points/composite-density-impostors.wgsl?raw'
+import drawTileImpostorsWgsl from '@/graph/modules/Points/draw-tile-impostors.wgsl?raw'
+import drawHybridAnchorPointsWgsl from '@/graph/modules/Points/draw-hybrid-anchor-points.wgsl?raw'
+import drawCompactedAnchorPointsWgsl from '@/graph/modules/Points/draw-compacted-anchor-points.wgsl?raw'
 import findPointsInRectFrag from '@/graph/modules/Points/find-points-in-rect.frag?raw'
 import findPointsInRectWgsl from '@/graph/modules/Points/find-points-in-rect.wgsl?raw'
 import findPointsInPolygonFrag from '@/graph/modules/Points/find-points-in-polygon.frag?raw'
@@ -36,6 +51,77 @@ import { readPixels } from '@/graph/helper'
 import { ensureVec2, ensureVec4 } from '@/graph/modules/Shared/uniform-utils'
 import { createAtlasDataFromImageData } from '@/graph/modules/Points/atlas-utils'
 
+type PointDrawVertexUniforms = {
+  ratio: number;
+  transformationMatrix: Mat4Array;
+  pointsTextureSize: number;
+  sizeScale: number;
+  spaceSize: number;
+  screenSize: [number, number];
+  greyoutColor: [number, number, number, number];
+  backgroundColor: [number, number, number, number];
+  scalePointsOnZoom: number;
+  maxPointSize: number;
+  isDarkenGreyout: number;
+  skipHighlighted: number;
+  skipGreyed: number;
+  hasImages: number;
+  imageCount: number;
+  imageAtlasCoordsTextureSize: number;
+  pointMinPixelSize: number;
+  pointLodStrength: number;
+  pointLodZoomRange: [number, number];
+  pointLodMinSampleRate: number;
+  pointLodSizeCompensation: number;
+  pointLodOpacityCompensation: number;
+  renderPositionMix: number;
+}
+
+type PointDrawFragmentUniforms = {
+  greyoutOpacity: number;
+  pointOpacity: number;
+  isDarkenGreyout: number;
+  backgroundColor: [number, number, number, number];
+  outlineColor: [number, number, number, number];
+  outlineWidth: number;
+  hasNonCircleShapes: number;
+  hasOutlinedPoints: number;
+  hasImagedPoints: number;
+}
+
+const IDENTITY_MAT4: Mat4Array = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+const ZERO_VEC2: [number, number] = [0, 0]
+const TRANSPARENT_BLACK: [number, number, number, number] = [0, 0, 0, 1]
+const WHITE_VEC4: [number, number, number, number] = [1, 1, 1, 1]
+const DISABLED_COLOR_VEC4: [number, number, number, number] = [-1, -1, -1, -1]
+const DEFAULT_POINT_LOD_ZOOM_RANGE: [number, number] = [0.12, 0.65]
+
+interface WebGpuBufferAccess {
+  handle?: GPUBuffer;
+}
+
+interface WebGpuRenderPassAccess {
+  handle?: GPURenderPassEncoder;
+}
+
+interface IndirectRenderPipelineAccess {
+  handle?: GPURenderPipeline;
+  setBindings: (bindings: Record<string, unknown>, options?: { disableWarnings?: boolean }) => void;
+  _getBindGroup?: () => GPUBindGroup | null;
+}
+
+interface IndirectModelAccess {
+  predraw: () => void;
+  pipeline: IndirectRenderPipelineAccess;
+  vertexArray: {
+    bindBeforeRender: (renderPass: RenderPass) => void;
+    unbindAfterRender: (renderPass: RenderPass) => void;
+  };
+  _areBindingsLoading?: () => unknown;
+  _getBindings?: () => Record<string, unknown>;
+  _updatePipeline?: () => IndirectRenderPipelineAccess;
+}
+
 export class Points extends CoreModule {
   public currentPositionFbo: Framebuffer | undefined
   public previousPositionFbo: Framebuffer | undefined
@@ -51,6 +137,9 @@ export class Points extends CoreModule {
   // — the texture path costs ~750ms/frame at n=100k due to vertex-stage texture
   // sampling on Apple TBDR; storage-buffer reads drop that to ~10ms.
   public positionStorageBuffer: Buffer | undefined
+  public previousRenderPositionStorageBuffer: Buffer | undefined
+  public renderPositionMix = 1
+  public isPositionStorageBufferDirty = true
   public pointStatusStorageBuffer: Buffer | undefined
   public imageCount = 0
   // Cached at setPointShapes() time. Lets the fragment shader skip the
@@ -70,6 +159,7 @@ export class Points extends CoreModule {
    * Used together with `Clusters.cachedCentroidPositions` to skip redundant GPU readbacks.
    */
   public areClusterCentroidsUpToDate = false
+  private hoveredTexture: Texture | undefined
   private colorBuffer: Buffer | undefined
   private sizeBuffer: Buffer | undefined
   private shapeBuffer: Buffer | undefined
@@ -82,7 +172,63 @@ export class Points extends CoreModule {
   private trackedPositions: Map<number, [number, number]> | undefined
   private isPositionsUpToDate = false
   private drawCommand: Model | undefined
+  private drawCulledCommand: Model | undefined
+  private densityImpostorCommand: Model | undefined
+  private densityCompositeCommand: Model | undefined
+  private tileImpostorCommand: Model | undefined
+  private hybridAnchorCommand: Model | undefined
+  private compactedAnchorCommand: Model | undefined
   private drawHighlightedCommand: Model | undefined
+  private drawBindingsBackend: string | undefined
+  private drawBindingsPosition: Buffer | Texture | undefined
+  private drawBindingsPreviousPosition: Buffer | undefined
+  private drawBindingsPointStatus: Texture | undefined
+  private drawBindingsPointStatusBuffer: Buffer | undefined
+  private drawBindingsImageAtlas: Texture | undefined
+  private drawBindingsImageAtlasCoords: Texture | undefined
+  private readonly drawVertexUniformScratch: PointDrawVertexUniforms = {
+    ratio: 1,
+    transformationMatrix: IDENTITY_MAT4,
+    pointsTextureSize: 0,
+    sizeScale: 1,
+    spaceSize: 0,
+    screenSize: ZERO_VEC2,
+    greyoutColor: DISABLED_COLOR_VEC4,
+    backgroundColor: TRANSPARENT_BLACK,
+    scalePointsOnZoom: 0,
+    maxPointSize: 0,
+    isDarkenGreyout: 0,
+    skipHighlighted: 0,
+    skipGreyed: 0,
+    hasImages: 0,
+    imageCount: 0,
+    imageAtlasCoordsTextureSize: 0,
+    pointMinPixelSize: 0,
+    pointLodStrength: 0,
+    pointLodZoomRange: DEFAULT_POINT_LOD_ZOOM_RANGE,
+    pointLodMinSampleRate: 1,
+    pointLodSizeCompensation: 1,
+    pointLodOpacityCompensation: 1,
+    renderPositionMix: 1,
+  }
+
+  private readonly drawFragmentUniformScratch: PointDrawFragmentUniforms = {
+    greyoutOpacity: -1,
+    pointOpacity: 1,
+    isDarkenGreyout: 0,
+    backgroundColor: TRANSPARENT_BLACK,
+    outlineColor: WHITE_VEC4,
+    outlineWidth: 0.9,
+    hasNonCircleShapes: 0,
+    hasOutlinedPoints: 0,
+    hasImagedPoints: 0,
+  }
+
+  private readonly drawUniformPayload = {
+    drawVertexUniforms: this.drawVertexUniformScratch,
+    drawFragmentUniforms: this.drawFragmentUniformScratch,
+  }
+
   private updatePositionCommand: Model | undefined
   private dragPointCommand: Model | undefined
   private findPointsInRectCommand: Model | undefined
@@ -97,6 +243,18 @@ export class Points extends CoreModule {
   private findPointsInPolygonVertexCoordBuffer: Buffer | undefined
   private drawHighlightedVertexCoordBuffer: Buffer | undefined
   private drawQuadVertexBuffer: Buffer | undefined
+  private densityImpostorTexture: Texture | undefined
+  private densityImpostorFbo: Framebuffer | undefined
+  private densityImpostorSize: [number, number] | undefined
+  private tileAtomicBuffer: Buffer | undefined
+  private tileResolvedBuffer: Buffer | undefined
+  private hybridAnchorCountBuffer: Buffer | undefined
+  private hybridAnchorPositionBuffer: Buffer | undefined
+  private hybridAnchorColorBuffer: Buffer | undefined
+  private hybridAnchorCapacity = 0
+  private tileColumns = 0
+  private tileRows = 0
+  private tileCount = 0
   private positionStorageBufferTextureSize = 0
 
   // Compute pipeline that copies currentPositionTexture → positionStorageBuffer
@@ -111,6 +269,66 @@ export class Points extends CoreModule {
   }> | undefined
 
   private syncPositionUniformBuffer: Buffer | undefined
+  private updatePositionComputePipeline: ComputePipeline | undefined
+  private updatePositionComputeShader: Shader | undefined
+  private updatePositionComputeUniformStore: UniformStore<{
+    updatePositionUniforms: {
+      friction: number;
+      spaceSize: number;
+      pointCount: number;
+      textureSize: number;
+    };
+  }> | undefined
+
+  private updatePositionComputeUniformBuffer: Buffer | undefined
+
+  private dragPointComputePipeline: ComputePipeline | undefined
+  private dragPointComputeShader: Shader | undefined
+  private clearTileImpostorPipeline: ComputePipeline | undefined
+  private clearTileImpostorShader: Shader | undefined
+  private binTileImpostorPipeline: ComputePipeline | undefined
+  private binTileImpostorShader: Shader | undefined
+  private resolveTileImpostorPipeline: ComputePipeline | undefined
+  private resolveTileImpostorShader: Shader | undefined
+  private clearHybridAnchorPipeline: ComputePipeline | undefined
+  private clearHybridAnchorShader: Shader | undefined
+  private fillHybridAnchorPipeline: ComputePipeline | undefined
+  private fillHybridAnchorShader: Shader | undefined
+  private clearVisiblePointsPipeline: ComputePipeline | undefined
+  private clearVisiblePointsShader: Shader | undefined
+  private cullVisiblePointsPipeline: ComputePipeline | undefined
+  private cullVisiblePointsShader: Shader | undefined
+  private visiblePointIndexBuffer: Buffer | undefined
+  private visiblePointIndirectBuffer: Buffer | undefined
+  private activePointMaskBuffer: Buffer | undefined
+  private activePointMaskCapacity = 0
+  private visiblePointCapacity = 0
+  private isCulledPointDrawPrepared = false
+  private cullVisiblePointsUniformStore: UniformStore<{
+    cullUniforms: {
+      ratio: number;
+      transformationMatrix: Mat4Array;
+      pointCount: number;
+      spaceSize: number;
+      screenSize: [number, number];
+      sizeScale: number;
+      scalePointsOnZoom: number;
+      maxPointSize: number;
+      pointMinPixelSize: number;
+    };
+  }> | undefined
+
+  private cullVisiblePointsUniformBuffer: Buffer | undefined
+  private dragPointComputeUniformStore: UniformStore<{
+    dragPointUniforms: {
+      mousePos: [number, number];
+      index: number;
+      pointCount: number;
+      textureSize: number;
+    };
+  }> | undefined
+
+  private dragPointComputeUniformBuffer: Buffer | undefined
   private trackPointsVertexCoordBuffer: Buffer | undefined
   private trackedIndices: number[] | undefined
   private searchTexture: Texture | undefined
@@ -157,6 +375,12 @@ export class Points extends CoreModule {
       imageCount: number;
       imageAtlasCoordsTextureSize: number;
       pointMinPixelSize: number;
+      pointLodStrength: number;
+      pointLodZoomRange: [number, number];
+      pointLodMinSampleRate: number;
+      pointLodSizeCompensation: number;
+      pointLodOpacityCompensation: number;
+      renderPositionMix: number;
     };
     drawFragmentUniforms: {
       greyoutOpacity: number;
@@ -168,6 +392,104 @@ export class Points extends CoreModule {
       hasNonCircleShapes: number;
       hasOutlinedPoints: number;
       hasImagedPoints: number;
+    };
+  }> | undefined
+
+  private densityImpostorUniformStore: UniformStore<{
+    densityUniforms: {
+      ratio: number;
+      transformationMatrix: Mat4Array;
+      spaceSize: number;
+      screenSize: [number, number];
+      sizeScale: number;
+      pointOpacity: number;
+      maxPointSize: number;
+      densityPointSizeScale: number;
+    };
+  }> | undefined
+
+  private densityCompositeUniformStore: UniformStore<{
+    compositeUniforms: {
+      strength: number;
+      opacity: number;
+    };
+  }> | undefined
+
+  private tileImpostorUniformStore: UniformStore<{
+    tileUniforms: {
+      ratio: number;
+      transformationMatrix: Mat4Array;
+      spaceSize: number;
+      screenSize: [number, number];
+      tileSize: number;
+      pointCount: number;
+      tileColumns: number;
+      tileRows: number;
+      colorScale: number;
+      positionScale: number;
+    };
+  }> | undefined
+
+  private tileImpostorUniformBuffer: Buffer | undefined
+
+  private tileRenderUniformStore: UniformStore<{
+    tileRenderUniforms: {
+      screenSize: [number, number];
+      ratio: number;
+      tileColumns: number;
+      tileRows: number;
+      tileSize: number;
+      opacity: number;
+      strength: number;
+      microSplats: number;
+      sparseTileThreshold: number;
+    };
+  }> | undefined
+
+  private hybridAnchorUniformStore: UniformStore<{
+    hybridAnchorUniforms: {
+      ratio: number;
+      transformationMatrix: Mat4Array;
+      spaceSize: number;
+      screenSize: [number, number];
+      tileSize: number;
+      tileColumns: number;
+      tileRows: number;
+      pointSizeScale: number;
+      denseSampleRate: number;
+      denseOpacity: number;
+      sparseOpacity: number;
+      sparseTileThreshold: number;
+      maxPointSize: number;
+    };
+  }> | undefined
+
+  private hybridAnchorBuildUniformStore: UniformStore<{
+    hybridAnchorBuildUniforms: {
+      ratio: number;
+      transformationMatrix: Mat4Array;
+      spaceSize: number;
+      screenSize: [number, number];
+      tileSize: number;
+      pointCount: number;
+      tileColumns: number;
+      tileRows: number;
+      anchorsPerTile: number;
+      denseSampleRate: number;
+      sparseTileThreshold: number;
+    };
+  }> | undefined
+
+  private hybridAnchorBuildUniformBuffer: Buffer | undefined
+
+  private compactedAnchorUniformStore: UniformStore<{
+    compactedAnchorUniforms: {
+      screenSize: [number, number];
+      ratio: number;
+      pointSizeScale: number;
+      denseOpacity: number;
+      sparseOpacity: number;
+      maxPointSize: number;
     };
   }> | undefined
 
@@ -246,6 +568,13 @@ export class Points extends CoreModule {
     };
   }> | undefined
 
+  private get effectivePixelRatio (): number {
+    const storeRatio = this.store.effectivePixelRatio
+    if (Number.isFinite(storeRatio) && storeRatio > 0) return storeRatio
+    const configRatio = this.config.pixelRatio
+    return Number.isFinite(configRatio) && configRatio > 0 ? configRatio : 1
+  }
+
   public updatePositions (): void {
     const { device, store, data, config: { rescalePositions, enableSimulation } } = this
 
@@ -314,7 +643,7 @@ export class Points extends CoreModule {
         // initial random scatter even while the GPU sim is actively
         // moving currentPositionTexture. luma.gl's default usage is
         // TEXTURE | COPY_DST | RENDER_ATTACHMENT only.
-        usage: Texture.TEXTURE | Texture.COPY_DST | Texture.RENDER_ATTACHMENT | Texture.COPY_SRC,
+        usage: Texture.TEXTURE | Texture.COPY_DST | Texture.RENDER_ATTACHMENT | Texture.COPY_SRC | Texture.STORAGE,
       })
       this.currentPositionTexture.copyImageData({
         data: initialState,
@@ -342,9 +671,14 @@ export class Points extends CoreModule {
     // Vertex shaders read positions[idx] directly instead of paying for the
     // textureSampleLevel slow path that costs ~750ms/frame at n=100k.
     if (device.info?.type === 'webgpu' &&
-        (!this.positionStorageBuffer || this.positionStorageBufferTextureSize !== pointsTextureSize)) {
+        (!this.positionStorageBuffer ||
+          !this.previousRenderPositionStorageBuffer ||
+          this.positionStorageBufferTextureSize !== pointsTextureSize)) {
       if (this.positionStorageBuffer && !this.positionStorageBuffer.destroyed) {
         this.positionStorageBuffer.destroy()
+      }
+      if (this.previousRenderPositionStorageBuffer && !this.previousRenderPositionStorageBuffer.destroyed) {
+        this.previousRenderPositionStorageBuffer.destroy()
       }
       const byteLength = pointsTextureSize * pointsTextureSize * 16 // vec4<f32>
       this.positionStorageBuffer = device.createBuffer({
@@ -354,9 +688,17 @@ export class Points extends CoreModule {
         // can be written to but not copied from.
         usage: Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC,
       })
+      this.previousRenderPositionStorageBuffer = device.createBuffer({
+        byteLength,
+        usage: Buffer.STORAGE | Buffer.COPY_DST,
+      })
       // Seed with the same initial positions written to currentPositionTexture.
       this.positionStorageBuffer.write(new Uint8Array(initialState.buffer, initialState.byteOffset, initialState.byteLength))
+      this.previousRenderPositionStorageBuffer.write(new Uint8Array(initialState.buffer, initialState.byteOffset, initialState.byteLength))
       this.positionStorageBufferTextureSize = pointsTextureSize
+    }
+    if (device.info?.type === 'webgpu') {
+      this.isPositionStorageBufferDirty = true
     }
 
     // Create previousPositionTexture and framebuffer
@@ -376,7 +718,7 @@ export class Points extends CoreModule {
         // COPY_SRC for the same reason as currentPositionTexture — they
         // ping-pong via swapFbo() so whichever is the "current" after a
         // swap needs to be readable by copyTextureToBuffer.
-        usage: Texture.TEXTURE | Texture.COPY_DST | Texture.RENDER_ATTACHMENT | Texture.COPY_SRC,
+        usage: Texture.TEXTURE | Texture.COPY_DST | Texture.RENDER_ATTACHMENT | Texture.COPY_SRC | Texture.STORAGE,
       })
       this.previousPositionTexture.copyImageData({
         data: initialState,
@@ -458,6 +800,7 @@ export class Points extends CoreModule {
         width: pointsTextureSize,
         height: pointsTextureSize,
         format: 'rgba32float',
+        usage: Texture.SAMPLE | Texture.RENDER | Texture.COPY_SRC | Texture.COPY_DST,
       })
       this.searchTexture.copyImageData({
         data: initialState,
@@ -481,12 +824,24 @@ export class Points extends CoreModule {
       })
     }
 
-    // Create hoveredFbo (2x2 for hover detection)
-    this.hoveredFbo ||= device.createFramebuffer({
-      width: 2,
-      height: 2,
-      colorAttachments: ['rgba32float'],
-    })
+    // Create hoveredFbo (2x2 for hover detection). WebGPU needs COPY_SRC so
+    // the async picker can read back the tiny result without CPU graph scans.
+    if (!this.hoveredTexture || this.hoveredTexture.destroyed) {
+      if (this.hoveredFbo && !this.hoveredFbo.destroyed) {
+        this.hoveredFbo.destroy()
+      }
+      this.hoveredTexture = device.createTexture({
+        width: 2,
+        height: 2,
+        format: 'rgba32float',
+        usage: Texture.SAMPLE | Texture.RENDER | Texture.COPY_SRC | Texture.COPY_DST,
+      })
+      this.hoveredFbo = device.createFramebuffer({
+        width: 2,
+        height: 2,
+        colorAttachments: [this.hoveredTexture],
+      })
+    }
 
     // Create buffers
     const indexData = createIndexesForBuffer(store.pointsTextureSize)
@@ -559,7 +914,10 @@ export class Points extends CoreModule {
     if (!this.imageIndicesBuffer) this.updateImageIndices()
     if (!this.imageSizesBuffer) this.updateImageSizes()
     if (!this.pointStatusTexture) this.updatePointStatus()
-    if (config.enableSimulation) {
+    const isWebGPU = device.info?.type === 'webgpu'
+    if (config.enableSimulation && isWebGPU) {
+      this.initUpdatePositionComputePipeline()
+    } else if (config.enableSimulation) {
       // Create vertex buffer for quad
       this.updatePositionVertexCoordBuffer ||= device.createBuffer({
         data: new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
@@ -606,49 +964,53 @@ export class Points extends CoreModule {
       })
     }
 
-    // Create vertex buffer for quad
-    this.dragPointVertexCoordBuffer ||= device.createBuffer({
-      data: new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
-    })
+    if (isWebGPU) {
+      this.initDragPointComputePipeline()
+    } else {
+      // Create vertex buffer for quad
+      this.dragPointVertexCoordBuffer ||= device.createBuffer({
+        data: new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+      })
 
-    // Create UniformStore for dragPoint uniforms
-    this.dragPointUniformStore ||= new UniformStore({
-      dragPointUniforms: {
-        uniformTypes: {
-          // Order MUST match shader declaration order (std140 layout)
-          mousePos: 'vec2<f32>',
-          index: 'f32',
+      // Create UniformStore for dragPoint uniforms
+      this.dragPointUniformStore ||= new UniformStore({
+        dragPointUniforms: {
+          uniformTypes: {
+            // Order MUST match shader declaration order (std140 layout)
+            mousePos: 'vec2<f32>',
+            index: 'f32',
+          },
+          defaultUniforms: {
+            mousePos: ensureVec2(store.mousePosition, [0, 0]),
+            index: store.hoveredPoint?.index ?? -1,
+          },
         },
-        defaultUniforms: {
-          mousePos: ensureVec2(store.mousePosition, [0, 0]),
-          index: store.hoveredPoint?.index ?? -1,
-        },
-      },
-    })
+      })
 
-    this.dragPointCommand ||= new Model(device, {
-      source: dragPointWgsl,
-      fs: dragPointFrag,
-      vs: updateVert,
-      topology: 'triangle-strip',
-      colorAttachmentFormats: ['rgba32float'],
-      vertexCount: 4,
-      attributes: {
-        vertexCoord: this.dragPointVertexCoordBuffer,
-      },
-      bufferLayout: [
-        { name: 'vertexCoord', format: 'float32x2' },
-      ],
-      defines: {
-        USE_UNIFORM_BUFFERS: true,
-      },
-      bindings: {
-        // Create uniform buffer binding
-        // Update it later by calling uniformStore.setUniforms()
-        dragPointUniforms: this.dragPointUniformStore.getManagedUniformBuffer(device, 'dragPointUniforms'),
-        // All texture bindings will be set dynamically in drag() method
-      },
-    })
+      this.dragPointCommand ||= new Model(device, {
+        source: dragPointWgsl,
+        fs: dragPointFrag,
+        vs: updateVert,
+        topology: 'triangle-strip',
+        colorAttachmentFormats: ['rgba32float'],
+        vertexCount: 4,
+        attributes: {
+          vertexCoord: this.dragPointVertexCoordBuffer,
+        },
+        bufferLayout: [
+          { name: 'vertexCoord', format: 'float32x2' },
+        ],
+        defines: {
+          USE_UNIFORM_BUFFERS: true,
+        },
+        bindings: {
+          // Create uniform buffer binding
+          // Update it later by calling uniformStore.setUniforms()
+          dragPointUniforms: this.dragPointUniformStore.getManagedUniformBuffer(device, 'dragPointUniforms'),
+          // All texture bindings will be set dynamically in drag() method
+        },
+      })
+    }
 
     // Create UniformStore for draw uniforms
     this.drawUniformStore ||= new UniformStore({
@@ -672,10 +1034,16 @@ export class Points extends CoreModule {
           imageCount: 'f32',
           imageAtlasCoordsTextureSize: 'f32',
           pointMinPixelSize: 'f32',
+          pointLodStrength: 'f32',
+          pointLodZoomRange: 'vec2<f32>',
+          pointLodMinSampleRate: 'f32',
+          pointLodSizeCompensation: 'f32',
+          pointLodOpacityCompensation: 'f32',
+          renderPositionMix: 'f32',
         },
         defaultUniforms: {
           // Order MUST match uniformTypes and shader declaration
-          ratio: config.pixelRatio,
+          ratio: this.effectivePixelRatio,
           transformationMatrix: ((): Mat4Array => {
             const t = store.transform ?? [1, 0, 0, 0, 1, 0, 0, 0, 1]
             return [
@@ -700,6 +1068,12 @@ export class Points extends CoreModule {
           imageCount: this.imageCount,
           imageAtlasCoordsTextureSize: this.imageAtlasCoordsTextureSize ?? 0,
           pointMinPixelSize: config.pointMinPixelSize,
+          pointLodStrength: this.getEffectivePointLodStrength(),
+          pointLodZoomRange: ensureVec2(config.pointLodZoomRange, [0.12, 0.65]),
+          pointLodMinSampleRate: config.pointLodMinSampleRate,
+          pointLodSizeCompensation: config.pointLodSizeCompensation,
+          pointLodOpacityCompensation: config.pointLodOpacityCompensation,
+          renderPositionMix: 1,
         },
       },
       drawFragmentUniforms: {
@@ -729,7 +1103,6 @@ export class Points extends CoreModule {
       },
     })
 
-    const isWebGPU = device.info?.type === 'webgpu'
     if (isWebGPU) {
       this.drawQuadVertexBuffer ||= device.createBuffer({
         data: new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
@@ -826,7 +1199,7 @@ export class Points extends CoreModule {
           sizeScale: config.pointSizeScale,
           spaceSize: store.adjustedSpaceSize,
           screenSize: ensureVec2(store.screenSize, [0, 0]),
-          ratio: config.pixelRatio,
+          ratio: this.effectivePixelRatio,
           transformationMatrix: store.transformationMatrix4x4,
           rect0: ensureVec2(store.searchArea?.[0], [0, 0]),
           rect1: ensureVec2(store.searchArea?.[1], [0, 0]),
@@ -931,7 +1304,7 @@ export class Points extends CoreModule {
           sizeScale: config.pointSizeScale,
           spaceSize: store.adjustedSpaceSize,
           screenSize: ensureVec2(store.screenSize, [0, 0]),
-          ratio: config.pixelRatio,
+          ratio: this.effectivePixelRatio,
           transformationMatrix: store.transformationMatrix4x4,
           mousePosition: ensureVec2(store.screenMousePosition, [0, 0]),
           scalePointsOnZoom: config.scalePointsOnZoom ? 1 : 0,
@@ -1160,7 +1533,7 @@ export class Points extends CoreModule {
       }
       this.colorBuffer = device.createBuffer({
         data: colorData,
-        usage: Buffer.VERTEX | Buffer.COPY_DST,
+        usage: Buffer.VERTEX | Buffer.COPY_DST | Buffer.STORAGE,
       })
     } else {
       this.colorBuffer.write(colorData)
@@ -1298,7 +1671,7 @@ export class Points extends CoreModule {
       }
       this.sizeBuffer = device.createBuffer({
         data: sizeData,
-        usage: Buffer.VERTEX | Buffer.COPY_DST,
+        usage: Buffer.VERTEX | Buffer.COPY_DST | Buffer.STORAGE,
       })
     } else {
       this.sizeBuffer.write(sizeData)
@@ -1576,7 +1949,7 @@ export class Points extends CoreModule {
     renderPass.end()
   }
 
-  public draw (renderPass: RenderPass): void {
+  public draw (renderPass: RenderPass, usePreparedCulledDraw = false): void {
     const { data, config, store } = this
     if (!this.colorBuffer) this.updateColor()
     if (!this.sizeBuffer) this.updateSize()
@@ -1606,119 +1979,137 @@ export class Points extends CoreModule {
     // Update draw count dynamically. WebGL uses point-list (one vertex per point);
     // WebGPU uses an instanced quad (4 vertices, N instances).
     if (this.device.info?.type === 'webgpu') {
+      if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return
+      if (!this.previousRenderPositionStorageBuffer || this.previousRenderPositionStorageBuffer.destroyed) return
+      if (!this.pointStatusStorageBuffer || this.pointStatusStorageBuffer.destroyed) return
       this.drawCommand.setInstanceCount(data.pointsNumber)
     } else {
       this.drawCommand.setVertexCount(data.pointsNumber)
     }
 
-    // Base uniforms that don't change between layers
-    // Convert booleans to floats (1.0 or 0.0) since uniform type is 'f32'
-    const baseVertexUniforms = {
-      ratio: config.pixelRatio,
-      transformationMatrix: store.transformationMatrix4x4,
-      pointsTextureSize: store.pointsTextureSize ?? 0,
-      sizeScale: config.pointSizeScale,
-      spaceSize: store.adjustedSpaceSize,
-      screenSize: ensureVec2(store.screenSize, [0, 0]),
-      greyoutColor: ensureVec4(store.greyoutPointColor, [-1, -1, -1, -1]),
-      backgroundColor: ensureVec4(store.backgroundColor, [0, 0, 0, 1]),
-      scalePointsOnZoom: config.scalePointsOnZoom ? 1 : 0, // Convert boolean to float
-      maxPointSize: store.maxPointSize,
-      isDarkenGreyout: (store.isDarkenGreyout ?? false) ? 1 : 0, // Convert boolean to float
-      hasImages: (this.imageCount > 0) ? 1 : 0, // Convert boolean to float
-      imageCount: this.imageCount,
-      imageAtlasCoordsTextureSize: this.imageAtlasCoordsTextureSize ?? 0,
-      pointMinPixelSize: config.pointMinPixelSize,
-    }
+    const drawVertexUniforms = this.drawVertexUniformScratch
+    drawVertexUniforms.ratio = this.effectivePixelRatio
+    drawVertexUniforms.transformationMatrix = store.transformationMatrix4x4
+    drawVertexUniforms.pointsTextureSize = store.pointsTextureSize ?? 0
+    drawVertexUniforms.sizeScale = config.pointSizeScale
+    drawVertexUniforms.spaceSize = store.adjustedSpaceSize
+    drawVertexUniforms.screenSize = ensureVec2(store.screenSize, ZERO_VEC2)
+    drawVertexUniforms.greyoutColor = ensureVec4(store.greyoutPointColor, DISABLED_COLOR_VEC4)
+    drawVertexUniforms.backgroundColor = ensureVec4(store.backgroundColor, TRANSPARENT_BLACK)
+    drawVertexUniforms.scalePointsOnZoom = config.scalePointsOnZoom ? 1 : 0
+    drawVertexUniforms.maxPointSize = store.maxPointSize
+    drawVertexUniforms.isDarkenGreyout = (store.isDarkenGreyout ?? false) ? 1 : 0
+    drawVertexUniforms.hasImages = (this.imageCount > 0) ? 1 : 0
+    drawVertexUniforms.imageCount = this.imageCount
+    drawVertexUniforms.imageAtlasCoordsTextureSize = this.imageAtlasCoordsTextureSize ?? 0
+    drawVertexUniforms.pointMinPixelSize = config.pointMinPixelSize
+    drawVertexUniforms.pointLodStrength = this.getEffectivePointLodStrength()
+    drawVertexUniforms.pointLodZoomRange = ensureVec2(config.pointLodZoomRange, DEFAULT_POINT_LOD_ZOOM_RANGE)
+    drawVertexUniforms.pointLodMinSampleRate = config.pointLodMinSampleRate
+    drawVertexUniforms.pointLodSizeCompensation = config.pointLodSizeCompensation
+    drawVertexUniforms.pointLodOpacityCompensation = config.pointLodOpacityCompensation
+    drawVertexUniforms.renderPositionMix = this.device.info?.type === 'webgpu' ? this.renderPositionMix : 1
 
-    const baseFragmentUniforms = {
-      // -1 is a sentinel value for the shader: when greyoutOpacity is -1, the shader skips opacity override (i.e. "not set")
-      greyoutOpacity: config.pointGreyoutOpacity ?? -1,
-      pointOpacity: config.pointOpacity,
-      isDarkenGreyout: (store.isDarkenGreyout ?? false) ? 1 : 0, // Convert boolean to float
-      backgroundColor: ensureVec4(store.backgroundColor, [0, 0, 0, 1]),
-      outlineColor: ensureVec4(store.outlinedPointRingColor, [1, 1, 1, 1]),
-      outlineWidth: 0.9,
-      hasNonCircleShapes: this.hasNonCircleShapes ? 1 : 0,
-      hasOutlinedPoints: config.outlinedPointIndices !== undefined ? 1 : 0,
-      hasImagedPoints: this.imageCount > 0 ? 1 : 0,
-    }
+    const drawFragmentUniforms = this.drawFragmentUniformScratch
+    drawFragmentUniforms.greyoutOpacity = config.pointGreyoutOpacity ?? -1
+    drawFragmentUniforms.pointOpacity = config.pointOpacity
+    drawFragmentUniforms.isDarkenGreyout = drawVertexUniforms.isDarkenGreyout
+    drawFragmentUniforms.backgroundColor = ensureVec4(store.backgroundColor, TRANSPARENT_BLACK)
+    drawFragmentUniforms.outlineColor = ensureVec4(store.outlinedPointRingColor, WHITE_VEC4)
+    drawFragmentUniforms.outlineWidth = 0.9
+    drawFragmentUniforms.hasNonCircleShapes = this.hasNonCircleShapes ? 1 : 0
+    drawFragmentUniforms.hasOutlinedPoints = config.outlinedPointIndices !== undefined ? 1 : 0
+    drawFragmentUniforms.hasImagedPoints = this.imageCount > 0 ? 1 : 0
 
     const hasHighlighting = config.highlightedPointIndices !== undefined
+    let drewMainPointsWithCulling = false
+    if (usePreparedCulledDraw && this.isCulledPointDrawPrepared) {
+      if (hasHighlighting) {
+        drawVertexUniforms.skipHighlighted = 1
+        drawVertexUniforms.skipGreyed = 0
+        this.drawUniformStore.setUniforms(this.drawUniformPayload)
+        drewMainPointsWithCulling = this.drawCulledPointsIndirect(renderPass)
+        drawVertexUniforms.skipHighlighted = 0
+        drawVertexUniforms.skipGreyed = 1
+        this.drawUniformStore.setUniforms(this.drawUniformPayload)
+        drewMainPointsWithCulling = this.drawCulledPointsIndirect(renderPass) && drewMainPointsWithCulling
+      } else {
+        drawVertexUniforms.skipHighlighted = 0
+        drawVertexUniforms.skipGreyed = 0
+        this.drawUniformStore.setUniforms(this.drawUniformPayload)
+        drewMainPointsWithCulling = this.drawCulledPointsIndirect(renderPass)
+      }
+    }
 
-    // Render in layers: greyed points first (behind), then highlighted points (in front)
-    if (hasHighlighting) {
-      // First draw greyed points (they will appear behind)
-      this.drawUniformStore.setUniforms({
-        drawVertexUniforms: {
-          ...baseVertexUniforms,
-          skipHighlighted: 1,
-          skipGreyed: 0,
-        },
-        drawFragmentUniforms: baseFragmentUniforms,
-      })
+    if (!drewMainPointsWithCulling) {
+      const currentPositionTexture = this.currentPositionTexture
+      const pointStatusTexture = this.pointStatusTexture
+      const imageAtlasTexture = this.imageAtlasTexture
+      const imageAtlasCoordsTexture = this.imageAtlasCoordsTexture
+      const backend = this.device.info?.type === 'webgpu' ? 'webgpu' : 'webgl'
+      const position = backend === 'webgpu' ? this.positionStorageBuffer : currentPositionTexture
+      const previousPosition = backend === 'webgpu' ? this.previousRenderPositionStorageBuffer : undefined
+      const pointStatusBuffer = backend === 'webgpu' ? this.pointStatusStorageBuffer : undefined
+      if (!position) return
+      if (backend === 'webgpu' && !previousPosition) return
+      if (
+        this.drawBindingsBackend !== backend ||
+        this.drawBindingsPosition !== position ||
+        this.drawBindingsPreviousPosition !== previousPosition ||
+        this.drawBindingsPointStatus !== pointStatusTexture ||
+        this.drawBindingsPointStatusBuffer !== pointStatusBuffer ||
+        this.drawBindingsImageAtlas !== imageAtlasTexture ||
+        this.drawBindingsImageAtlasCoords !== imageAtlasCoordsTexture
+      ) {
+        if (backend === 'webgpu') {
+          this.drawCommand.setBindings({
+            positions: position as Buffer,
+            previousPositions: previousPosition as Buffer,
+            pointStatusBuf: pointStatusBuffer as Buffer,
+            pointStatus: pointStatusTexture,
+            imageAtlasTexture,
+            imageAtlasCoords: imageAtlasCoordsTexture,
+          })
+        } else {
+          this.drawCommand.setBindings({
+            positionsTexture: position as Texture,
+            pointStatus: pointStatusTexture,
+            imageAtlasTexture,
+            imageAtlasCoords: imageAtlasCoordsTexture,
+          })
+        }
+        this.drawBindingsBackend = backend
+        this.drawBindingsPosition = position
+        this.drawBindingsPreviousPosition = previousPosition
+        this.drawBindingsPointStatus = pointStatusTexture
+        this.drawBindingsPointStatusBuffer = pointStatusBuffer
+        this.drawBindingsImageAtlas = imageAtlasTexture
+        this.drawBindingsImageAtlasCoords = imageAtlasCoordsTexture
+      }
 
-      this.drawCommand.setBindings({
-        // WebGPU binding: vertex-pulled positions via storage buffer (fast path).
-        // WebGL2 binding: positionsTexture (legacy path); luma.gl ignores unused
-        // bindings per backend's shader layout.
-        ...(this.positionStorageBuffer && { positions: this.positionStorageBuffer }),
-        ...(this.pointStatusStorageBuffer && { pointStatusBuf: this.pointStatusStorageBuffer }),
-        positionsTexture: this.currentPositionTexture,
-        pointStatus: this.pointStatusTexture,
-        imageAtlasTexture: this.imageAtlasTexture,
-        imageAtlasCoords: this.imageAtlasCoordsTexture,
-      })
+      // Render in layers: greyed points first (behind), then highlighted points (in front)
+      if (hasHighlighting) {
+        // First draw greyed points (they will appear behind)
+        drawVertexUniforms.skipHighlighted = 1
+        drawVertexUniforms.skipGreyed = 0
+        this.drawUniformStore.setUniforms(this.drawUniformPayload)
 
-      this.drawCommand.draw(renderPass)
+        this.drawCommand.draw(renderPass)
 
-      // Then draw highlighted points (they will appear in front)
-      this.drawUniformStore.setUniforms({
-        drawVertexUniforms: {
-          ...baseVertexUniforms,
-          skipHighlighted: 0,
-          skipGreyed: 1,
-        },
-        drawFragmentUniforms: baseFragmentUniforms,
-      })
+        // Then draw highlighted points (they will appear in front)
+        drawVertexUniforms.skipHighlighted = 0
+        drawVertexUniforms.skipGreyed = 1
+        this.drawUniformStore.setUniforms(this.drawUniformPayload)
 
-      this.drawCommand.setBindings({
-        // WebGPU binding: vertex-pulled positions via storage buffer (fast path).
-        // WebGL2 binding: positionsTexture (legacy path); luma.gl ignores unused
-        // bindings per backend's shader layout.
-        ...(this.positionStorageBuffer && { positions: this.positionStorageBuffer }),
-        ...(this.pointStatusStorageBuffer && { pointStatusBuf: this.pointStatusStorageBuffer }),
-        positionsTexture: this.currentPositionTexture,
-        pointStatus: this.pointStatusTexture,
-        imageAtlasTexture: this.imageAtlasTexture,
-        imageAtlasCoords: this.imageAtlasCoordsTexture,
-      })
+        this.drawCommand.draw(renderPass)
+      } else {
+        // If no highlighting, draw all points
+        drawVertexUniforms.skipHighlighted = 0
+        drawVertexUniforms.skipGreyed = 0
+        this.drawUniformStore.setUniforms(this.drawUniformPayload)
 
-      this.drawCommand.draw(renderPass)
-    } else {
-      // If no highlighting, draw all points
-      this.drawUniformStore.setUniforms({
-        drawVertexUniforms: {
-          ...baseVertexUniforms,
-          skipHighlighted: 0,
-          skipGreyed: 0,
-        },
-        drawFragmentUniforms: baseFragmentUniforms,
-      })
-
-      this.drawCommand.setBindings({
-        // WebGPU binding: vertex-pulled positions via storage buffer (fast path).
-        // WebGL2 binding: positionsTexture (legacy path); luma.gl ignores unused
-        // bindings per backend's shader layout.
-        ...(this.positionStorageBuffer && { positions: this.positionStorageBuffer }),
-        ...(this.pointStatusStorageBuffer && { pointStatusBuf: this.pointStatusStorageBuffer }),
-        positionsTexture: this.currentPositionTexture,
-        pointStatus: this.pointStatusTexture,
-        imageAtlasTexture: this.imageAtlasTexture,
-        imageAtlasCoords: this.imageAtlasCoordsTexture,
-      })
-
-      this.drawCommand.draw(renderPass)
+        this.drawCommand.draw(renderPass)
+      }
     }
 
     // Draw highlighted point rings if enabled
@@ -1791,7 +2182,303 @@ export class Points extends CoreModule {
     }
   }
 
+  public prepareGpuCulledDraw (): boolean {
+    this.isCulledPointDrawPrepared = false
+    const { data, config, store } = this
+    if (this.device.info?.type !== 'webgpu') return false
+    const hasActiveFilter = config.activePointIndices !== undefined
+    if (!data.pointsNumber || (!hasActiveFilter && data.pointsNumber < 10000)) return false
+    if (!store.screenSize || store.screenSize[0] === 0 || store.screenSize[1] === 0) return false
+    if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return false
+    if (!this.sizeBuffer) this.updateSize()
+    if (!this.sizeBuffer || this.sizeBuffer.destroyed) return false
+    if (!this.colorBuffer) this.updateColor()
+    if (!this.colorBuffer || this.colorBuffer.destroyed) return false
+    if (!this.pointStatusStorageBuffer || this.pointStatusStorageBuffer.destroyed) return false
+    if (this.imageCount > 0 || this.hasNonCircleShapes) return false
+
+    const scale = Math.abs(store.transformationMatrix4x4[0] ?? 1)
+    if (!hasActiveFilter && scale < 1.08 && config.pointMinPixelSize <= 0) return false
+
+    this.ensureVisiblePointBuffers(data.pointsNumber)
+    this.updateActivePointMask()
+    this.initVisiblePointCullPipelines()
+    if (
+      !this.visiblePointIndexBuffer ||
+      !this.visiblePointIndirectBuffer ||
+      !this.activePointMaskBuffer ||
+      !this.clearVisiblePointsPipeline ||
+      !this.cullVisiblePointsPipeline ||
+      !this.cullVisiblePointsUniformStore ||
+      !this.cullVisiblePointsUniformBuffer
+    ) {
+      return false
+    }
+
+    this.cullVisiblePointsUniformStore.setUniforms({
+      cullUniforms: {
+        ratio: this.effectivePixelRatio,
+        transformationMatrix: store.transformationMatrix4x4,
+        pointCount: data.pointsNumber,
+        spaceSize: store.adjustedSpaceSize,
+        screenSize: ensureVec2(store.screenSize, ZERO_VEC2),
+        sizeScale: config.pointSizeScale,
+        scalePointsOnZoom: config.scalePointsOnZoom ? 1 : 0,
+        maxPointSize: store.maxPointSize,
+        pointMinPixelSize: config.pointMinPixelSize,
+      },
+    })
+
+    this.clearVisiblePointsPipeline.setBindings({
+      indirectArgs: this.visiblePointIndirectBuffer,
+    })
+    let pass = this.device.beginComputePass({ id: 'points.visible.clear' })
+    pass.setPipeline(this.clearVisiblePointsPipeline)
+    pass.dispatch(1, 1, 1)
+    pass.end()
+
+    this.cullVisiblePointsPipeline.setBindings({
+      cullUniforms: this.cullVisiblePointsUniformBuffer,
+      positions: this.positionStorageBuffer,
+      sizes: this.sizeBuffer,
+      visibleIndices: this.visiblePointIndexBuffer,
+      indirectArgs: this.visiblePointIndirectBuffer,
+      activeMask: this.activePointMaskBuffer,
+    })
+    pass = this.device.beginComputePass({ id: 'points.visible.cull' })
+    pass.setPipeline(this.cullVisiblePointsPipeline)
+    pass.dispatch(Math.ceil(data.pointsNumber / 64), 1, 1)
+    pass.end()
+
+    this.isCulledPointDrawPrepared = true
+    return true
+  }
+
+  public renderImpostorDensity (): boolean {
+    const { data, config, store } = this
+    if (this.device.info?.type !== 'webgpu') return false
+    if (!data.pointsNumber || data.pointsNumber === 0) return false
+    if (!store.screenSize || store.screenSize[0] === 0 || store.screenSize[1] === 0) return false
+    if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return false
+
+    if (!this.colorBuffer) this.updateColor()
+    if (!this.colorBuffer) return false
+    if (!this.sizeBuffer) this.updateSize()
+    if (!this.sizeBuffer) return false
+
+    this.ensureTileImpostorBuffers()
+    this.initTileImpostorPipelines()
+    if (
+      !this.tileImpostorUniformStore ||
+      !this.tileImpostorUniformBuffer ||
+      !this.clearTileImpostorPipeline ||
+      !this.binTileImpostorPipeline ||
+      !this.resolveTileImpostorPipeline ||
+      !this.tileAtomicBuffer ||
+      !this.tileResolvedBuffer ||
+      this.tileCount === 0
+    ) {
+      return false
+    }
+
+    this.tileImpostorUniformStore.setUniforms({
+      tileUniforms: {
+        ratio: this.effectivePixelRatio,
+        transformationMatrix: store.transformationMatrix4x4,
+        spaceSize: store.adjustedSpaceSize,
+        screenSize: ensureVec2(store.screenSize, [0, 0]),
+        tileSize: this.getTileImpostorSize(),
+        pointCount: data.pointsNumber,
+        tileColumns: this.tileColumns,
+        tileRows: this.tileRows,
+        colorScale: 1024,
+        positionScale: 1024,
+      },
+    })
+
+    this.clearTileImpostorPipeline.setBindings({
+      tileUniforms: this.tileImpostorUniformBuffer,
+      atomicTiles: this.tileAtomicBuffer,
+      resolvedTiles: this.tileResolvedBuffer,
+    })
+    let pass = this.device.beginComputePass({ id: 'impostor.tiles.clear' })
+    pass.setPipeline(this.clearTileImpostorPipeline)
+    pass.dispatch(Math.ceil(this.tileCount / 64), 1, 1)
+    pass.end()
+
+    this.binTileImpostorPipeline.setBindings({
+      tileUniforms: this.tileImpostorUniformBuffer,
+      positions: this.positionStorageBuffer,
+      colors: this.colorBuffer,
+      atomicTiles: this.tileAtomicBuffer,
+    })
+    pass = this.device.beginComputePass({ id: 'impostor.tiles.bin' })
+    pass.setPipeline(this.binTileImpostorPipeline)
+    pass.dispatch(Math.ceil(data.pointsNumber / 64), 1, 1)
+    pass.end()
+
+    this.resolveTileImpostorPipeline.setBindings({
+      tileUniforms: this.tileImpostorUniformBuffer,
+      atomicTiles: this.tileAtomicBuffer,
+      resolvedTiles: this.tileResolvedBuffer,
+    })
+    pass = this.device.beginComputePass({ id: 'impostor.tiles.resolve' })
+    pass.setPipeline(this.resolveTileImpostorPipeline)
+    pass.dispatch(Math.ceil(this.tileCount / 64), 1, 1)
+    pass.end()
+
+    if (this.config.impostorExactOverlay && !this.config.impostorStableOverlay) {
+      this.ensureHybridAnchorBuffers()
+      this.initHybridAnchorBuildPipelines()
+      if (
+        !this.hybridAnchorBuildUniformStore ||
+        !this.hybridAnchorBuildUniformBuffer ||
+        !this.clearHybridAnchorPipeline ||
+        !this.fillHybridAnchorPipeline ||
+        !this.hybridAnchorCountBuffer ||
+        !this.hybridAnchorPositionBuffer ||
+        !this.hybridAnchorColorBuffer
+      ) {
+        return true
+      }
+      this.hybridAnchorBuildUniformStore.setUniforms({
+        hybridAnchorBuildUniforms: {
+          ratio: this.effectivePixelRatio,
+          transformationMatrix: store.transformationMatrix4x4,
+          spaceSize: store.adjustedSpaceSize,
+          screenSize: ensureVec2(store.screenSize, [0, 0]),
+          tileSize: this.getTileImpostorSize(),
+          pointCount: data.pointsNumber,
+          tileColumns: this.tileColumns,
+          tileRows: this.tileRows,
+          anchorsPerTile: this.getHybridAnchorsPerTile(),
+          denseSampleRate: config.impostorExactOverlaySampleRate,
+          sparseTileThreshold: config.impostorSparseTileThreshold,
+        },
+      })
+
+      this.clearHybridAnchorPipeline.setBindings({
+        anchorUniforms: this.hybridAnchorBuildUniformBuffer,
+        anchorCounts: this.hybridAnchorCountBuffer,
+        anchorPositions: this.hybridAnchorPositionBuffer,
+        anchorColors: this.hybridAnchorColorBuffer,
+      })
+      pass = this.device.beginComputePass({ id: 'impostor.anchors.clear' })
+      pass.setPipeline(this.clearHybridAnchorPipeline)
+      pass.dispatch(Math.ceil(Math.max(this.tileCount, this.hybridAnchorCapacity) / 64), 1, 1)
+      pass.end()
+
+      this.fillHybridAnchorPipeline.setBindings({
+        anchorUniforms: this.hybridAnchorBuildUniformBuffer,
+        positions: this.positionStorageBuffer,
+        colors: this.colorBuffer,
+        sizes: this.sizeBuffer,
+        resolvedTiles: this.tileResolvedBuffer,
+        anchorCounts: this.hybridAnchorCountBuffer,
+        anchorPositions: this.hybridAnchorPositionBuffer,
+        anchorColors: this.hybridAnchorColorBuffer,
+      })
+      pass = this.device.beginComputePass({ id: 'impostor.anchors.fill' })
+      pass.setPipeline(this.fillHybridAnchorPipeline)
+      pass.dispatch(Math.ceil(data.pointsNumber / 64), 1, 1)
+      pass.end()
+    }
+    return true
+  }
+
+  public drawImpostorComposite (renderPass: RenderPass): boolean {
+    if (this.device.info?.type !== 'webgpu') return false
+    if (!this.tileResolvedBuffer || this.tileResolvedBuffer.destroyed || this.tileCount === 0) return false
+    this.initTileImpostorRenderCommand()
+    if (!this.tileImpostorCommand || !this.tileRenderUniformStore) return false
+
+    this.tileImpostorCommand.setInstanceCount(this.tileCount * this.getTileImpostorMicroSplats())
+    this.tileRenderUniformStore.setUniforms({
+      tileRenderUniforms: {
+        screenSize: ensureVec2(this.store.screenSize, [0, 0]),
+        ratio: this.effectivePixelRatio,
+        tileColumns: this.tileColumns,
+        tileRows: this.tileRows,
+        tileSize: this.getTileImpostorSize(),
+        opacity: this.config.impostorTileOpacity,
+        strength: this.config.impostorCompositeStrength,
+        microSplats: this.getTileImpostorMicroSplats(),
+        sparseTileThreshold: this.config.impostorSparseTileThreshold,
+      },
+    })
+    this.tileImpostorCommand.setBindings({
+      resolvedTiles: this.tileResolvedBuffer,
+    })
+    this.tileImpostorCommand.draw(renderPass)
+    return true
+  }
+
+  public drawImpostorExactOverlay (renderPass: RenderPass): void {
+    if (this.device.info?.type !== 'webgpu') return
+    if (this.config.impostorStableOverlay) {
+      if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return
+      if (!this.colorBuffer) this.updateColor()
+      if (!this.colorBuffer) return
+      if (!this.tileResolvedBuffer || this.tileResolvedBuffer.destroyed || this.tileCount === 0) return
+      this.initHybridAnchorCommand()
+      if (!this.hybridAnchorCommand || !this.hybridAnchorUniformStore) return
+
+      this.hybridAnchorCommand.setInstanceCount(this.data.pointsNumber ?? 0)
+      this.hybridAnchorUniformStore.setUniforms({
+        hybridAnchorUniforms: {
+          ratio: this.effectivePixelRatio,
+          transformationMatrix: this.store.transformationMatrix4x4,
+          spaceSize: this.store.adjustedSpaceSize,
+          screenSize: ensureVec2(this.store.screenSize, [0, 0]),
+          tileSize: this.getTileImpostorSize(),
+          tileColumns: this.tileColumns,
+          tileRows: this.tileRows,
+          pointSizeScale: this.config.pointSizeScale * this.config.impostorExactOverlaySizeScale,
+          denseSampleRate: this.config.impostorExactOverlaySampleRate,
+          denseOpacity: this.config.pointOpacity * this.config.impostorExactOverlayOpacity,
+          sparseOpacity: this.config.pointOpacity * this.config.impostorSparseAnchorOpacity,
+          sparseTileThreshold: this.config.impostorSparseTileThreshold,
+          maxPointSize: this.store.maxPointSize,
+        },
+      })
+      this.hybridAnchorCommand.setBindings({
+        positions: this.positionStorageBuffer,
+        colors: this.colorBuffer,
+        resolvedTiles: this.tileResolvedBuffer,
+      })
+      this.hybridAnchorCommand.draw(renderPass)
+      return
+    }
+
+    if (!this.hybridAnchorPositionBuffer || this.hybridAnchorPositionBuffer.destroyed) return
+    if (!this.hybridAnchorColorBuffer || this.hybridAnchorColorBuffer.destroyed) return
+    if (this.hybridAnchorCapacity === 0) return
+    this.initCompactedAnchorCommand()
+    if (!this.compactedAnchorCommand || !this.compactedAnchorUniformStore) return
+
+    this.compactedAnchorCommand.setInstanceCount(this.hybridAnchorCapacity)
+    this.compactedAnchorUniformStore.setUniforms({
+      compactedAnchorUniforms: {
+        screenSize: ensureVec2(this.store.screenSize, [0, 0]),
+        ratio: this.effectivePixelRatio,
+        pointSizeScale: this.config.pointSizeScale * this.config.impostorExactOverlaySizeScale,
+        denseOpacity: this.config.pointOpacity * this.config.impostorExactOverlayOpacity,
+        sparseOpacity: this.config.pointOpacity * this.config.impostorSparseAnchorOpacity,
+        maxPointSize: this.store.maxPointSize,
+      },
+    })
+    this.compactedAnchorCommand.setBindings({
+      anchorPositions: this.hybridAnchorPositionBuffer,
+      anchorColors: this.hybridAnchorColorBuffer,
+    })
+    this.compactedAnchorCommand.draw(renderPass)
+  }
+
   public updatePosition (): void {
+    if (this.device.info?.type === 'webgpu') {
+      this.updatePositionCompute()
+      return
+    }
     if (!this.updatePositionCommand || !this.updatePositionUniformStore || !this.currentPositionFbo || this.currentPositionFbo.destroyed) return
     if (!this.previousPositionTexture || this.previousPositionTexture.destroyed) return
     if (!this.velocityTexture || this.velocityTexture.destroyed) return
@@ -1822,9 +2509,14 @@ export class Points extends CoreModule {
     // to read. After this call, `currentPositionFbo` holds the new result.
     // Invalidate tracked positions cache since positions have changed
     this.isPositionsUpToDate = false
+    this.isPositionStorageBufferDirty = true
   }
 
   public drag (): void {
+    if (this.device.info?.type === 'webgpu') {
+      this.dragCompute()
+      return
+    }
     if (!this.dragPointCommand || !this.dragPointUniformStore || !this.currentPositionFbo || this.currentPositionFbo.destroyed) return
     if (!this.previousPositionTexture || this.previousPositionTexture.destroyed) return
 
@@ -1851,6 +2543,7 @@ export class Points extends CoreModule {
     // to read. After this call, `currentPositionFbo` holds the drag result.
     // Invalidate tracked positions cache since positions have changed
     this.isPositionsUpToDate = false
+    this.isPositionStorageBufferDirty = true
   }
 
   public findPointsInRect (): boolean {
@@ -1864,7 +2557,7 @@ export class Points extends CoreModule {
         screenSize: ensureVec2(this.store.screenSize, [0, 0]),
         sizeScale: this.config.pointSizeScale,
         transformationMatrix: this.store.transformationMatrix4x4,
-        ratio: this.config.pixelRatio,
+        ratio: this.effectivePixelRatio,
         rect0: ensureVec2(this.store.searchArea?.[0], [0, 0]),
         rect1: ensureVec2(this.store.searchArea?.[1], [0, 0]),
         scalePointsOnZoom: this.config.scalePointsOnZoom ? 1 : 0, // Convert boolean to number
@@ -1983,7 +2676,7 @@ export class Points extends CoreModule {
     })
 
     const baseUniforms = {
-      ratio: this.config.pixelRatio,
+      ratio: this.effectivePixelRatio,
       sizeScale: this.config.pointSizeScale,
       pointsTextureSize: this.store.pointsTextureSize ?? 0,
       transformationMatrix: this.store.transformationMatrix4x4,
@@ -2267,12 +2960,60 @@ export class Points extends CoreModule {
     // 1. Destroy Models FIRST (they destroy _gpuGeometry if exists, and _uniformStore)
     this.drawCommand?.destroy()
     this.drawCommand = undefined
+    this.drawCulledCommand?.destroy()
+    this.drawCulledCommand = undefined
+    this.densityImpostorCommand?.destroy()
+    this.densityImpostorCommand = undefined
+    this.densityCompositeCommand?.destroy()
+    this.densityCompositeCommand = undefined
+    this.tileImpostorCommand?.destroy()
+    this.tileImpostorCommand = undefined
+    this.hybridAnchorCommand?.destroy()
+    this.hybridAnchorCommand = undefined
+    this.compactedAnchorCommand?.destroy()
+    this.compactedAnchorCommand = undefined
     this.drawHighlightedCommand?.destroy()
     this.drawHighlightedCommand = undefined
     this.updatePositionCommand?.destroy()
     this.updatePositionCommand = undefined
+    this.updatePositionComputePipeline?.destroy()
+    this.updatePositionComputePipeline = undefined
+    this.updatePositionComputeShader?.destroy()
+    this.updatePositionComputeShader = undefined
     this.dragPointCommand?.destroy()
     this.dragPointCommand = undefined
+    this.dragPointComputePipeline?.destroy()
+    this.dragPointComputePipeline = undefined
+    this.dragPointComputeShader?.destroy()
+    this.dragPointComputeShader = undefined
+    this.clearTileImpostorPipeline?.destroy()
+    this.clearTileImpostorPipeline = undefined
+    this.clearTileImpostorShader?.destroy()
+    this.clearTileImpostorShader = undefined
+    this.binTileImpostorPipeline?.destroy()
+    this.binTileImpostorPipeline = undefined
+    this.binTileImpostorShader?.destroy()
+    this.binTileImpostorShader = undefined
+    this.resolveTileImpostorPipeline?.destroy()
+    this.resolveTileImpostorPipeline = undefined
+    this.resolveTileImpostorShader?.destroy()
+    this.resolveTileImpostorShader = undefined
+    this.clearHybridAnchorPipeline?.destroy()
+    this.clearHybridAnchorPipeline = undefined
+    this.clearHybridAnchorShader?.destroy()
+    this.clearHybridAnchorShader = undefined
+    this.fillHybridAnchorPipeline?.destroy()
+    this.fillHybridAnchorPipeline = undefined
+    this.fillHybridAnchorShader?.destroy()
+    this.fillHybridAnchorShader = undefined
+    this.clearVisiblePointsPipeline?.destroy()
+    this.clearVisiblePointsPipeline = undefined
+    this.clearVisiblePointsShader?.destroy()
+    this.clearVisiblePointsShader = undefined
+    this.cullVisiblePointsPipeline?.destroy()
+    this.cullVisiblePointsPipeline = undefined
+    this.cullVisiblePointsShader?.destroy()
+    this.cullVisiblePointsShader = undefined
     this.findPointsInRectCommand?.destroy()
     this.findPointsInRectCommand = undefined
     this.findPointsInPolygonCommand?.destroy()
@@ -2283,6 +3024,13 @@ export class Points extends CoreModule {
     this.fillSampledPointsFboCommand = undefined
     this.trackPointsCommand?.destroy()
     this.trackPointsCommand = undefined
+    this.drawBindingsBackend = undefined
+    this.drawBindingsPosition = undefined
+    this.drawBindingsPreviousPosition = undefined
+    this.drawBindingsPointStatus = undefined
+    this.drawBindingsPointStatusBuffer = undefined
+    this.drawBindingsImageAtlas = undefined
+    this.drawBindingsImageAtlasCoords = undefined
 
     // 2. Destroy Framebuffers (before textures they reference)
     if (this.currentPositionFbo && !this.currentPositionFbo.destroyed) {
@@ -2313,6 +3061,10 @@ export class Points extends CoreModule {
       this.sampledPointsFbo.destroy()
     }
     this.sampledPointsFbo = undefined
+    if (this.densityImpostorFbo && !this.densityImpostorFbo.destroyed) {
+      this.densityImpostorFbo.destroy()
+    }
+    this.densityImpostorFbo = undefined
 
     // 3. Destroy Textures
     if (this.currentPositionTexture && !this.currentPositionTexture.destroyed) {
@@ -2331,6 +3083,10 @@ export class Points extends CoreModule {
       this.searchTexture.destroy()
     }
     this.searchTexture = undefined
+    if (this.hoveredTexture && !this.hoveredTexture.destroyed) {
+      this.hoveredTexture.destroy()
+    }
+    this.hoveredTexture = undefined
     if (this.pointStatusTexture && !this.pointStatusTexture.destroyed) {
       this.pointStatusTexture.destroy()
     }
@@ -2359,14 +3115,42 @@ export class Points extends CoreModule {
       this.pinnedStatusTexture.destroy()
     }
     this.pinnedStatusTexture = undefined
+    if (this.densityImpostorTexture && !this.densityImpostorTexture.destroyed) {
+      this.densityImpostorTexture.destroy()
+    }
+    this.densityImpostorTexture = undefined
+    this.densityImpostorSize = undefined
 
     // 4. Destroy UniformStores (Models already destroyed their managed uniform buffers)
     this.updatePositionUniformStore?.destroy()
     this.updatePositionUniformStore = undefined
+    this.updatePositionComputeUniformStore?.destroy()
+    this.updatePositionComputeUniformStore = undefined
     this.dragPointUniformStore?.destroy()
     this.dragPointUniformStore = undefined
+    this.dragPointComputeUniformStore?.destroy()
+    this.dragPointComputeUniformStore = undefined
     this.drawUniformStore?.destroy()
     this.drawUniformStore = undefined
+    this.densityImpostorUniformStore?.destroy()
+    this.densityImpostorUniformStore = undefined
+    this.densityCompositeUniformStore?.destroy()
+    this.densityCompositeUniformStore = undefined
+    this.tileImpostorUniformStore?.destroy()
+    this.tileImpostorUniformStore = undefined
+    this.tileImpostorUniformBuffer = undefined
+    this.tileRenderUniformStore?.destroy()
+    this.tileRenderUniformStore = undefined
+    this.hybridAnchorUniformStore?.destroy()
+    this.hybridAnchorUniformStore = undefined
+    this.hybridAnchorBuildUniformStore?.destroy()
+    this.hybridAnchorBuildUniformStore = undefined
+    this.hybridAnchorBuildUniformBuffer = undefined
+    this.compactedAnchorUniformStore?.destroy()
+    this.compactedAnchorUniformStore = undefined
+    this.cullVisiblePointsUniformStore?.destroy()
+    this.cullVisiblePointsUniformStore = undefined
+    this.cullVisiblePointsUniformBuffer = undefined
     this.findPointsInRectUniformStore?.destroy()
     this.findPointsInRectUniformStore = undefined
     this.findPointsInPolygonUniformStore?.destroy()
@@ -2413,6 +3197,49 @@ export class Points extends CoreModule {
       this.sampledPointIndices.destroy()
     }
     this.sampledPointIndices = undefined
+    if (this.tileAtomicBuffer && !this.tileAtomicBuffer.destroyed) {
+      this.tileAtomicBuffer.destroy()
+    }
+    this.tileAtomicBuffer = undefined
+    if (this.tileResolvedBuffer && !this.tileResolvedBuffer.destroyed) {
+      this.tileResolvedBuffer.destroy()
+    }
+    this.tileResolvedBuffer = undefined
+    if (this.hybridAnchorCountBuffer && !this.hybridAnchorCountBuffer.destroyed) {
+      this.hybridAnchorCountBuffer.destroy()
+    }
+    this.hybridAnchorCountBuffer = undefined
+    if (this.hybridAnchorPositionBuffer && !this.hybridAnchorPositionBuffer.destroyed) {
+      this.hybridAnchorPositionBuffer.destroy()
+    }
+    this.hybridAnchorPositionBuffer = undefined
+    if (this.hybridAnchorColorBuffer && !this.hybridAnchorColorBuffer.destroyed) {
+      this.hybridAnchorColorBuffer.destroy()
+    }
+    this.hybridAnchorColorBuffer = undefined
+    if (this.visiblePointIndexBuffer && !this.visiblePointIndexBuffer.destroyed) {
+      this.visiblePointIndexBuffer.destroy()
+    }
+    this.visiblePointIndexBuffer = undefined
+    if (this.visiblePointIndirectBuffer && !this.visiblePointIndirectBuffer.destroyed) {
+      this.visiblePointIndirectBuffer.destroy()
+    }
+    this.visiblePointIndirectBuffer = undefined
+    if (this.positionStorageBuffer && !this.positionStorageBuffer.destroyed) {
+      this.positionStorageBuffer.destroy()
+    }
+    this.positionStorageBuffer = undefined
+    if (this.previousRenderPositionStorageBuffer && !this.previousRenderPositionStorageBuffer.destroyed) {
+      this.previousRenderPositionStorageBuffer.destroy()
+    }
+    this.previousRenderPositionStorageBuffer = undefined
+    this.positionStorageBufferTextureSize = 0
+    this.visiblePointCapacity = 0
+    this.isCulledPointDrawPrepared = false
+    this.hybridAnchorCapacity = 0
+    this.tileColumns = 0
+    this.tileRows = 0
+    this.tileCount = 0
     if (this.updatePositionVertexCoordBuffer && !this.updatePositionVertexCoordBuffer.destroyed) {
       this.updatePositionVertexCoordBuffer.destroy()
     }
@@ -2437,6 +3264,10 @@ export class Points extends CoreModule {
       this.trackPointsVertexCoordBuffer.destroy()
     }
     this.trackPointsVertexCoordBuffer = undefined
+    if (this.drawQuadVertexBuffer && !this.drawQuadVertexBuffer.destroyed) {
+      this.drawQuadVertexBuffer.destroy()
+    }
+    this.drawQuadVertexBuffer = undefined
   }
 
   /**
@@ -2453,16 +3284,17 @@ export class Points extends CoreModule {
    * sidesteps the alignment requirement entirely — one thread per point,
    * textureLoad + storage write, no padding involved. ~0.1 ms at n=1M.
    */
-  public syncPositionStorageBuffer (): void {
-    if (!this.device || this.device.info?.type !== 'webgpu') return
-    if (!this.currentPositionTexture || this.currentPositionTexture.destroyed) return
-    if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return
+  public syncPositionStorageBuffer (force = false): boolean {
+    if (!this.device || this.device.info?.type !== 'webgpu') return false
+    if (!force && !this.isPositionStorageBufferDirty) return false
+    if (!this.currentPositionTexture || this.currentPositionTexture.destroyed) return false
+    if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return false
     const size = this.positionStorageBufferTextureSize
-    if (size === 0) return
+    if (size === 0) return false
     const pointCount = this.data.pointsNumber ?? 0
-    if (pointCount === 0) return
+    if (pointCount === 0) return false
     this.initSyncPositionPipeline()
-    if (!this.syncPositionPipeline || !this.syncPositionUniformStore || !this.syncPositionUniformBuffer) return
+    if (!this.syncPositionPipeline || !this.syncPositionUniformStore || !this.syncPositionUniformBuffer) return false
     this.syncPositionUniformStore.setUniforms({
       syncPositionUniforms: { pointCount, textureSize: size },
     })
@@ -2475,6 +3307,24 @@ export class Points extends CoreModule {
     pass.setPipeline(this.syncPositionPipeline)
     pass.dispatch(Math.ceil(pointCount / 64), 1, 1)
     pass.end()
+    this.isPositionStorageBufferDirty = false
+    return true
+  }
+
+  public setRenderPositionInterpolation (value: number): void {
+    this.renderPositionMix = Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 1
+  }
+
+  public captureRenderPreviousPositions (): boolean {
+    if (!this.device || this.device.info?.type !== 'webgpu') return false
+    if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return false
+    if (!this.previousRenderPositionStorageBuffer || this.previousRenderPositionStorageBuffer.destroyed) return false
+    const source = (this.positionStorageBuffer as unknown as WebGpuBufferAccess).handle
+    const destination = (this.previousRenderPositionStorageBuffer as unknown as WebGpuBufferAccess).handle
+    const encoder = (this.device as unknown as { commandEncoder?: { handle?: GPUCommandEncoder } }).commandEncoder?.handle
+    if (!source || !destination || !encoder) return false
+    encoder.copyBufferToBuffer(source, 0, destination, 0, this.positionStorageBuffer.byteLength)
+    return true
   }
 
   /**
@@ -2499,10 +3349,11 @@ export class Points extends CoreModule {
     if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return new Float32Array(0)
     const size = this.positionStorageBufferTextureSize
     if (size === 0) return new Float32Array(0)
-    // Flush any pending GPU work first so the storage buffer reflects the
-    // latest sim state. The frame loop calls syncPositionStorageBuffer
-    // every render tick; offline callers (graph.step() in a tight loop)
-    // should call graph.render() before readback to refresh the buffer.
+    // Ensure the storage buffer reflects the latest currentPositionTexture
+    // before the async map. The WebGPU integration and drag paths write the
+    // storage buffer directly; the sync pass is now only a fallback for any
+    // legacy texture-only position mutation.
+    if (this.isPositionStorageBufferDirty) this.syncPositionStorageBuffer()
     this.device.submit()
     // luma.gl auto-creates a temporary MAP_READ staging buffer, copies the
     // contents over via its own isolated commandEncoder, and unmaps after.
@@ -2538,6 +3389,793 @@ export class Points extends CoreModule {
     this.areClusterCentroidsUpToDate = false
   }
 
+  private getTileImpostorSize (): number {
+    return Math.max(2, Math.round(this.config.impostorTileSize || 7))
+  }
+
+  private getTileImpostorMicroSplats (): number {
+    return Math.max(1, Math.round(this.config.impostorMicroSplats || 6))
+  }
+
+  private getHybridAnchorsPerTile (): number {
+    return Math.max(1, Math.round(this.config.impostorAnchorsPerTile || 5))
+  }
+
+  private ensureTileImpostorBuffers (): void {
+    const ratio = this.effectivePixelRatio
+    const tileSize = this.getTileImpostorSize()
+    const width = Math.max(1, Math.ceil((this.store.screenSize?.[0] ?? 1) * ratio))
+    const height = Math.max(1, Math.ceil((this.store.screenSize?.[1] ?? 1) * ratio))
+    const tileColumns = Math.max(1, Math.ceil(width / tileSize))
+    const tileRows = Math.max(1, Math.ceil(height / tileSize))
+    const tileCount = tileColumns * tileRows
+    if (
+      this.tileAtomicBuffer &&
+      this.tileResolvedBuffer &&
+      !this.tileAtomicBuffer.destroyed &&
+      !this.tileResolvedBuffer.destroyed &&
+      this.tileColumns === tileColumns &&
+      this.tileRows === tileRows &&
+      this.tileCount === tileCount
+    ) {
+      return
+    }
+
+    if (this.tileAtomicBuffer && !this.tileAtomicBuffer.destroyed) {
+      this.tileAtomicBuffer.destroy()
+    }
+    if (this.tileResolvedBuffer && !this.tileResolvedBuffer.destroyed) {
+      this.tileResolvedBuffer.destroy()
+    }
+
+    this.tileColumns = tileColumns
+    this.tileRows = tileRows
+    this.tileCount = tileCount
+    this.tileAtomicBuffer = this.device.createBuffer({
+      byteLength: tileCount * 9 * Uint32Array.BYTES_PER_ELEMENT,
+      usage: Buffer.STORAGE | Buffer.COPY_DST,
+    })
+    this.tileResolvedBuffer = this.device.createBuffer({
+      byteLength: tileCount * 3 * 4 * Float32Array.BYTES_PER_ELEMENT,
+      usage: Buffer.STORAGE | Buffer.COPY_DST,
+    })
+  }
+
+  private ensureHybridAnchorBuffers (): void {
+    if (this.tileCount === 0) return
+    const anchorsPerTile = this.getHybridAnchorsPerTile()
+    const capacity = this.tileCount * anchorsPerTile
+    if (
+      this.hybridAnchorCountBuffer &&
+      this.hybridAnchorPositionBuffer &&
+      this.hybridAnchorColorBuffer &&
+      !this.hybridAnchorCountBuffer.destroyed &&
+      !this.hybridAnchorPositionBuffer.destroyed &&
+      !this.hybridAnchorColorBuffer.destroyed &&
+      this.hybridAnchorCapacity === capacity
+    ) {
+      return
+    }
+
+    if (this.hybridAnchorCountBuffer && !this.hybridAnchorCountBuffer.destroyed) {
+      this.hybridAnchorCountBuffer.destroy()
+    }
+    if (this.hybridAnchorPositionBuffer && !this.hybridAnchorPositionBuffer.destroyed) {
+      this.hybridAnchorPositionBuffer.destroy()
+    }
+    if (this.hybridAnchorColorBuffer && !this.hybridAnchorColorBuffer.destroyed) {
+      this.hybridAnchorColorBuffer.destroy()
+    }
+
+    this.hybridAnchorCapacity = capacity
+    this.hybridAnchorCountBuffer = this.device.createBuffer({
+      byteLength: this.tileCount * Uint32Array.BYTES_PER_ELEMENT,
+      usage: Buffer.STORAGE | Buffer.COPY_DST,
+    })
+    this.hybridAnchorPositionBuffer = this.device.createBuffer({
+      byteLength: capacity * 4 * Float32Array.BYTES_PER_ELEMENT,
+      usage: Buffer.STORAGE | Buffer.COPY_DST,
+    })
+    this.hybridAnchorColorBuffer = this.device.createBuffer({
+      byteLength: capacity * 4 * Float32Array.BYTES_PER_ELEMENT,
+      usage: Buffer.STORAGE | Buffer.COPY_DST,
+    })
+  }
+
+  private ensureVisiblePointBuffers (pointCount: number): void {
+    if (
+      this.visiblePointIndexBuffer &&
+      this.visiblePointIndirectBuffer &&
+      !this.visiblePointIndexBuffer.destroyed &&
+      !this.visiblePointIndirectBuffer.destroyed &&
+      this.visiblePointCapacity >= pointCount
+    ) {
+      return
+    }
+    if (this.visiblePointIndexBuffer && !this.visiblePointIndexBuffer.destroyed) {
+      this.visiblePointIndexBuffer.destroy()
+    }
+    if (this.visiblePointIndirectBuffer && !this.visiblePointIndirectBuffer.destroyed) {
+      this.visiblePointIndirectBuffer.destroy()
+    }
+    this.visiblePointCapacity = pointCount
+    this.visiblePointIndexBuffer = this.device.createBuffer({
+      byteLength: pointCount * Uint32Array.BYTES_PER_ELEMENT,
+      usage: Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC,
+    })
+    this.visiblePointIndirectBuffer = this.device.createBuffer({
+      data: new Uint32Array([4, 0, 0, 0]),
+      usage: Buffer.STORAGE | Buffer.INDIRECT | Buffer.COPY_DST | Buffer.COPY_SRC,
+    })
+  }
+
+  public updateActivePointMask (): void {
+    const pointCount = this.data.pointsNumber ?? 0
+    if (this.device.info?.type !== 'webgpu' || pointCount === 0) return
+    const expectedBytes = pointCount * Uint32Array.BYTES_PER_ELEMENT
+    if (!this.activePointMaskBuffer || this.activePointMaskBuffer.destroyed || this.activePointMaskCapacity < pointCount) {
+      if (this.activePointMaskBuffer && !this.activePointMaskBuffer.destroyed) {
+        this.activePointMaskBuffer.destroy()
+      }
+      this.activePointMaskBuffer = this.device.createBuffer({
+        byteLength: expectedBytes,
+        usage: Buffer.STORAGE | Buffer.COPY_DST,
+      })
+      this.activePointMaskCapacity = pointCount
+    }
+    const mask = new Uint32Array(pointCount)
+    const activePointIndices = this.config.activePointIndices
+    if (activePointIndices === undefined) {
+      mask.fill(1)
+    } else {
+      for (const index of activePointIndices) {
+        if (index >= 0 && index < pointCount) mask[index] = 1
+      }
+    }
+    this.activePointMaskBuffer.write(mask)
+  }
+
+  private drawCulledPointsIndirect (renderPass: RenderPass): boolean {
+    if (!this.drawUniformStore) return false
+    if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return false
+    if (!this.previousRenderPositionStorageBuffer || this.previousRenderPositionStorageBuffer.destroyed) return false
+    if (!this.pointStatusStorageBuffer || this.pointStatusStorageBuffer.destroyed) return false
+    if (!this.colorBuffer || this.colorBuffer.destroyed) return false
+    if (!this.sizeBuffer || this.sizeBuffer.destroyed) return false
+    if (!this.visiblePointIndexBuffer || this.visiblePointIndexBuffer.destroyed) return false
+    if (!this.visiblePointIndirectBuffer || this.visiblePointIndirectBuffer.destroyed) return false
+    this.initCulledPointDrawCommand()
+    if (!this.drawCulledCommand) return false
+
+    this.drawCulledCommand.setBindings({
+      drawVertexUniforms: this.drawUniformStore.getManagedUniformBuffer(this.device, 'drawVertexUniforms'),
+      drawFragmentUniforms: this.drawUniformStore.getManagedUniformBuffer(this.device, 'drawFragmentUniforms'),
+      positions: this.positionStorageBuffer,
+      previousPositions: this.previousRenderPositionStorageBuffer,
+      pointStatusBuf: this.pointStatusStorageBuffer,
+      colors: this.colorBuffer,
+      sizes: this.sizeBuffer,
+      visibleIndices: this.visiblePointIndexBuffer,
+    })
+    return this.drawModelIndirect(this.drawCulledCommand, renderPass, this.visiblePointIndirectBuffer)
+  }
+
+  private initVisiblePointCullPipelines (): void {
+    if (this.device.info?.type !== 'webgpu') return
+    this.cullVisiblePointsUniformStore ||= new UniformStore({
+      cullUniforms: {
+        uniformTypes: {
+          ratio: 'f32',
+          transformationMatrix: 'mat4x4<f32>',
+          pointCount: 'u32',
+          spaceSize: 'f32',
+          screenSize: 'vec2<f32>',
+          sizeScale: 'f32',
+          scalePointsOnZoom: 'f32',
+          maxPointSize: 'f32',
+          pointMinPixelSize: 'f32',
+        },
+        defaultUniforms: {
+          ratio: this.effectivePixelRatio,
+          transformationMatrix: this.store.transformationMatrix4x4,
+          pointCount: this.data.pointsNumber ?? 0,
+          spaceSize: this.store.adjustedSpaceSize,
+          screenSize: ensureVec2(this.store.screenSize, [0, 0]),
+          sizeScale: this.config.pointSizeScale,
+          scalePointsOnZoom: this.config.scalePointsOnZoom ? 1 : 0,
+          maxPointSize: this.store.maxPointSize,
+          pointMinPixelSize: this.config.pointMinPixelSize,
+        },
+      },
+    })
+    this.cullVisiblePointsUniformBuffer ||= this.cullVisiblePointsUniformStore.getManagedUniformBuffer(this.device, 'cullUniforms')
+
+    this.clearVisiblePointsShader ||= this.device.createShader({
+      stage: 'compute',
+      source: clearVisiblePointsComputeWgsl(),
+    })
+    this.clearVisiblePointsPipeline ||= this.device.createComputePipeline({
+      shader: this.clearVisiblePointsShader,
+      entryPoint: 'computeMain',
+      shaderLayout: {
+        bindings: [
+          { type: 'storage', name: 'indirectArgs', group: 0, location: 0 },
+        ],
+      },
+    })
+
+    this.cullVisiblePointsShader ||= this.device.createShader({
+      stage: 'compute',
+      source: cullVisiblePointsComputeWgsl(),
+    })
+    this.cullVisiblePointsPipeline ||= this.device.createComputePipeline({
+      shader: this.cullVisiblePointsShader,
+      entryPoint: 'computeMain',
+      shaderLayout: {
+        bindings: [
+          { type: 'uniform', name: 'cullUniforms', group: 0, location: 0 },
+          { type: 'storage', name: 'positions', group: 0, location: 1 },
+          { type: 'storage', name: 'sizes', group: 0, location: 2 },
+          { type: 'storage', name: 'visibleIndices', group: 0, location: 3 },
+          { type: 'storage', name: 'indirectArgs', group: 0, location: 4 },
+          { type: 'storage', name: 'activeMask', group: 0, location: 5 },
+        ],
+      },
+    })
+  }
+
+  private initCulledPointDrawCommand (): void {
+    if (this.device.info?.type !== 'webgpu') return
+    if (!this.drawUniformStore) return
+    this.drawQuadVertexBuffer ||= this.device.createBuffer({
+      data: new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+    })
+    this.drawCulledCommand ||= new Model(this.device, {
+      source: drawCulledPointsWgsl,
+      topology: 'triangle-strip',
+      colorAttachmentFormats: ['bgra8unorm'],
+      vertexCount: 4,
+      instanceCount: 0,
+      attributes: {
+        quadCorner: this.drawQuadVertexBuffer,
+      },
+      bufferLayout: [
+        { name: 'quadCorner', format: 'float32x2' },
+      ],
+      defines: {
+        USE_UNIFORM_BUFFERS: true,
+      },
+      bindings: {
+        drawVertexUniforms: this.drawUniformStore.getManagedUniformBuffer(this.device, 'drawVertexUniforms'),
+        drawFragmentUniforms: this.drawUniformStore.getManagedUniformBuffer(this.device, 'drawFragmentUniforms'),
+      },
+      parameters: {
+        blend: true,
+        blendColorOperation: 'add',
+        blendColorSrcFactor: 'one',
+        blendColorDstFactor: 'one-minus-src-alpha',
+        blendAlphaOperation: 'add',
+        blendAlphaSrcFactor: 'one',
+        blendAlphaDstFactor: 'one-minus-src-alpha',
+        depthWriteEnabled: false,
+        sampleCount: this.config.msaa,
+      },
+    })
+  }
+
+  private drawModelIndirect (model: Model, renderPass: RenderPass, indirectBuffer: Buffer): boolean {
+    const modelAccess = model as unknown as IndirectModelAccess
+    const webPass = renderPass as unknown as WebGpuRenderPassAccess
+    const webBuffer = indirectBuffer as unknown as WebGpuBufferAccess
+    if (!webPass.handle || !webBuffer.handle) return false
+    if (modelAccess._areBindingsLoading?.()) return false
+    if (!modelAccess._getBindings || !modelAccess._updatePipeline) return false
+
+    modelAccess.predraw()
+    modelAccess.pipeline = modelAccess._updatePipeline()
+    modelAccess.pipeline.setBindings(modelAccess._getBindings(), { disableWarnings: true })
+    if (!modelAccess.pipeline.handle) return false
+
+    webPass.handle.setPipeline(modelAccess.pipeline.handle)
+    const bindGroup = modelAccess.pipeline._getBindGroup?.()
+    if (bindGroup) webPass.handle.setBindGroup(0, bindGroup)
+    modelAccess.vertexArray.bindBeforeRender(renderPass)
+    webPass.handle.drawIndirect(webBuffer.handle, 0)
+    modelAccess.vertexArray.unbindAfterRender(renderPass)
+    return true
+  }
+
+  private initTileImpostorPipelines (): void {
+    if (this.device.info?.type !== 'webgpu') return
+    this.tileImpostorUniformStore ||= new UniformStore({
+      tileUniforms: {
+        uniformTypes: {
+          ratio: 'f32',
+          transformationMatrix: 'mat4x4<f32>',
+          spaceSize: 'f32',
+          screenSize: 'vec2<f32>',
+          tileSize: 'f32',
+          pointCount: 'u32',
+          tileColumns: 'u32',
+          tileRows: 'u32',
+          colorScale: 'u32',
+          positionScale: 'u32',
+        },
+        defaultUniforms: {
+          ratio: this.effectivePixelRatio,
+          transformationMatrix: this.store.transformationMatrix4x4,
+          spaceSize: this.store.adjustedSpaceSize,
+          screenSize: ensureVec2(this.store.screenSize, [0, 0]),
+          tileSize: this.getTileImpostorSize(),
+          pointCount: this.data.pointsNumber ?? 0,
+          tileColumns: this.tileColumns,
+          tileRows: this.tileRows,
+          colorScale: 1024,
+          positionScale: 1024,
+        },
+      },
+    })
+    this.tileImpostorUniformBuffer ||= this.tileImpostorUniformStore.getManagedUniformBuffer(this.device, 'tileUniforms')
+
+    this.clearTileImpostorShader ||= this.device.createShader({
+      stage: 'compute',
+      source: clearTileImpostorsComputeWgsl(),
+    })
+    this.clearTileImpostorPipeline ||= this.device.createComputePipeline({
+      shader: this.clearTileImpostorShader,
+      entryPoint: 'computeMain',
+      shaderLayout: {
+        bindings: [
+          { type: 'uniform', name: 'tileUniforms', group: 0, location: 0 },
+          { type: 'storage', name: 'atomicTiles', group: 0, location: 1 },
+          { type: 'storage', name: 'resolvedTiles', group: 0, location: 2 },
+        ],
+      },
+    })
+
+    this.binTileImpostorShader ||= this.device.createShader({
+      stage: 'compute',
+      source: binTileImpostorsComputeWgsl(),
+    })
+    this.binTileImpostorPipeline ||= this.device.createComputePipeline({
+      shader: this.binTileImpostorShader,
+      entryPoint: 'computeMain',
+      shaderLayout: {
+        bindings: [
+          { type: 'uniform', name: 'tileUniforms', group: 0, location: 0 },
+          { type: 'storage', name: 'positions', group: 0, location: 1 },
+          { type: 'storage', name: 'colors', group: 0, location: 2 },
+          { type: 'storage', name: 'atomicTiles', group: 0, location: 3 },
+        ],
+      },
+    })
+
+    this.resolveTileImpostorShader ||= this.device.createShader({
+      stage: 'compute',
+      source: resolveTileImpostorsComputeWgsl(),
+    })
+    this.resolveTileImpostorPipeline ||= this.device.createComputePipeline({
+      shader: this.resolveTileImpostorShader,
+      entryPoint: 'computeMain',
+      shaderLayout: {
+        bindings: [
+          { type: 'uniform', name: 'tileUniforms', group: 0, location: 0 },
+          { type: 'storage', name: 'atomicTiles', group: 0, location: 1 },
+          { type: 'storage', name: 'resolvedTiles', group: 0, location: 2 },
+        ],
+      },
+    })
+  }
+
+  private initHybridAnchorBuildPipelines (): void {
+    if (this.device.info?.type !== 'webgpu') return
+    this.hybridAnchorBuildUniformStore ||= new UniformStore({
+      hybridAnchorBuildUniforms: {
+        uniformTypes: {
+          ratio: 'f32',
+          transformationMatrix: 'mat4x4<f32>',
+          spaceSize: 'f32',
+          screenSize: 'vec2<f32>',
+          tileSize: 'f32',
+          pointCount: 'u32',
+          tileColumns: 'u32',
+          tileRows: 'u32',
+          anchorsPerTile: 'u32',
+          denseSampleRate: 'f32',
+          sparseTileThreshold: 'f32',
+        },
+        defaultUniforms: {
+          ratio: this.effectivePixelRatio,
+          transformationMatrix: this.store.transformationMatrix4x4,
+          spaceSize: this.store.adjustedSpaceSize,
+          screenSize: ensureVec2(this.store.screenSize, [0, 0]),
+          tileSize: this.getTileImpostorSize(),
+          pointCount: this.data.pointsNumber ?? 0,
+          tileColumns: this.tileColumns,
+          tileRows: this.tileRows,
+          anchorsPerTile: this.getHybridAnchorsPerTile(),
+          denseSampleRate: this.config.impostorExactOverlaySampleRate,
+          sparseTileThreshold: this.config.impostorSparseTileThreshold,
+        },
+      },
+    })
+    this.hybridAnchorBuildUniformBuffer ||= this.hybridAnchorBuildUniformStore.getManagedUniformBuffer(this.device, 'hybridAnchorBuildUniforms')
+
+    this.clearHybridAnchorShader ||= this.device.createShader({
+      stage: 'compute',
+      source: clearHybridAnchorsComputeWgsl(),
+    })
+    this.clearHybridAnchorPipeline ||= this.device.createComputePipeline({
+      shader: this.clearHybridAnchorShader,
+      entryPoint: 'computeMain',
+      shaderLayout: {
+        bindings: [
+          { type: 'uniform', name: 'anchorUniforms', group: 0, location: 0 },
+          { type: 'storage', name: 'anchorCounts', group: 0, location: 1 },
+          { type: 'storage', name: 'anchorPositions', group: 0, location: 2 },
+          { type: 'storage', name: 'anchorColors', group: 0, location: 3 },
+        ],
+      },
+    })
+
+    this.fillHybridAnchorShader ||= this.device.createShader({
+      stage: 'compute',
+      source: fillHybridAnchorsComputeWgsl(),
+    })
+    this.fillHybridAnchorPipeline ||= this.device.createComputePipeline({
+      shader: this.fillHybridAnchorShader,
+      entryPoint: 'computeMain',
+      shaderLayout: {
+        bindings: [
+          { type: 'uniform', name: 'anchorUniforms', group: 0, location: 0 },
+          { type: 'storage', name: 'positions', group: 0, location: 1 },
+          { type: 'storage', name: 'colors', group: 0, location: 2 },
+          { type: 'storage', name: 'sizes', group: 0, location: 3 },
+          { type: 'storage', name: 'resolvedTiles', group: 0, location: 4 },
+          { type: 'storage', name: 'anchorCounts', group: 0, location: 5 },
+          { type: 'storage', name: 'anchorPositions', group: 0, location: 6 },
+          { type: 'storage', name: 'anchorColors', group: 0, location: 7 },
+        ],
+      },
+    })
+  }
+
+  private initTileImpostorRenderCommand (): void {
+    if (this.device.info?.type !== 'webgpu') return
+    this.drawQuadVertexBuffer ||= this.device.createBuffer({
+      data: new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+    })
+    this.tileRenderUniformStore ||= new UniformStore({
+      tileRenderUniforms: {
+        uniformTypes: {
+          screenSize: 'vec2<f32>',
+          ratio: 'f32',
+          tileColumns: 'u32',
+          tileRows: 'u32',
+          tileSize: 'f32',
+          opacity: 'f32',
+          strength: 'f32',
+          microSplats: 'u32',
+          sparseTileThreshold: 'f32',
+        },
+        defaultUniforms: {
+          screenSize: ensureVec2(this.store.screenSize, [0, 0]),
+          ratio: this.effectivePixelRatio,
+          tileColumns: this.tileColumns,
+          tileRows: this.tileRows,
+          tileSize: this.getTileImpostorSize(),
+          opacity: this.config.impostorTileOpacity,
+          strength: this.config.impostorCompositeStrength,
+          microSplats: this.getTileImpostorMicroSplats(),
+          sparseTileThreshold: this.config.impostorSparseTileThreshold,
+        },
+      },
+    })
+    this.tileImpostorCommand ||= new Model(this.device, {
+      source: drawTileImpostorsWgsl,
+      topology: 'triangle-strip',
+      colorAttachmentFormats: ['bgra8unorm'],
+      vertexCount: 4,
+      instanceCount: this.tileCount * this.getTileImpostorMicroSplats(),
+      attributes: {
+        quadCorner: this.drawQuadVertexBuffer,
+      },
+      bufferLayout: [
+        { name: 'quadCorner', format: 'float32x2' },
+      ],
+      defines: {
+        USE_UNIFORM_BUFFERS: true,
+      },
+      bindings: {
+        tileRenderUniforms: this.tileRenderUniformStore.getManagedUniformBuffer(this.device, 'tileRenderUniforms'),
+      },
+      parameters: {
+        blend: true,
+        blendColorOperation: 'add',
+        blendColorSrcFactor: 'one',
+        blendColorDstFactor: 'one-minus-src-alpha',
+        blendAlphaOperation: 'add',
+        blendAlphaSrcFactor: 'one',
+        blendAlphaDstFactor: 'one-minus-src-alpha',
+        depthWriteEnabled: false,
+        sampleCount: this.config.msaa,
+      },
+    })
+  }
+
+  private initCompactedAnchorCommand (): void {
+    if (this.device.info?.type !== 'webgpu') return
+    this.drawQuadVertexBuffer ||= this.device.createBuffer({
+      data: new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+    })
+    this.compactedAnchorUniformStore ||= new UniformStore({
+      compactedAnchorUniforms: {
+        uniformTypes: {
+          screenSize: 'vec2<f32>',
+          ratio: 'f32',
+          pointSizeScale: 'f32',
+          denseOpacity: 'f32',
+          sparseOpacity: 'f32',
+          maxPointSize: 'f32',
+        },
+        defaultUniforms: {
+          screenSize: ensureVec2(this.store.screenSize, [0, 0]),
+          ratio: this.effectivePixelRatio,
+          pointSizeScale: this.config.pointSizeScale * this.config.impostorExactOverlaySizeScale,
+          denseOpacity: this.config.pointOpacity * this.config.impostorExactOverlayOpacity,
+          sparseOpacity: this.config.pointOpacity * this.config.impostorSparseAnchorOpacity,
+          maxPointSize: this.store.maxPointSize,
+        },
+      },
+    })
+    this.compactedAnchorCommand ||= new Model(this.device, {
+      source: drawCompactedAnchorPointsWgsl,
+      topology: 'triangle-strip',
+      colorAttachmentFormats: ['bgra8unorm'],
+      vertexCount: 4,
+      instanceCount: this.hybridAnchorCapacity,
+      attributes: {
+        quadCorner: this.drawQuadVertexBuffer,
+      },
+      bufferLayout: [
+        { name: 'quadCorner', format: 'float32x2' },
+      ],
+      defines: {
+        USE_UNIFORM_BUFFERS: true,
+      },
+      bindings: {
+        compactedAnchorUniforms: this.compactedAnchorUniformStore.getManagedUniformBuffer(this.device, 'compactedAnchorUniforms'),
+      },
+      parameters: {
+        blend: true,
+        blendColorOperation: 'add',
+        blendColorSrcFactor: 'one',
+        blendColorDstFactor: 'one-minus-src-alpha',
+        blendAlphaOperation: 'add',
+        blendAlphaSrcFactor: 'one',
+        blendAlphaDstFactor: 'one-minus-src-alpha',
+        depthWriteEnabled: false,
+        sampleCount: this.config.msaa,
+      },
+    })
+  }
+
+  private initHybridAnchorCommand (): void {
+    if (this.device.info?.type !== 'webgpu') return
+    this.drawQuadVertexBuffer ||= this.device.createBuffer({
+      data: new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+    })
+    this.hybridAnchorUniformStore ||= new UniformStore({
+      hybridAnchorUniforms: {
+        uniformTypes: {
+          ratio: 'f32',
+          transformationMatrix: 'mat4x4<f32>',
+          spaceSize: 'f32',
+          screenSize: 'vec2<f32>',
+          tileSize: 'f32',
+          tileColumns: 'u32',
+          tileRows: 'u32',
+          pointSizeScale: 'f32',
+          denseSampleRate: 'f32',
+          denseOpacity: 'f32',
+          sparseOpacity: 'f32',
+          sparseTileThreshold: 'f32',
+          maxPointSize: 'f32',
+        },
+        defaultUniforms: {
+          ratio: this.effectivePixelRatio,
+          transformationMatrix: this.store.transformationMatrix4x4,
+          spaceSize: this.store.adjustedSpaceSize,
+          screenSize: ensureVec2(this.store.screenSize, [0, 0]),
+          tileSize: this.getTileImpostorSize(),
+          tileColumns: this.tileColumns,
+          tileRows: this.tileRows,
+          pointSizeScale: this.config.pointSizeScale * this.config.impostorExactOverlaySizeScale,
+          denseSampleRate: this.config.impostorExactOverlaySampleRate,
+          denseOpacity: this.config.pointOpacity * this.config.impostorExactOverlayOpacity,
+          sparseOpacity: this.config.pointOpacity * this.config.impostorSparseAnchorOpacity,
+          sparseTileThreshold: this.config.impostorSparseTileThreshold,
+          maxPointSize: this.store.maxPointSize,
+        },
+      },
+    })
+    this.hybridAnchorCommand ||= new Model(this.device, {
+      source: drawHybridAnchorPointsWgsl,
+      topology: 'triangle-strip',
+      colorAttachmentFormats: ['bgra8unorm'],
+      vertexCount: 4,
+      instanceCount: this.data.pointsNumber ?? 0,
+      attributes: {
+        quadCorner: this.drawQuadVertexBuffer,
+      },
+      bufferLayout: [
+        { name: 'quadCorner', format: 'float32x2' },
+      ],
+      defines: {
+        USE_UNIFORM_BUFFERS: true,
+      },
+      bindings: {
+        hybridAnchorUniforms: this.hybridAnchorUniformStore.getManagedUniformBuffer(this.device, 'hybridAnchorUniforms'),
+      },
+      parameters: {
+        blend: true,
+        blendColorOperation: 'add',
+        blendColorSrcFactor: 'one',
+        blendColorDstFactor: 'one-minus-src-alpha',
+        blendAlphaOperation: 'add',
+        blendAlphaSrcFactor: 'one',
+        blendAlphaDstFactor: 'one-minus-src-alpha',
+        depthWriteEnabled: false,
+        sampleCount: this.config.msaa,
+      },
+    })
+  }
+
+  private ensureDensityImpostorTarget (): void {
+    const densityScale = Math.max(1, Math.round(this.config.impostorDensityScale || 4))
+    const ratio = this.effectivePixelRatio
+    const width = Math.max(1, Math.ceil((this.store.screenSize?.[0] ?? 1) * ratio / densityScale))
+    const height = Math.max(1, Math.ceil((this.store.screenSize?.[1] ?? 1) * ratio / densityScale))
+    if (
+      this.densityImpostorTexture &&
+      this.densityImpostorFbo &&
+      !this.densityImpostorTexture.destroyed &&
+      !this.densityImpostorFbo.destroyed &&
+      this.densityImpostorSize?.[0] === width &&
+      this.densityImpostorSize?.[1] === height
+    ) {
+      return
+    }
+
+    if (this.densityImpostorFbo && !this.densityImpostorFbo.destroyed) {
+      this.densityImpostorFbo.destroy()
+    }
+    if (this.densityImpostorTexture && !this.densityImpostorTexture.destroyed) {
+      this.densityImpostorTexture.destroy()
+    }
+
+    this.densityImpostorTexture = this.device.createTexture({
+      width,
+      height,
+      format: 'rgba16float',
+      usage: Texture.RENDER | Texture.SAMPLE,
+    })
+    this.densityImpostorFbo = this.device.createFramebuffer({
+      width,
+      height,
+      colorAttachments: [this.densityImpostorTexture],
+    })
+    this.densityImpostorSize = [width, height]
+  }
+
+  private initDensityImpostorCommands (): void {
+    if (this.device.info?.type !== 'webgpu') return
+    this.drawQuadVertexBuffer ||= this.device.createBuffer({
+      data: new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+    })
+
+    this.densityImpostorUniformStore ||= new UniformStore({
+      densityUniforms: {
+        uniformTypes: {
+          ratio: 'f32',
+          transformationMatrix: 'mat4x4<f32>',
+          spaceSize: 'f32',
+          screenSize: 'vec2<f32>',
+          sizeScale: 'f32',
+          pointOpacity: 'f32',
+          maxPointSize: 'f32',
+          densityPointSizeScale: 'f32',
+        },
+        defaultUniforms: {
+          ratio: this.effectivePixelRatio,
+          transformationMatrix: this.store.transformationMatrix4x4,
+          spaceSize: this.store.adjustedSpaceSize,
+          screenSize: ensureVec2(this.store.screenSize, [0, 0]),
+          sizeScale: this.config.pointSizeScale,
+          pointOpacity: this.config.pointOpacity,
+          maxPointSize: this.store.maxPointSize,
+          densityPointSizeScale: this.config.impostorPointSizeScale,
+        },
+      },
+    })
+    this.densityImpostorCommand ||= new Model(this.device, {
+      source: drawDensityImpostorsWgsl,
+      topology: 'triangle-strip',
+      colorAttachmentFormats: ['rgba16float'],
+      vertexCount: 4,
+      instanceCount: this.data.pointsNumber ?? 0,
+      attributes: {
+        quadCorner: this.drawQuadVertexBuffer,
+        ...(this.sizeBuffer && { size: this.sizeBuffer }),
+        ...(this.colorBuffer && { color: this.colorBuffer }),
+      },
+      bufferLayout: [
+        { name: 'quadCorner', format: 'float32x2' },
+        { name: 'size', format: 'float32', stepMode: 'instance' },
+        { name: 'color', format: 'float32x4', stepMode: 'instance' },
+      ],
+      defines: {
+        USE_UNIFORM_BUFFERS: true,
+      },
+      bindings: {
+        densityUniforms: this.densityImpostorUniformStore.getManagedUniformBuffer(this.device, 'densityUniforms'),
+      },
+      parameters: {
+        blend: true,
+        blendColorOperation: 'add',
+        blendColorSrcFactor: 'one',
+        blendColorDstFactor: 'one',
+        blendAlphaOperation: 'add',
+        blendAlphaSrcFactor: 'one',
+        blendAlphaDstFactor: 'one',
+        depthWriteEnabled: false,
+        sampleCount: 1,
+      },
+    })
+
+    this.densityCompositeUniformStore ||= new UniformStore({
+      compositeUniforms: {
+        uniformTypes: {
+          strength: 'f32',
+          opacity: 'f32',
+        },
+        defaultUniforms: {
+          strength: this.config.impostorCompositeStrength,
+          opacity: this.config.pointOpacity,
+        },
+      },
+    })
+    this.densityCompositeCommand ||= new Model(this.device, {
+      source: compositeDensityImpostorsWgsl,
+      topology: 'triangle-strip',
+      colorAttachmentFormats: ['bgra8unorm'],
+      vertexCount: 4,
+      attributes: {
+        quadCorner: this.drawQuadVertexBuffer,
+      },
+      bufferLayout: [
+        { name: 'quadCorner', format: 'float32x2' },
+      ],
+      defines: {
+        USE_UNIFORM_BUFFERS: true,
+      },
+      bindings: {
+        compositeUniforms: this.densityCompositeUniformStore.getManagedUniformBuffer(this.device, 'compositeUniforms'),
+      },
+      parameters: {
+        blend: true,
+        blendColorOperation: 'add',
+        blendColorSrcFactor: 'one',
+        blendColorDstFactor: 'one-minus-src-alpha',
+        blendAlphaOperation: 'add',
+        blendAlphaSrcFactor: 'one',
+        blendAlphaDstFactor: 'one-minus-src-alpha',
+        depthWriteEnabled: false,
+        sampleCount: this.config.msaa,
+      },
+    })
+  }
+
   private initSyncPositionPipeline (): void {
     if (this.syncPositionPipeline || !this.device || this.device.info?.type !== 'webgpu') return
     this.syncPositionUniformStore ||= new UniformStore({
@@ -2560,6 +4198,140 @@ export class Points extends CoreModule {
       entryPoint: 'computeMain',
       shaderLayout: { bindings },
     })
+  }
+
+  private initUpdatePositionComputePipeline (): void {
+    if (this.updatePositionComputePipeline || !this.device || this.device.info?.type !== 'webgpu') return
+    this.updatePositionComputeUniformStore ||= new UniformStore({
+      updatePositionUniforms: {
+        uniformTypes: {
+          friction: 'f32',
+          spaceSize: 'f32',
+          pointCount: 'u32',
+          textureSize: 'u32',
+        },
+      },
+    })
+    this.updatePositionComputeUniformBuffer ||= this.updatePositionComputeUniformStore.getManagedUniformBuffer(this.device, 'updatePositionUniforms')
+    this.updatePositionComputeShader = this.device.createShader({
+      stage: 'compute',
+      source: updatePositionComputeWgsl(),
+    })
+    const bindings: BindingDeclaration[] = [
+      { type: 'uniform', name: 'updatePositionUniforms', group: 0, location: 0 },
+      { type: 'texture', name: 'previousPositions', group: 0, location: 1 },
+      { type: 'texture', name: 'velocity', group: 0, location: 2 },
+      { type: 'texture', name: 'pinnedStatusTexture', group: 0, location: 3 },
+      { type: 'storage', name: 'positionsOut', group: 0, location: 4 },
+      { type: 'storage', name: 'positionsBuf', group: 0, location: 5 },
+    ]
+    this.updatePositionComputePipeline = this.device.createComputePipeline({
+      shader: this.updatePositionComputeShader,
+      entryPoint: 'computeMain',
+      shaderLayout: { bindings },
+    })
+  }
+
+  private initDragPointComputePipeline (): void {
+    if (this.dragPointComputePipeline || !this.device || this.device.info?.type !== 'webgpu') return
+    this.dragPointComputeUniformStore ||= new UniformStore({
+      dragPointUniforms: {
+        uniformTypes: {
+          mousePos: 'vec2<f32>',
+          index: 'f32',
+          pointCount: 'u32',
+          textureSize: 'u32',
+        },
+      },
+    })
+    this.dragPointComputeUniformBuffer ||= this.dragPointComputeUniformStore.getManagedUniformBuffer(this.device, 'dragPointUniforms')
+    this.dragPointComputeShader = this.device.createShader({
+      stage: 'compute',
+      source: dragPointComputeWgsl(),
+    })
+    const bindings: BindingDeclaration[] = [
+      { type: 'uniform', name: 'dragPointUniforms', group: 0, location: 0 },
+      { type: 'texture', name: 'previousPositions', group: 0, location: 1 },
+      { type: 'storage', name: 'positionsOut', group: 0, location: 2 },
+      { type: 'storage', name: 'positionsBuf', group: 0, location: 3 },
+    ]
+    this.dragPointComputePipeline = this.device.createComputePipeline({
+      shader: this.dragPointComputeShader,
+      entryPoint: 'computeMain',
+      shaderLayout: { bindings },
+    })
+  }
+
+  private updatePositionCompute (): void {
+    if (!this.updatePositionComputePipeline || !this.updatePositionComputeUniformStore || !this.updatePositionComputeUniformBuffer) return
+    if (!this.currentPositionTexture || this.currentPositionTexture.destroyed) return
+    if (!this.previousPositionTexture || this.previousPositionTexture.destroyed) return
+    if (!this.velocityTexture || this.velocityTexture.destroyed) return
+    if (!this.pinnedStatusTexture || this.pinnedStatusTexture.destroyed) return
+    if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return
+    const pointCount = this.data.pointsNumber ?? 0
+    const textureSize = this.store.pointsTextureSize ?? 0
+    if (pointCount === 0 || textureSize === 0) return
+
+    this.updatePositionComputeUniformStore.setUniforms({
+      updatePositionUniforms: {
+        friction: this.config.simulationFriction,
+        spaceSize: this.store.adjustedSpaceSize,
+        pointCount,
+        textureSize,
+      },
+    })
+    this.updatePositionComputePipeline.setBindings({
+      updatePositionUniforms: this.updatePositionComputeUniformBuffer,
+      previousPositions: this.previousPositionTexture,
+      velocity: this.velocityTexture,
+      pinnedStatusTexture: this.pinnedStatusTexture,
+      positionsOut: this.currentPositionTexture,
+      positionsBuf: this.positionStorageBuffer,
+    })
+    const pass = this.device.beginComputePass({ id: 'update-position.buffer-first' })
+    pass.setPipeline(this.updatePositionComputePipeline)
+    pass.dispatch(Math.ceil(pointCount / 64), 1, 1)
+    pass.end()
+
+    this.isPositionsUpToDate = false
+    this.isPositionStorageBufferDirty = false
+  }
+
+  private dragCompute (): void {
+    if (!this.dragPointComputePipeline || !this.dragPointComputeUniformStore || !this.dragPointComputeUniformBuffer) return
+    if (!this.currentPositionTexture || this.currentPositionTexture.destroyed) return
+    if (!this.previousPositionTexture || this.previousPositionTexture.destroyed) return
+    if (!this.positionStorageBuffer || this.positionStorageBuffer.destroyed) return
+    const pointCount = this.data.pointsNumber ?? 0
+    const textureSize = this.store.pointsTextureSize ?? 0
+    if (pointCount === 0 || textureSize === 0) return
+
+    this.dragPointComputeUniformStore.setUniforms({
+      dragPointUniforms: {
+        mousePos: ensureVec2(this.store.mousePosition, [0, 0]),
+        index: this.store.hoveredPoint?.index ?? -1,
+        pointCount,
+        textureSize,
+      },
+    })
+    this.dragPointComputePipeline.setBindings({
+      dragPointUniforms: this.dragPointComputeUniformBuffer,
+      previousPositions: this.previousPositionTexture,
+      positionsOut: this.currentPositionTexture,
+      positionsBuf: this.positionStorageBuffer,
+    })
+    const pass = this.device.beginComputePass({ id: 'drag-point.buffer-first' })
+    pass.setPipeline(this.dragPointComputePipeline)
+    pass.dispatch(Math.ceil(pointCount / 64), 1, 1)
+    pass.end()
+
+    this.isPositionsUpToDate = false
+    this.isPositionStorageBufferDirty = false
+  }
+
+  private getEffectivePointLodStrength (): number {
+    return this.config.renderLodMode === 'exact' ? 0 : this.config.pointLodStrength
   }
 
   private rescaleInitialNodePositions (): void {

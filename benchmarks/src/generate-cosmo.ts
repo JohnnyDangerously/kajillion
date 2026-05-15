@@ -103,6 +103,29 @@ export function generateCosmoLab (opts: CosmoLabOptions): GeneratedGraph {
     }
   }
 
+  // Keep the seeded layout inside the simulation world. The force update clamps
+  // positions to [0, spaceSize]; if initial communities spill outside the world,
+  // the first sim frames flatten them against the boundaries and the demo reads
+  // as a square. Preserve the relative community layout, just shrink it enough
+  // to leave visible breathing room.
+  const marginScale = 0.86
+  let maxOffset = 0
+  for (let i = 0; i < count; i += 1) {
+    maxOffset = Math.max(
+      maxOffset,
+      Math.abs((positions[i * 2] ?? HALF_SPACE) - HALF_SPACE),
+      Math.abs((positions[i * 2 + 1] ?? HALF_SPACE) - HALF_SPACE)
+    )
+  }
+  const maxAllowedOffset = HALF_SPACE * marginScale
+  if (maxOffset > maxAllowedOffset) {
+    const scale = maxAllowedOffset / maxOffset
+    for (let i = 0; i < count; i += 1) {
+      positions[i * 2] = HALF_SPACE + ((positions[i * 2] ?? HALF_SPACE) - HALF_SPACE) * scale
+      positions[i * 2 + 1] = HALF_SPACE + ((positions[i * 2 + 1] ?? HALF_SPACE) - HALF_SPACE) * scale
+    }
+  }
+
   const linkBuf: number[] = []
   const seen = new Set<bigint>()
   const intraEdgeBudget = Math.floor(count * intraDensity)

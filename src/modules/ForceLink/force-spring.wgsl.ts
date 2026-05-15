@@ -68,7 +68,9 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
         // at the link's index) so filtering buys nothing.
         let bundle = textureLoad(linkBundleTexture, vec2<i32>(i32(iCount), i32(jCount)), 0);
         let biasStrength = bundle.b;
-        var randomMinLinkDist = bundle.a * (forceLink.linkDistRandomVariationRange.g - forceLink.linkDistRandomVariationRange.r) + forceLink.linkDistRandomVariationRange.r;
+        var randomMinLinkDist = bundle.a *
+          (forceLink.linkDistRandomVariationRange.g - forceLink.linkDistRandomVariationRange.r) +
+          forceLink.linkDistRandomVariationRange.r;
         randomMinLinkDist = randomMinLinkDist * forceLink.linkDistance;
 
         iCount = iCount + 1.0;

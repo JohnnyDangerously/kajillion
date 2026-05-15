@@ -24,6 +24,20 @@ table of per-pass GPU time.
 | `seed` | 42 | RNG seed for the BA generator and initial positions. |
 | `warmup` | 2000 | Milliseconds to render before measurement starts. |
 | `measure` | 8000 | Milliseconds of measurement window. |
+| `data` | `ba` | Dataset generator: `ba` or `cosmo` for the cosmo-lab community graph. |
+| `useWebGPU` | `false` | Use the WebGPU path when set to `1` or `true`. |
+| `nosim` | `false` | Disable simulation so render cost can be isolated. |
+| `continuousRender` | `false` | Keep rendering after settle; use with `nosim=1` for render-only GPU timings. |
+| `renderLinks` | `true` | Set `0` or `false` for points-only render diagnostics. |
+| `pointDefaultSize` | `2` | Override default point sprite size for render sweeps. |
+| `linkDefaultWidth` | `0.5` | Override default link width for line fill-cost sweeps. |
+| `pointMinPixelSize` | engine default | Override point sub-pixel culling threshold. |
+| `linkMinPixelLength` | engine default | Override link sub-pixel culling threshold. |
+| `pixelRatio` | device DPR | Override canvas pixel ratio. |
+| `adaptiveDpr` | engine default | Set `1`/`true` or `0`/`false` to force adaptive DPR on/off. |
+| `msaa` | `1` | Set `4` for WebGPU 4x MSAA canvas pass. |
+| `frameRateLimit` / `fpsCap` | `0` | Pace the render loop to this FPS. `0` or omitted means native rAF cadence. |
+| `frameRateHeadroomFps` / `fpsHeadroom` | `0` | Optional high-refresh soft cap: target detected display Hz minus this amount when `frameRateLimit=0`. |
 
 Example: <http://localhost:4173/?n=250000&m=3&warmup=3000&measure=10000>
 

@@ -2,6 +2,15 @@ function getRandom (min: number, max: number): number {
   return Math.random() * (max - min) + min
 }
 
+type ProcessedPerformances = {
+  pointPositions: Float32Array;
+  pointColors: Float32Array;
+  pointSizes: Float32Array;
+  pointLabelToIndex: Map<string, number>;
+  pointIndexToLabel: Map<number, string>;
+  links: Float32Array;
+}
+
 export const pointsToShowLabelsFor = [
   'Drury Lane Theatre',
   "King's Theatre",
@@ -18,7 +27,7 @@ export const processPerformances = (performances: {
   theaterCode: string;
   performanceTitle: string;
   theaterName: string;
-}[]): { pointPositions: Float32Array; pointColors: Float32Array; pointSizes: Float32Array; pointLabelToIndex: Map<string, number>; pointIndexToLabel: Map<number, string>; links: Float32Array } => {
+}[]): ProcessedPerformances => {
   const pointLabelToIndex = new Map<string, number>()
   const pointIndexToLabel = new Map<number, string>()
   const pointPositions: number[] = []

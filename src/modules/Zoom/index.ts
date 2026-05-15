@@ -52,6 +52,45 @@ export class Zoom {
   public constructor (store: Store, config: GraphConfigInterface) {
     this.store = store
     this.config = config
+    this.updateScaleExtent()
+  }
+
+  public updateScaleExtent (): void {
+    this.behavior.scaleExtent([this.getMinZoomLevel(), this.getMaxZoomLevel()])
+  }
+
+  public updateTranslateExtent (): void {
+    if (!this.config.constrainCameraToGraph) {
+      this.behavior.translateExtent([
+        [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY],
+        [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY],
+      ])
+      return
+    }
+
+    const [width, height] = this.store.screenSize
+    const spaceSize = this.store.adjustedSpaceSize
+    if (!width || !height || !Number.isFinite(spaceSize) || spaceSize <= 0) return
+
+    const padding = spaceSize * Math.max(0, this.config.cameraBoundsPadding)
+    const minX = (width - spaceSize) / 2 - padding
+    const maxX = (width + spaceSize) / 2 + padding
+    const minY = (height - spaceSize) / 2 - padding
+    const maxY = (height + spaceSize) / 2 + padding
+    this.behavior.translateExtent([
+      [minX, minY],
+      [maxX, maxY],
+    ])
+  }
+
+  public constrainTransform (transform: ZoomTransform): ZoomTransform {
+    const [width, height] = this.store.screenSize
+    if (!width || !height) return transform
+    return this.behavior.constrain()(
+      transform,
+      [[0, 0], [width, height]],
+      this.behavior.translateExtent()
+    )
   }
 
   /**
@@ -163,5 +202,15 @@ export class Zoom {
       size *= Math.min(5.0, Math.max(1.0, k * 0.01))
     }
     return Math.min(size, maxPointSize) / 2
+  }
+
+  private getMinZoomLevel (): number {
+    return Math.max(0.001, Number.isFinite(this.config.minZoomLevel) ? this.config.minZoomLevel : 0.001)
+  }
+
+  private getMaxZoomLevel (): number {
+    const maxZoom = this.config.maxZoomLevel
+    if (maxZoom === Infinity) return Infinity
+    return Math.max(this.getMinZoomLevel(), Number.isFinite(maxZoom) ? maxZoom : Infinity)
   }
 }
