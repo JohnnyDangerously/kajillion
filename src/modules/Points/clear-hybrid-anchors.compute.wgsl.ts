@@ -24,7 +24,7 @@ fn computeMain(@builtin(global_invocation_id) gid: vec3<u32>) {
   let i = gid.x;
   let tileCount = anchorUniforms.tileColumns * anchorUniforms.tileRows;
   let anchorCapacity = tileCount * anchorUniforms.anchorsPerTile;
-  if (i < tileCount) {
+  if (i < anchorCapacity) {
     atomicStore(&anchorCounts[i], 0u);
   }
   if (i < anchorCapacity) {

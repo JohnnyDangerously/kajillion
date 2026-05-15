@@ -3469,7 +3469,7 @@ export class Points extends CoreModule {
 
     this.hybridAnchorCapacity = capacity
     this.hybridAnchorCountBuffer = this.device.createBuffer({
-      byteLength: this.tileCount * Uint32Array.BYTES_PER_ELEMENT,
+      byteLength: capacity * Uint32Array.BYTES_PER_ELEMENT,
       usage: Buffer.STORAGE | Buffer.COPY_DST,
     })
     this.hybridAnchorPositionBuffer = this.device.createBuffer({

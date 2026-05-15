@@ -20,100 +20,102 @@ struct VertexInput {
 struct VertexOutput {
   @builtin(position) position: vec4<f32>,
   @location(0) local: vec2<f32>,
-  @location(1) tileData: vec4<f32>,
-  @location(2) dotAlpha: f32,
+  @location(1) color: vec3<f32>,
+  @location(2) alphaScale: f32,
 };
 
-fn hash01(xIn: u32) -> f32 {
-  var x = xIn + 1u;
-  x = (x ^ (x >> 16u)) * 0x7feb352du;
-  x = (x ^ (x >> 15u)) * 0x846ca68bu;
-  x = x ^ (x >> 16u);
-  return f32(x & 0x00ffffffu) / 16777216.0;
+fn hiddenVertex(input: VertexInput) -> VertexOutput {
+  var output: VertexOutput;
+  output.position = vec4<f32>(2.0, 2.0, 2.0, 1.0);
+  output.local = input.quadCorner;
+  output.color = vec3<f32>(0.0);
+  output.alphaScale = 0.0;
+  return output;
 }
 
-fn sampleUnit(tileIndex: u32, microIndex: u32) -> vec2<f32> {
-  let seed = tileIndex * 747796405u + microIndex * 2891336453u;
-  let a = hash01(seed);
-  let b = hash01(seed ^ 0x9e3779b9u);
-  return vec2<f32>(a, b) * 2.0 - vec2<f32>(1.0);
+fn stableQuarterPixel(pixel: vec2<f32>) -> vec2<f32> {
+  return floor(pixel * 4.0 + vec2<f32>(0.5)) * 0.25;
 }
 
-fn covarianceOffset(sample: vec2<f32>, variance: vec2<f32>, covariance: f32) -> vec2<f32> {
-  let sx = sqrt(clamp(variance.x, 0.002, 0.18));
-  let sy = sqrt(clamp(variance.y, 0.002, 0.18));
-  let shear = clamp(covariance / max(sx * sy, 0.001), -0.70, 0.70);
-  return vec2<f32>(
-    sample.x * sx + sample.y * sy * shear * 0.45,
-    sample.y * sy,
-  );
+fn covarianceAxes(variance: vec2<f32>, covariance: f32) -> mat2x2<f32> {
+  let delta = sqrt(max((variance.x - variance.y) * (variance.x - variance.y) + 4.0 * covariance * covariance, 0.0));
+  let lambdaMajor = max(0.0008, (variance.x + variance.y + delta) * 0.5);
+  var major = vec2<f32>(1.0, 0.0);
+  if (abs(covariance) > 0.0001 || abs(lambdaMajor - variance.x) > 0.0001) {
+    major = normalize(vec2<f32>(covariance, lambdaMajor - variance.x));
+  }
+  let minor = vec2<f32>(-major.y, major.x);
+  return mat2x2<f32>(major, minor);
 }
 
 @vertex
 fn vertexMain(input: VertexInput, @builtin(instance_index) rawInstanceIdx: u32) -> VertexOutput {
-  var output: VertexOutput;
   let microCount = max(tileRender.microSplats, 1u);
   let instanceIdx = rawInstanceIdx / microCount;
   let microIndex = rawInstanceIdx - instanceIdx * microCount;
+  if (microIndex > 0u) {
+    return hiddenVertex(input);
+  }
+
+  let tileCount = tileRender.tileColumns * tileRender.tileRows;
+  if (instanceIdx >= tileCount) {
+    return hiddenVertex(input);
+  }
+
   let data = resolvedTiles[instanceIdx];
   if (data.x <= tileRender.sparseTileThreshold) {
-    output.position = vec4<f32>(2.0, 2.0, 2.0, 1.0);
-    output.local = input.quadCorner;
-    output.tileData = data;
-    output.dotAlpha = 0.0;
-    return output;
+    return hiddenVertex(input);
   }
 
   let columns = tileRender.tileColumns;
   let tileX = instanceIdx % columns;
   let tileY = instanceIdx / columns;
-  let tileMeta = resolvedTiles[instanceIdx + columns * tileRender.tileRows];
-  let tileMoment = resolvedTiles[instanceIdx + columns * tileRender.tileRows * 2u];
-  let centroid = clamp(tileMeta.xy, vec2<f32>(0.08), vec2<f32>(0.92));
-  let framebufferSize = max(tileRender.screenSize * tileRender.ratio, vec2<f32>(1.0));
-  let sample = sampleUnit(instanceIdx, microIndex);
-  let occupancy = clamp(data.x / max(f32(microCount), 1.0), 0.0, 1.0);
-  if (hash01(instanceIdx ^ (microIndex * 2246822519u)) > occupancy && microIndex > 0u) {
-    output.position = vec4<f32>(2.0, 2.0, 2.0, 1.0);
-    output.local = input.quadCorner;
-    output.tileData = data;
-    output.dotAlpha = 0.0;
-    return output;
-  }
+  let tileMeta = resolvedTiles[instanceIdx + tileCount];
+  let tileMoment = resolvedTiles[instanceIdx + tileCount * 2u];
+  let centroid = clamp(tileMeta.xy, vec2<f32>(0.04), vec2<f32>(0.96));
+  let variance = clamp(tileMeta.zw, vec2<f32>(0.0012), vec2<f32>(0.22));
+  let covariance = clamp(tileMoment.x, -0.18, 0.18);
 
-  let distribution = covarianceOffset(sample, tileMeta.zw, tileMoment.x);
-  let sampleLocal = clamp(centroid + distribution * 1.35, vec2<f32>(0.05), vec2<f32>(0.95));
-  let rawPixelCenter = (vec2<f32>(f32(tileX), f32(tileY)) + sampleLocal) * tileRender.tileSize;
-  let pixelCenter = floor(rawPixelCenter * 4.0 + vec2<f32>(0.5)) * 0.25;
-  let center = vec2<f32>(
+  let framebufferSize = max(tileRender.screenSize * tileRender.ratio, vec2<f32>(1.0));
+  let pixelCenter = stableQuarterPixel((vec2<f32>(f32(tileX), f32(tileY)) + centroid) * tileRender.tileSize);
+  let clipCenter = vec2<f32>(
     pixelCenter.x / framebufferSize.x * 2.0 - 1.0,
     1.0 - pixelCenter.y / framebufferSize.y * 2.0,
   );
-  let density = clamp(log2(data.x + 1.0) * 0.18 * tileRender.strength, 0.0, 1.0);
-  let rawRadiusPx = clamp(tileRender.tileSize * mix(0.20, 0.42, density), 1.15, 3.25);
-  let radiusPx = floor(rawRadiusPx * 4.0 + 0.5) * 0.25;
-  let halfExtent = radiusPx / framebufferSize;
-  output.position = vec4<f32>(center + input.quadCorner * halfExtent, 0.0, 1.0);
+
+  let delta = sqrt(max((variance.x - variance.y) * (variance.x - variance.y) + 4.0 * covariance * covariance, 0.0));
+  let lambdaMajor = max(0.0008, (variance.x + variance.y + delta) * 0.5);
+  let lambdaMinor = max(0.0008, (variance.x + variance.y - delta) * 0.5);
+  let density = clamp(log2(data.x + 1.0) * 0.15 * max(tileRender.strength, 0.001), 0.0, 1.0);
+  let massScale = mix(2.05, 3.35, density);
+  let radiusMajorPx = clamp(sqrt(lambdaMajor) * tileRender.tileSize * massScale, 1.15, tileRender.tileSize * 1.55);
+  let radiusMinorPx = clamp(sqrt(lambdaMinor) * tileRender.tileSize * massScale, 0.95, tileRender.tileSize * 1.20);
+  let axes = covarianceAxes(variance, covariance);
+  let pixelOffset = axes[0] * input.quadCorner.x * radiusMajorPx + axes[1] * input.quadCorner.y * radiusMinorPx;
+  let clipOffset = vec2<f32>(
+    pixelOffset.x / framebufferSize.x * 2.0,
+    -pixelOffset.y / framebufferSize.y * 2.0,
+  );
+
+  var output: VertexOutput;
+  output.position = vec4<f32>(clipCenter + clipOffset, 0.0, 1.0);
   output.local = input.quadCorner;
-  output.tileData = data;
-  output.dotAlpha = clamp((0.18 + density * 0.42) * tileRender.opacity, 0.0, 0.62);
+  output.color = data.yzw;
+
+  let opticalDepth = max(0.0, data.x - tileRender.sparseTileThreshold) * tileRender.opacity * max(tileRender.strength, 0.001);
+  output.alphaScale = clamp(1.0 - exp(-opticalDepth * 0.20), 0.0, 0.34);
   return output;
 }
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
-  let count = input.tileData.x;
-  if (count <= tileRender.sparseTileThreshold) {
-    discard;
-  }
-
   let r2 = dot(input.local, input.local);
   if (r2 > 1.0) {
     discard;
   }
-  let core = 1.0 - smoothstep(0.0, 0.58, r2);
-  let edge = 1.0 - smoothstep(0.56, 1.0, r2);
-  let color = input.tileData.yzw;
-  let alpha = clamp((edge * 0.90 + core * 0.10) * input.dotAlpha, 0.0, 0.32);
-  return vec4<f32>(color * alpha, alpha);
+
+  let gaussian = exp(-r2 * 3.2);
+  let edgeFade = 1.0 - smoothstep(0.82, 1.0, r2);
+  let alpha = clamp(gaussian * edgeFade * input.alphaScale, 0.0, 0.30);
+  return vec4<f32>(input.color * alpha, alpha);
 }

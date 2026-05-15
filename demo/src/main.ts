@@ -342,7 +342,6 @@ function buildGraphConfig (cfg: DemoConfig): GraphConfig {
   const useAdditiveLinks = cfg.blend === 'add' && !isLight
   const enableInteractions = isWork
   const useMassConservingLod = cfg.webgpu && cfg.lod && !isWork && cfg.n >= 50000
-  const usePhantomOverview = useMassConservingLod && cfg.n >= 100000
   const c: GraphConfig = {
     spaceSize: DEMO_SPACE_SIZE,
     backgroundColor: useSubnetPalette ? '#ffffff' : isLight ? '#fbfdff' : useEmberPalette ? '#010101' : useIonPalette ? '#02030a' : useSignalPalette || useTokyoPalette || useInsightPalette || useInfluencePalette ? '#020202' : useFintechPalette ? '#0e1f2b' : useTalentPalette ? '#172333' : (isWork ? '#05070b' : '#06090d'),
@@ -429,13 +428,13 @@ function buildGraphConfig (cfg: DemoConfig): GraphConfig {
         : 0.0035
       : useAdditiveLinks ? 0.006 : isLight ? 0.024 : 0.04,
     impostorExactOverlay: true,
-    impostorStableOverlay: usePhantomOverview,
+    impostorStableOverlay: false,
     impostorExactOverlaySampleRate: useMassConservingLod
       ? cfg.n >= 500000
-        ? 0.20
+        ? 0.09
         : cfg.n >= 250000
-          ? 0.26
-          : 0.32
+          ? 0.12
+          : 0.16
       : cfg.density ? 0.38 : 0.34,
     impostorExactOverlayOpacity: useMassConservingLod
       ? isLight
@@ -445,7 +444,7 @@ function buildGraphConfig (cfg: DemoConfig): GraphConfig {
     impostorExactOverlaySizeScale: useMassConservingLod ? 1.02 : 0.86,
     impostorSparseTileThreshold: useMassConservingLod ? 2 : 5,
     impostorSparseAnchorOpacity: useMassConservingLod ? 0.96 : 0.95,
-    impostorAnchorsPerTile: useMassConservingLod ? (cfg.n >= 500000 ? 4 : 6) : cfg.density ? 6 : 5,
+    impostorAnchorsPerTile: useMassConservingLod ? (cfg.n >= 500000 ? 3 : 4) : cfg.density ? 6 : 5,
     impostorPointSizeScale: useMassConservingLod ? 1.16 : 1.0,
     impostorCompositeStrength: useMassConservingLod ? (isLight ? 0.08 : 0.12) : useAdditiveLinks ? 0.24 : isLight ? 0.34 : 0.48,
     impostorAutoMinPoints: isWork ? 1_000_000 : useMassConservingLod ? 50000 : 500000,
@@ -457,11 +456,15 @@ function buildGraphConfig (cfg: DemoConfig): GraphConfig {
     pointLodMinSampleRate: cfg.density ? 0.22 : 0.32,
     pointLodSizeCompensation: 0.46,
     pointLodOpacityCompensation: useAdditiveLinks ? 0.34 : isLight ? 0.38 : 0.62,
-    linkLodStrength: 0,
+    linkLodStrength: useMassConservingLod ? (cfg.lanes ? 0.68 : 0.78) : 0,
     linkLodZoomRange: [0.14, 0.90],
-    linkLodMinSampleRate: isLight ? (cfg.lanes ? 0.18 : 0.14) : cfg.lanes ? 0.30 : 0.20,
-    linkLodWidthCompensation: isLight ? 0.26 : cfg.lanes ? 0.38 : 0.22,
-    linkLodOpacityCompensation: useAdditiveLinks ? 0.25 : isLight ? 0.22 : 0.62,
+    linkLodMinSampleRate: useMassConservingLod
+      ? isLight
+        ? (cfg.lanes ? 0.16 : 0.10)
+        : (cfg.lanes ? 0.22 : 0.14)
+      : isLight ? (cfg.lanes ? 0.18 : 0.14) : cfg.lanes ? 0.30 : 0.20,
+    linkLodWidthCompensation: useMassConservingLod ? (cfg.lanes ? 0.48 : 0.34) : isLight ? 0.26 : cfg.lanes ? 0.38 : 0.22,
+    linkLodOpacityCompensation: useMassConservingLod ? (isLight ? 0.32 : 0.58) : useAdditiveLinks ? 0.25 : isLight ? 0.22 : 0.62,
     useWebGPU: cfg.webgpu,
     pixelRatio: window.devicePixelRatio || 1,
     adaptivePixelRatio: cfg.adaptiveDpr && !isLight ? 1 : false,
