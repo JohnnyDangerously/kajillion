@@ -37,8 +37,8 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> 
   let sparse = anchor.w > 0.0;
   let tileCount = abs(anchor.w);
   let density = clamp(log2(tileCount + 1.0) * 0.13, 0.0, 1.0);
-  let sparseSize = mix(0.92, 1.08, density);
-  let denseSize = mix(0.58, 0.88, density);
+  let sparseSize = mix(0.70, 0.92, density);
+  let denseSize = mix(0.42, 0.62, density);
   let pointSize = max(anchor.z, 1.0);
   let sizePx = min(
     compactedAnchor.maxPointSize * compactedAnchor.ratio,
@@ -70,7 +70,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   }
   let edge = 1.0 - smoothstep(0.38, 1.0, r2);
   let core = 1.0 - smoothstep(0.0, 0.24, r2);
-  let alpha = clamp((edge * 0.88 + core * 0.12) * input.color.a * input.alphaScale, 0.0, 0.86);
+  let alpha = clamp((edge * 0.82 + core * 0.08) * input.color.a * input.alphaScale, 0.0, 0.48);
   let color = input.color.rgb;
   return vec4<f32>(color * alpha, alpha);
 }

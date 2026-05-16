@@ -358,14 +358,14 @@ function buildGraphConfig (cfg: DemoConfig): GraphConfig {
         : cfg.lanes
           ? isLight
             ? useMassConservingLod ? 0.060 : (useAdditiveLinks ? 0.62 : 0.18)
-            : useEmberPalette ? 0.34 : useIonPalette ? 0.40 : useSignalPalette ? 0.58 : useTokyoPalette ? 0.32 : (cfg.blend === 'add' ? 0.46 : 0.72)
+            : useMassConservingLod ? 0.060 : useEmberPalette ? 0.34 : useIonPalette ? 0.40 : useSignalPalette ? 0.58 : useTokyoPalette ? 0.32 : (cfg.blend === 'add' ? 0.46 : 0.72)
           : cfg.density
             ? isLight
               ? useMassConservingLod ? 0.050 : (useAdditiveLinks ? 0.56 : 0.16)
-              : useEmberPalette ? 0.26 : useIonPalette ? 0.32 : useSignalPalette ? 0.46 : useTokyoPalette ? 0.28 : (cfg.blend === 'add' ? 0.42 : 0.62)
+              : useMassConservingLod ? 0.045 : useEmberPalette ? 0.26 : useIonPalette ? 0.32 : useSignalPalette ? 0.46 : useTokyoPalette ? 0.28 : (cfg.blend === 'add' ? 0.42 : 0.62)
             : isLight
               ? useMassConservingLod ? 0.026 : (useAdditiveLinks ? 0.07 : 0.10)
-              : useEmberPalette ? 0.030 : useIonPalette ? 0.040 : useSignalPalette ? 0.64 : useTokyoPalette ? 0.82 : useInsightPalette ? 0.72 : useFintechPalette ? 0.64 : useInfluencePalette ? 0.50 : useTalentPalette ? 0 : (cfg.blend === 'add' ? 0.018 : 0.045)
+              : useMassConservingLod ? 0.024 : useEmberPalette ? 0.030 : useIonPalette ? 0.040 : useSignalPalette ? 0.64 : useTokyoPalette ? 0.82 : useInsightPalette ? 0.72 : useFintechPalette ? 0.64 : useInfluencePalette ? 0.50 : useTalentPalette ? 0 : (cfg.blend === 'add' ? 0.018 : 0.045)
       : 0,
     renderLinks: cfg.renderLinks,
     curvedLinks: isWork ? cfg.lanes : cfg.lanes,
@@ -389,7 +389,7 @@ function buildGraphConfig (cfg: DemoConfig): GraphConfig {
     simulationGravity: isWork ? 0.08 : 0.24,
     enableGpuTimings: true,
     disableIdleFrameSkip: true,
-    linkBlendMode: (isWork || isLight || useGalleryPalette) ? 'normal' : cfg.blend,
+    linkBlendMode: (isWork || isLight || useGalleryPalette || useMassConservingLod) ? 'normal' : cfg.blend,
     hoveredPointCursor: enableInteractions ? 'pointer' : 'default',
     hoveredLinkCursor: enableInteractions ? 'pointer' : 'default',
     renderHoveredPointRing: enableInteractions,
@@ -408,6 +408,7 @@ function buildGraphConfig (cfg: DemoConfig): GraphConfig {
     onPointClick: enableInteractions
       ? (index) => {
         focusWorkPoint(index, true)
+        exploreNodeClickHook?.(index)
       }
       : undefined,
     onLinkClick: enableInteractions
@@ -424,29 +425,29 @@ function buildGraphConfig (cfg: DemoConfig): GraphConfig {
     impostorMicroSplats: useMassConservingLod ? 1 : 1,
     impostorTileOpacity: useMassConservingLod
       ? isLight
-        ? 0.002
-        : 0.0035
+        ? 0.00035
+        : 0.00045
       : useAdditiveLinks ? 0.006 : isLight ? 0.024 : 0.04,
     impostorExactOverlay: true,
     impostorStableOverlay: false,
     impostorExactOverlaySampleRate: useMassConservingLod
       ? cfg.n >= 500000
-        ? 0.09
+        ? 0.045
         : cfg.n >= 250000
-          ? 0.12
-          : 0.16
+          ? 0.060
+          : 0.090
       : cfg.density ? 0.38 : 0.34,
     impostorExactOverlayOpacity: useMassConservingLod
       ? isLight
-        ? 0.88
-        : 0.76
+        ? 0.42
+        : 0.34
       : useAdditiveLinks ? 0.74 : isLight ? 0.58 : 0.82,
-    impostorExactOverlaySizeScale: useMassConservingLod ? 1.02 : 0.86,
+    impostorExactOverlaySizeScale: useMassConservingLod ? 0.72 : 0.86,
     impostorSparseTileThreshold: useMassConservingLod ? 2 : 5,
-    impostorSparseAnchorOpacity: useMassConservingLod ? 0.96 : 0.95,
-    impostorAnchorsPerTile: useMassConservingLod ? (cfg.n >= 500000 ? 3 : 4) : cfg.density ? 6 : 5,
-    impostorPointSizeScale: useMassConservingLod ? 1.16 : 1.0,
-    impostorCompositeStrength: useMassConservingLod ? (isLight ? 0.08 : 0.12) : useAdditiveLinks ? 0.24 : isLight ? 0.34 : 0.48,
+    impostorSparseAnchorOpacity: useMassConservingLod ? 0.50 : 0.95,
+    impostorAnchorsPerTile: useMassConservingLod ? (cfg.n >= 500000 ? 2 : 3) : cfg.density ? 6 : 5,
+    impostorPointSizeScale: useMassConservingLod ? 0.78 : 1.0,
+    impostorCompositeStrength: useMassConservingLod ? (isLight ? 0.018 : 0.025) : useAdditiveLinks ? 0.24 : isLight ? 0.34 : 0.48,
     impostorAutoMinPoints: isWork ? 1_000_000 : useMassConservingLod ? 50000 : 500000,
     impostorAutoMaxZoom: useMassConservingLod ? 0.52 : 0.28,
     linkMinPixelLength: 0,
@@ -460,15 +461,15 @@ function buildGraphConfig (cfg: DemoConfig): GraphConfig {
     linkLodZoomRange: [0.14, 0.90],
     linkLodMinSampleRate: useMassConservingLod
       ? isLight
-        ? (cfg.lanes ? 0.16 : 0.10)
-        : (cfg.lanes ? 0.22 : 0.14)
+        ? (cfg.lanes ? 0.06 : 0.035)
+        : (cfg.lanes ? 0.08 : 0.045)
       : isLight ? (cfg.lanes ? 0.18 : 0.14) : cfg.lanes ? 0.30 : 0.20,
-    linkLodWidthCompensation: useMassConservingLod ? (cfg.lanes ? 0.48 : 0.34) : isLight ? 0.26 : cfg.lanes ? 0.38 : 0.22,
-    linkLodOpacityCompensation: useMassConservingLod ? (isLight ? 0.32 : 0.58) : useAdditiveLinks ? 0.25 : isLight ? 0.22 : 0.62,
+    linkLodWidthCompensation: useMassConservingLod ? (cfg.lanes ? 0.16 : 0.10) : isLight ? 0.26 : cfg.lanes ? 0.38 : 0.22,
+    linkLodOpacityCompensation: useMassConservingLod ? (isLight ? 0.12 : 0.18) : useAdditiveLinks ? 0.25 : isLight ? 0.22 : 0.62,
     useWebGPU: cfg.webgpu,
     pixelRatio: window.devicePixelRatio || 1,
     adaptivePixelRatio: cfg.adaptiveDpr && !isLight ? 1 : false,
-    msaa: cfg.webgpu && cfg.msaa ? 4 : 1,
+    msaa: cfg.webgpu && cfg.msaa && !useMassConservingLod ? 4 : 1,
     frameRateLimit: cfg.frameRateLimit,
     frameRateHeadroomFps: cfg.frameRateHeadroomFps,
     debugFrameTrace: cfg.debugFrameTrace,
@@ -1713,6 +1714,11 @@ let labNodeFilterMask: Uint8Array | null = null
 let labNodeFilterEdgeMode: GraphFrameVisibilityFilter['edgeMode'] = 'inside'
 let labInteractionState: GraphInteractionSummary | null = null
 let currentDataKey = ''
+// Live link-attribute buffers for incremental appendEdges streaming.
+let agentLinkColors: Float32Array | null = null
+let agentLinkWidths: Float32Array | null = null
+// Set by the explore module so node clicks reach it across graph rebuilds.
+const exploreNodeClickHook: ((index: number) => void) | null = null
 hydrateControlsFromUrl()
 syncDependentControls()
 let currentConfig: DemoConfig = readControls()
@@ -2747,6 +2753,7 @@ interface AgentGraphPayload {
 
 type AgentCommand =
   | { type: 'loadGraph'; graph: AgentGraphPayload; options?: { title?: string; graphId?: string; fit?: boolean; workMode?: boolean } }
+  | { type: 'appendEdges'; links: number[] }
   | { type: 'focusNode'; index: number; options?: NodeFocusOptions & { async?: boolean } }
   | { type: 'filterNodes'; pointIndices: number[]; options?: NodeFilterOptions }
   | { type: 'clearInteraction' }
@@ -2865,6 +2872,8 @@ async function installAgentGraph (payload: AgentGraphPayload, options: { title?:
   labelAnchors = buildLabelAnchors(renderData)
   workFocusState = undefined
   const visual = buildVisualAttributes(renderData)
+  agentLinkColors = visual.linkColors
+  agentLinkWidths = visual.linkWidths
   graph.setPointPositions(renderData.positions, true)
   graph.setPointColors(visual.pointColors)
   graph.setPointSizes(visual.pointSizes)
@@ -2882,11 +2891,57 @@ async function installAgentGraph (payload: AgentGraphPayload, options: { title?:
   }
 }
 
+/**
+ * Incrementally appends edges to the live graph without rebuilding it.
+ * Used by the explore module to stream a network's mesh in after the
+ * skeleton (positions + spokes) has already loaded. `pairs` is a flat
+ * array of node-index pairs into the current graph.
+ */
+function appendEdgesToCurrentGraph (pairs: number[]): { edgeCount: number } {
+  const graph = currentGraph
+  const rd = currentRenderData
+  if (!graph || !rd) throw new Error('appendEdges: no active graph')
+  if (pairs.length === 0 || pairs.length % 2 !== 0) {
+    return { edgeCount: rd.edgeCount }
+  }
+  const addedEdges = pairs.length / 2
+  const oldLinks = rd.links
+  const newLinks = new Float32Array(oldLinks.length + pairs.length)
+  newLinks.set(oldLinks, 0)
+  newLinks.set(pairs, oldLinks.length)
+
+  // Faint cool-grey so streamed mesh edges read as background vs. spokes.
+  const faint = [0.46, 0.62, 0.95, 0.16]
+  const oldColors = agentLinkColors ?? new Float32Array(0)
+  const newColors = new Float32Array(oldColors.length + addedEdges * 4)
+  newColors.set(oldColors, 0)
+  for (let i = 0; i < addedEdges; i += 1) {
+    newColors.set(faint, oldColors.length + i * 4)
+  }
+  const oldWidths = agentLinkWidths ?? new Float32Array(0)
+  const newWidths = new Float32Array(oldWidths.length + addedEdges)
+  newWidths.set(oldWidths, 0)
+  newWidths.fill(0.6, oldWidths.length)
+
+  rd.links = newLinks
+  rd.edgeCount = newLinks.length / 2
+  agentLinkColors = newColors
+  agentLinkWidths = newWidths
+
+  graph.setLinks(newLinks)
+  graph.setLinkColors(newColors)
+  graph.setLinkWidths(newWidths)
+  graph.render()
+  return { edgeCount: rd.edgeCount }
+}
+
 async function applyAgentCommand (command: AgentCommand): Promise<unknown> {
   const lab = visualLabControlPlane
   switch (command.type) {
   case 'loadGraph':
     return await installAgentGraph(command.graph, command.options)
+  case 'appendEdges':
+    return appendEdgesToCurrentGraph(command.links)
   case 'focusNode':
     if (!lab) return null
     return command.options?.async === false

@@ -11,6 +11,8 @@ struct TileImpostorUniforms {
   tileRows: u32,
   colorScale: u32,
   positionScale: u32,
+  buildSampleRate: f32,
+  buildSampleWeight: u32,
 };
 
 struct AtomicTile {

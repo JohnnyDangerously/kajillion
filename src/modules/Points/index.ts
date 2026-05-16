@@ -427,6 +427,8 @@ export class Points extends CoreModule {
       tileRows: number;
       colorScale: number;
       positionScale: number;
+      buildSampleRate: number;
+      buildSampleWeight: number;
     };
   }> | undefined
 
@@ -2293,6 +2295,8 @@ export class Points extends CoreModule {
         tileRows: this.tileRows,
         colorScale: 1024,
         positionScale: 1024,
+        buildSampleRate: this.getTileBuildSampleRate(),
+        buildSampleWeight: this.getTileBuildSampleWeight(),
       },
     })
 
@@ -3401,6 +3405,20 @@ export class Points extends CoreModule {
     return Math.max(1, Math.round(this.config.impostorAnchorsPerTile || 5))
   }
 
+  private getTileBuildSampleRate (): number {
+    if (this.config.renderLodMode === 'exact') return 1
+    const scale = Math.abs(this.store.transformationMatrix4x4[0] ?? 1)
+    if (scale <= 0.16) return 0.25
+    if (scale <= 0.24) return 0.33
+    if (scale <= 0.34) return 0.50
+    if (scale <= 0.46) return 0.67
+    return 1
+  }
+
+  private getTileBuildSampleWeight (): number {
+    return Math.max(1, Math.round(1 / this.getTileBuildSampleRate()))
+  }
+
   private ensureTileImpostorBuffers (): void {
     const ratio = this.effectivePixelRatio
     const tileSize = this.getTileImpostorSize()
@@ -3700,6 +3718,8 @@ export class Points extends CoreModule {
           tileRows: 'u32',
           colorScale: 'u32',
           positionScale: 'u32',
+          buildSampleRate: 'f32',
+          buildSampleWeight: 'u32',
         },
         defaultUniforms: {
           ratio: this.effectivePixelRatio,
@@ -3712,6 +3732,8 @@ export class Points extends CoreModule {
           tileRows: this.tileRows,
           colorScale: 1024,
           positionScale: 1024,
+          buildSampleRate: this.getTileBuildSampleRate(),
+          buildSampleWeight: this.getTileBuildSampleWeight(),
         },
       },
     })

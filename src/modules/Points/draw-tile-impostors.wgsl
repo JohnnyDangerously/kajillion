@@ -33,10 +33,6 @@ fn hiddenVertex(input: VertexInput) -> VertexOutput {
   return output;
 }
 
-fn stableQuarterPixel(pixel: vec2<f32>) -> vec2<f32> {
-  return floor(pixel * 4.0 + vec2<f32>(0.5)) * 0.25;
-}
-
 fn covarianceAxes(variance: vec2<f32>, covariance: f32) -> mat2x2<f32> {
   let delta = sqrt(max((variance.x - variance.y) * (variance.x - variance.y) + 4.0 * covariance * covariance, 0.0));
   let lambdaMajor = max(0.0008, (variance.x + variance.y + delta) * 0.5);
@@ -77,7 +73,7 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) rawInstanceIdx: u32) 
   let covariance = clamp(tileMoment.x, -0.18, 0.18);
 
   let framebufferSize = max(tileRender.screenSize * tileRender.ratio, vec2<f32>(1.0));
-  let pixelCenter = stableQuarterPixel((vec2<f32>(f32(tileX), f32(tileY)) + centroid) * tileRender.tileSize);
+  let pixelCenter = (vec2<f32>(f32(tileX), f32(tileY)) + centroid) * tileRender.tileSize;
   let clipCenter = vec2<f32>(
     pixelCenter.x / framebufferSize.x * 2.0 - 1.0,
     1.0 - pixelCenter.y / framebufferSize.y * 2.0,
@@ -87,7 +83,7 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) rawInstanceIdx: u32) 
   let lambdaMajor = max(0.0008, (variance.x + variance.y + delta) * 0.5);
   let lambdaMinor = max(0.0008, (variance.x + variance.y - delta) * 0.5);
   let density = clamp(log2(data.x + 1.0) * 0.15 * max(tileRender.strength, 0.001), 0.0, 1.0);
-  let massScale = mix(2.05, 3.35, density);
+  let massScale = mix(1.55, 2.35, density);
   let radiusMajorPx = clamp(sqrt(lambdaMajor) * tileRender.tileSize * massScale, 1.15, tileRender.tileSize * 1.55);
   let radiusMinorPx = clamp(sqrt(lambdaMinor) * tileRender.tileSize * massScale, 0.95, tileRender.tileSize * 1.20);
   let axes = covarianceAxes(variance, covariance);
@@ -103,7 +99,7 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) rawInstanceIdx: u32) 
   output.color = data.yzw;
 
   let opticalDepth = max(0.0, data.x - tileRender.sparseTileThreshold) * tileRender.opacity * max(tileRender.strength, 0.001);
-  output.alphaScale = clamp(1.0 - exp(-opticalDepth * 0.20), 0.0, 0.34);
+  output.alphaScale = clamp(1.0 - exp(-opticalDepth * 0.10), 0.0, 0.08);
   return output;
 }
 
@@ -116,6 +112,6 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
 
   let gaussian = exp(-r2 * 3.2);
   let edgeFade = 1.0 - smoothstep(0.82, 1.0, r2);
-  let alpha = clamp(gaussian * edgeFade * input.alphaScale, 0.0, 0.30);
+  let alpha = clamp(gaussian * edgeFade * input.alphaScale, 0.0, 0.075);
   return vec4<f32>(input.color * alpha, alpha);
 }
