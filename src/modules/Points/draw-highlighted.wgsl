@@ -48,7 +48,7 @@ fn calculatePointSize(pointSize: f32) -> f32 {
   if (drawHighlighted.scalePointsOnZoom > 0.0) {
     pSize = pointSize * scale;
   } else {
-    pSize = pointSize * min(5.0, max(1.0, scale * 0.01));
+    pSize = pointSize;
   }
   return min(pSize, drawHighlighted.maxPointSize);
 }

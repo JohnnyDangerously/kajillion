@@ -1,0 +1,25 @@
+{
+  "feature": "demo-graph-config",
+  "purpose": "Own demo-only GraphConfig policy derived from controls, palette, scale, and interaction hooks.",
+  "owned_files": [
+    "demo/src/features/graph-config/**",
+    "demo/src/features/demo-lifecycle/demo-space.ts"
+  ],
+  "public_entrypoints": [
+    "demo/src/features/graph-config/build-graph-config.ts",
+    "demo/src/features/demo-lifecycle/demo-space.ts"
+  ],
+  "verify": [
+    "npm run demo:build"
+  ],
+  "invariants": [
+    "This feature does not own graph data generation or render-loop lifecycle.",
+    "Graph interaction callbacks are passed in as explicit hooks.",
+    "Demo-space constants stay importable by generation, labels, replay, and graph-config code."
+  ],
+  "change_protocols": [
+    "When adding a new demo visual knob, update DemoConfig first and then map it here.",
+    "When changing analyst zoom constants, verify work-mode zoom behavior manually.",
+    "Keep callbacks typed in DemoGraphConfigHooks instead of importing demo main state."
+  ]
+}

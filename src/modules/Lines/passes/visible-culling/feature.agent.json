@@ -1,0 +1,24 @@
+{
+  "feature": "lines_visible_culling_pass",
+  "purpose": "Own the WebGPU visible-line culling lifecycle for indirect line drawing.",
+  "owned_files": [
+    "src/modules/Lines/passes/visible-culling/**"
+  ],
+  "public_entrypoints": [
+    "@/graph/modules/Lines/passes/visible-culling/contracts",
+    "@/graph/modules/Lines/passes/visible-culling/visible-line-culling-pass"
+  ],
+  "verify": [
+    "npm run build"
+  ],
+  "invariants": [
+    "Compute binding names and locations mirror CLEAR_VISIBLE_LINE_BINDINGS and CULL_VISIBLE_LINE_BINDINGS.",
+    "Caller-owned line attribute buffers stay outside this pass.",
+    "prepare() returns true only after clear and cull compute passes run for the current frame.",
+    "draw() uses the prepared indirect buffer and does not allocate per frame."
+  ],
+  "change_protocols": [
+    "Changing cull uniforms requires checking cull-visible-lines.compute.wgsl.ts and contracts.ts together.",
+    "Changing indirect draw behavior requires checking luma model access shims in shared/contracts.ts."
+  ]
+}

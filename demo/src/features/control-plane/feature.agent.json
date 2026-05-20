@@ -1,0 +1,26 @@
+{
+  "feature": "demo-control-plane",
+  "purpose": "Own demo-only control parsing, DOM element lookup, and live perf overlay helpers for the Kajillion demo.",
+  "owned_tables": [],
+  "owned_events": [],
+  "public_entrypoints": [
+    "demo/src/features/control-plane/types.ts",
+    "demo/src/features/control-plane/controls.ts",
+    "demo/src/features/control-plane/dom.ts",
+    "demo/src/features/control-plane/perf-overlay.ts"
+  ],
+  "verify": [
+    "npm run demo:build"
+  ],
+  "invariants": [
+    "Feature helpers take explicit inputs instead of importing demo main state.",
+    "Graph lifecycle and hot render-loop behavior remain in demo/src/main.ts.",
+    "DOM IDs are looked up only in dom.ts.",
+    "Perf overlay rendering must preserve the existing 250 ms timer cadence."
+  ],
+  "change_protocols": [
+    "When adding controls, update dom.ts and controls.ts together.",
+    "When changing overlay metrics, keep timing math in perf-overlay.ts and avoid touching graph modules.",
+    "When moving more code out of main.ts, prefer a new small module in this feature with a typed entrypoint."
+  ]
+}

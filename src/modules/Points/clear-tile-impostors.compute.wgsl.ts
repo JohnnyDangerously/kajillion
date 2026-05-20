@@ -31,23 +31,29 @@ struct AtomicTile {
 @group(0) @binding(1) var<storage, read_write> atomicTiles: array<AtomicTile>;
 @group(0) @binding(2) var<storage, read_write> resolvedTiles: array<vec4<f32>>;
 
+const TILE_ATOMIC_LANES: u32 = 4u;
+
 @compute @workgroup_size(64)
 fn computeMain(@builtin(global_invocation_id) gid: vec3<u32>) {
   let i = gid.x;
   let tileCount = tileUniforms.tileColumns * tileUniforms.tileRows;
-  if (i >= tileCount) { return; }
-  atomicStore(&atomicTiles[i].count, 0u);
-  atomicStore(&atomicTiles[i].r, 0u);
-  atomicStore(&atomicTiles[i].g, 0u);
-  atomicStore(&atomicTiles[i].b, 0u);
-  atomicStore(&atomicTiles[i].x, 0u);
-  atomicStore(&atomicTiles[i].y, 0u);
-  atomicStore(&atomicTiles[i].xx, 0u);
-  atomicStore(&atomicTiles[i].yy, 0u);
-  atomicStore(&atomicTiles[i].xy, 0u);
-  resolvedTiles[i] = vec4<f32>(0.0);
-  resolvedTiles[i + tileCount] = vec4<f32>(0.0);
-  resolvedTiles[i + tileCount * 2u] = vec4<f32>(0.0);
+  let atomicCount = tileCount * TILE_ATOMIC_LANES;
+  if (i < atomicCount) {
+    atomicStore(&atomicTiles[i].count, 0u);
+    atomicStore(&atomicTiles[i].r, 0u);
+    atomicStore(&atomicTiles[i].g, 0u);
+    atomicStore(&atomicTiles[i].b, 0u);
+    atomicStore(&atomicTiles[i].x, 0u);
+    atomicStore(&atomicTiles[i].y, 0u);
+    atomicStore(&atomicTiles[i].xx, 0u);
+    atomicStore(&atomicTiles[i].yy, 0u);
+    atomicStore(&atomicTiles[i].xy, 0u);
+  }
+  if (i < tileCount) {
+    resolvedTiles[i] = vec4<f32>(0.0);
+    resolvedTiles[i + tileCount] = vec4<f32>(0.0);
+    resolvedTiles[i + tileCount * 2u] = vec4<f32>(0.0);
+  }
 }
 `
 }

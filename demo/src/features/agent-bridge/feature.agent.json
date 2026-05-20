@@ -1,0 +1,30 @@
+{
+  "feature": "demo-agent-bridge",
+  "purpose": "Own demo-only agent graph payload parsing, append-edge buffer helpers, and command-loop API protocol wiring.",
+  "owned_tables": [],
+  "owned_events": [
+    "agent.commands.poll",
+    "agent.commands.ack"
+  ],
+  "public_entrypoints": [
+    "demo/src/features/agent-bridge/types.ts",
+    "demo/src/features/agent-bridge/graph-payload.ts",
+    "demo/src/features/agent-bridge/append-edges.ts",
+    "demo/src/features/agent-bridge/command-loop.ts",
+    "demo/src/features/agent-bridge/index.ts"
+  ],
+  "verify": [
+    "npm run demo:build"
+  ],
+  "invariants": [
+    "Feature helpers take explicit inputs instead of importing demo main state.",
+    "Graph lifecycle, DOM state, and render calls remain in demo/src/main.ts.",
+    "The command loop preserves the /agent/commands polling and /agent/ack acknowledgement protocol.",
+    "Payload conversion receives demo space sizing from the caller."
+  ],
+  "change_protocols": [
+    "When adding agent commands, update types.ts and the stateful dispatcher in demo/src/main.ts together.",
+    "When changing the polling protocol, keep command-loop.ts configurable for tests and dev-server wiring.",
+    "When moving more code out of main.ts, prefer pure helpers here unless the code needs live graph state."
+  ]
+}

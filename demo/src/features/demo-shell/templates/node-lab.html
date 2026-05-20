@@ -1,0 +1,76 @@
+<button type="button" id="node-lab-tab" aria-controls="node-treatment-lab" aria-expanded="false" title="Open node treatment lab">N</button>
+<div id="node-treatment-lab" aria-label="Node treatment lab">
+  <div class="node-lab-head">
+    <div class="node-lab-title">Node Treatment Lab</div>
+    <button type="button" id="node-lab-close">Close</button>
+  </div>
+  <canvas id="node-lab-canvas" width="1080" height="572"></canvas>
+  <div class="node-lab-toolbar" aria-label="Node lab controls">
+    <label>scene
+      <select id="node-lab-scene">
+        <option value="pair">pair</option>
+        <option value="cluster">cluster</option>
+        <option value="scale">scale row</option>
+      </select>
+    </label>
+    <label>palette
+      <select id="node-lab-palette">
+        <option value="bright">bright</option>
+        <option value="dark">dark</option>
+        <option value="neon">neon</option>
+        <option value="pastel">pastel</option>
+      </select>
+    </label>
+    <label>border
+      <select id="node-lab-border">
+        <option value="black">black</option>
+        <option value="white">white</option>
+        <option value="same-bright">same bright</option>
+        <option value="same-dark">same dark</option>
+        <option value="double">double</option>
+        <option value="none">none</option>
+      </select>
+    </label>
+    <label>lighting
+      <select id="node-lab-lighting">
+        <option value="sphere">sphere</option>
+        <option value="flat">flat</option>
+        <option value="glass">glass</option>
+        <option value="halo">halo</option>
+        <option value="specular">specular</option>
+        <option value="depth">depth lift</option>
+      </select>
+    </label>
+    <label>sharpness
+      <select id="node-lab-sharpness">
+        <option value="sdf">sdf edge</option>
+        <option value="crisp">crisp</option>
+        <option value="soft">soft</option>
+        <option value="ink">ink</option>
+        <option value="sparkle">sparkle</option>
+      </select>
+    </label>
+    <label>zoom <input id="node-lab-zoom" type="range" min="18" max="420" step="1" value="100"/></label>
+  </div>
+  <div class="node-lab-zoom-row" aria-label="Node lab zoom presets">
+    <div class="node-lab-stat"><strong>Zoom</strong><span id="node-lab-zoom-readout">100%</span></div>
+    <button type="button" data-node-lab-zoom="35">35%</button>
+    <button type="button" data-node-lab-zoom="100">100%</button>
+    <button type="button" data-node-lab-zoom="220">220%</button>
+    <button type="button" data-node-lab-zoom="360">360%</button>
+  </div>
+  <div class="node-lab-options" aria-label="Node rendering treatments">
+    <button type="button" class="node-lab-option active" data-treatment="rim">Rim disc</button>
+    <button type="button" class="node-lab-option" data-treatment="halo">Soft halo</button>
+    <button type="button" class="node-lab-option" data-treatment="glass">Glass node</button>
+    <button type="button" class="node-lab-option" data-treatment="ink">Ink border</button>
+    <button type="button" class="node-lab-option" data-treatment="selected">Selected</button>
+    <button type="button" class="node-lab-option" data-treatment="vip">VIP signal</button>
+  </div>
+  <div class="node-lab-stats">
+    <div class="node-lab-stat"><strong>Fill</strong><span id="node-lab-fill">solid + rim</span></div>
+    <div class="node-lab-stat"><strong>Edge</strong><span id="node-lab-edge">curved weighted</span></div>
+    <div class="node-lab-stat"><strong>Cost</strong><span id="node-lab-cost">low</span></div>
+    <div class="node-lab-stat"><strong>Pass</strong><span id="node-lab-pass">canvas preview</span></div>
+  </div>
+</div>

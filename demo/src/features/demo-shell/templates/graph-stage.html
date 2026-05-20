@@ -1,0 +1,74 @@
+<header>
+  <h1>Kajillion · WebGPU graph</h1>
+  <span class="meta">M5 Max · Chrome 148 · n=<code id="meta-n">100000</code></span>
+</header>
+<div id="graph-host">
+  <div id="graph"></div>
+  <div id="cosmic-intro-renderer" hidden aria-hidden="true"></div>
+  <div id="work-regions"></div>
+  <div id="cluster-labels">
+    <div class="cluster-label">Operations</div>
+    <div class="cluster-label">People</div>
+    <div class="cluster-label">Growth</div>
+    <div class="cluster-label">Product</div>
+    <div class="cluster-label">Finance</div>
+    <div class="cluster-label">Research</div>
+    <div class="cluster-label">Customer Success</div>
+  </div>
+  <div id="cosmic-intro" hidden>
+    <div class="cosmic-target" aria-hidden="true"></div>
+    <div class="cosmic-copy">You are here</div>
+    <button type="button" id="cosmic-begin">Begin</button>
+  </div>
+  <div id="focus-panel" aria-live="polite">
+    <div class="focus-title" id="focus-title">Overview</div>
+    <div class="focus-subtitle" id="focus-subtitle">Work graph</div>
+    <div class="focus-metrics">
+      <div class="metric"><span class="k">node</span><span class="v" id="focus-node">—</span></div>
+      <div class="metric"><span class="k">degree</span><span class="v" id="focus-degree">—</span></div>
+      <div class="metric"><span class="k">links</span><span class="v" id="focus-links">—</span></div>
+    </div>
+    <div class="focus-details">
+      <div><span>type</span><strong id="focus-kind">—</strong></div>
+      <div><span>group</span><strong id="focus-group">—</strong></div>
+      <div><span>company</span><strong id="focus-company">—</strong></div>
+      <div><span>strength</span><strong id="focus-strength">—</strong></div>
+    </div>
+    <div class="focus-actions">
+      <button type="button" id="btn-focus-overview">Overview</button>
+      <button type="button" id="btn-focus-neighbors" disabled>Neighbors</button>
+      <button type="button" id="btn-focus-step" disabled>Step in</button>
+    </div>
+  </div>
+  <div id="overlay">
+    <div class="row big"><span class="k">browser fps</span><span class="v" id="m-wall">—</span></div>
+    <div class="row"><span class="k">render fps</span><span class="v" id="m-render">—</span></div>
+    <div class="row"><span class="k">gpu budget</span><span class="v" id="m-budget">—</span></div>
+    <div class="row"><span class="k">display hz</span><span class="v" id="m-display">—</span></div>
+    <div class="row"><span class="k">target fps</span><span class="v" id="m-target">—</span></div>
+    <div class="row"><span class="k">frame skip</span><span class="v" id="m-skip">—</span></div>
+    <div class="row"><span class="k">frame cap</span><span class="v" id="m-cap">native</span></div>
+    <div class="row"><span class="k">zoom distance</span><span class="v" id="m-zoom-distance">—</span></div>
+    <div class="row"><span class="k">render policy</span><span class="v" id="m-render-policy">—</span></div>
+    <div class="row"><span class="k">policy density</span><span class="v" id="m-policy-density">—</span></div>
+    <div class="row"><span class="k">policy reason</span><span class="v" id="m-policy-reason">—</span></div>
+    <hr/>
+    <div class="row"><span class="k">force.quadtree.build</span><span class="v" id="m-quad">—</span></div>
+    <div class="row"><span class="k">force.repulsion</span><span class="v" id="m-rep">—</span></div>
+    <div class="row"><span class="k">force.link.in/out</span><span class="v" id="m-link">—</span></div>
+    <div class="row"><span class="k">force.gravity</span><span class="v" id="m-grav">—</span></div>
+    <div class="row"><span class="k">render.canvas</span><span class="v" id="m-canvas">—</span></div>
+    <div class="row"><span class="k">render.lines.cull</span><span class="v" id="m-lines-cull">—</span></div>
+    <div class="row"><span class="k">render.lines</span><span class="v" id="m-lines">—</span></div>
+    <div class="row"><span class="k">render.points.cull</span><span class="v" id="m-points-cull">—</span></div>
+    <div class="row"><span class="k">points.tile.budget</span><span class="v" id="m-points-tile-budget">—</span></div>
+    <div class="row"><span class="k">render.points</span><span class="v" id="m-points">—</span></div>
+    <div class="row"><span class="k">impostor.tiles.bin</span><span class="v" id="m-impostor-tiles-bin">—</span></div>
+    <div class="row"><span class="k">impostor.tiles.resolve</span><span class="v" id="m-impostor-tiles-resolve">—</span></div>
+    <div class="row"><span class="k">impostor.anchors.fill</span><span class="v" id="m-impostor-anchors-fill">—</span></div>
+    <div class="row"><span class="k">impostor.anchors.materialize</span><span class="v" id="m-impostor-anchors-materialize">—</span></div>
+    <hr/>
+    <div class="row"><span class="k">alpha</span><span class="v" id="m-alpha">—</span></div>
+    <div class="row"><span class="k">DPR</span><span class="v" id="m-dpr">—</span></div>
+  </div>
+</div>

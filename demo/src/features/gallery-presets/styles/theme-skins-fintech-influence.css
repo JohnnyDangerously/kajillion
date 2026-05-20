@@ -1,0 +1,66 @@
+:root[data-palette="fintech"][data-theme="dark"] {
+  --page-bg: #0d1f2b;
+  --graph-bg: #0d1f2b;
+  --graph-field: #0d1f2b;
+  --button-active-bg: rgba(46, 172, 230, 0.18);
+  --button-active-border: #28aee8;
+  --overlay-hot: #28aee8;
+  --label-bg: transparent;
+  --label-fg: rgba(237, 244, 250, 0.92);
+  --label-border: transparent;
+}
+
+:root[data-palette="fintech"][data-theme="dark"] #graph-host::before {
+  content: "Тренды развития сегментов fintech-стартапов и отдельных проектов";
+  position: absolute;
+  left: 44%;
+  top: 22px;
+  z-index: 2;
+  transform: translateX(-50%);
+  color: rgba(246, 247, 250, 0.96);
+  font: 700 19px/1.15 Arial, Helvetica, sans-serif;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+:root[data-palette="fintech"][data-theme="dark"] #graph-host::after {
+  content: "● B2C   ● B2B2C   ● B2B\A - - -  Выход в другой сегмент\A →  Публичная компания";
+  position: absolute;
+  left: 18px;
+  top: 94px;
+  z-index: 2;
+  color: rgba(210, 222, 232, 0.74);
+  white-space: pre-line;
+  font: 10px/1.8 Arial, Helvetica, sans-serif;
+  pointer-events: none;
+}
+
+:root[data-palette="fintech"][data-theme="dark"] #overlay,
+:root[data-palette="fintech"][data-theme="dark"] header {
+  display: none;
+}
+
+:root[data-palette="influence"][data-theme="dark"] {
+  --page-bg: #000000;
+  --graph-bg: #000000;
+  --graph-field:
+    radial-gradient(circle at 50% 50%, rgba(255, 66, 18, 0.050) 0%, transparent 32%),
+    #000000;
+  --button-active-bg: rgba(255, 54, 18, 0.22);
+  --button-active-border: #ff3612;
+  --overlay-hot: #ffcb00;
+  --label-bg: transparent;
+  --label-fg: rgba(248, 248, 245, 0.96);
+  --label-border: transparent;
+}
+
+:root[data-palette="influence"][data-theme="dark"] #overlay,
+:root[data-palette="influence"][data-theme="dark"] header,
+:root[data-palette="influence"][data-theme="dark"] #sidebar {
+  display: none;
+}
+
+:root[data-palette="influence"][data-theme="dark"] #graph-host {
+  inset: 0;
+}

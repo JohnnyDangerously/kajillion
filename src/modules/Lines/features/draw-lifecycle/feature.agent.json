@@ -1,0 +1,22 @@
+{
+  "feature": "lines_draw_lifecycle",
+  "purpose": "Own pure draw/precompute/culling lifecycle helpers for the Lines renderer.",
+  "owned_files": [
+    "src/modules/Lines/features/draw-lifecycle/**"
+  ],
+  "public_entrypoints": [
+    "@/graph/modules/Lines/features/draw-lifecycle/lifecycle"
+  ],
+  "verify": [
+    "npm run build"
+  ],
+  "invariants": [
+    "Helpers are pure or mutate caller-provided scratch buffers only.",
+    "GPU resources, pass ordering, and shader contracts stay outside this feature boundary.",
+    "No per-frame allocation increases."
+  ],
+  "change_protocols": [
+    "When changing LOD or scissor calculations, compare against the previous index.ts behavior.",
+    "When changing active-mask helpers, preserve dirty/signature semantics in the caller."
+  ]
+}

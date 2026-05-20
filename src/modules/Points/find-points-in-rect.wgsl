@@ -44,7 +44,7 @@ fn pointSizeF(size: f32) -> f32 {
   if (findPointsInRect.scalePointsOnZoom > 0.0) {
     pSize = size * findPointsInRect.ratio * scale;
   } else {
-    pSize = size * findPointsInRect.ratio * min(5.0, max(1.0, scale * 0.01));
+    pSize = size * findPointsInRect.ratio;
   }
   return min(pSize, findPointsInRect.maxPointSize * findPointsInRect.ratio);
 }

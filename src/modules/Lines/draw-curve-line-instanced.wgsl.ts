@@ -44,6 +44,7 @@ fn map(value: f32, min1: f32, max1: f32, min2: f32, max2: f32) -> f32 {
 
 struct DrawLineFragmentUniforms {
   renderMode: f32,
+  hasArrowedLinks: f32,
 };
 
 @fragment
@@ -51,7 +52,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   var opacity: f32 = 1.0;
   let color = input.rgbaColor.rgb;
 
-  if (input.useArrow > 0.5) {
+  if (drawLineFragment.hasArrowedLinks > 0.0 && input.useArrow > 0.5) {
     let end_arrow = 0.5 + input.arrowLength / 2.0;
     let start_arrow = end_arrow - input.arrowLength;
     let arrowWidthDelta = input.arrowWidthFactor / 2.0;

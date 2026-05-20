@@ -1,0 +1,24 @@
+{
+  "feature": "lines_precompute_pass",
+  "purpose": "Own the WebGPU line-instance precompute lifecycle for curved line drawing.",
+  "owned_files": [
+    "src/modules/Lines/passes/precompute/**"
+  ],
+  "public_entrypoints": [
+    "@/graph/modules/Lines/passes/precompute/contracts",
+    "@/graph/modules/Lines/passes/precompute/line-instance-pass"
+  ],
+  "verify": [
+    "npm run build"
+  ],
+  "invariants": [
+    "LINE_INSTANCE_BYTE_LENGTH matches the WGSL LineInstance layout.",
+    "Compute binding names and locations mirror PRECOMPUTE_LINE_INSTANCES_BINDINGS.",
+    "The pass reuses caller-owned attribute buffers and does not create CPU-side per-frame copies.",
+    "The render model remains owned by src/modules/Lines/index.ts."
+  ],
+  "change_protocols": [
+    "Changing packed instance layout requires checking draw-curve-line-instanced.wgsl and precompute-line-instances.compute.wgsl.",
+    "Changing compute bindings requires checking contracts.ts and line-instance-pass.ts together."
+  ]
+}

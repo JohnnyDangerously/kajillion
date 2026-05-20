@@ -1,0 +1,28 @@
+{
+  "feature": "lines_passes",
+  "purpose": "Own pass-local contracts, immutable fallbacks, and shader binding layouts for the Lines renderer.",
+  "owned_files": [
+    "src/modules/Lines/passes/**"
+  ],
+  "public_entrypoints": [
+    "@/graph/modules/Lines/passes/draw/contracts",
+    "@/graph/modules/Lines/passes/hover/contracts",
+    "@/graph/modules/Lines/passes/precompute/contracts",
+    "@/graph/modules/Lines/passes/sampling/contracts",
+    "@/graph/modules/Lines/passes/shared/constants",
+    "@/graph/modules/Lines/passes/shared/contracts",
+    "@/graph/modules/Lines/passes/visible-culling/contracts"
+  ],
+  "verify": [
+    "npm run build"
+  ],
+  "invariants": [
+    "WGSL and GLSL resource contract names stay unchanged.",
+    "Shader files remain import-path stable unless deliberately moved with neutral import aliases.",
+    "Pass helpers are constants or type-only contracts and do not add per-frame allocation."
+  ],
+  "change_protocols": [
+    "Changing a uniform payload type requires checking the matching WGSL/GLSL declaration and binding setup.",
+    "Changing a binding layout requires checking the matching shader resource declarations."
+  ]
+}

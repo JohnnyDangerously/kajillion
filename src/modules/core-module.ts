@@ -1,7 +1,7 @@
 import { Device } from '@luma.gl/core'
 import { type GraphConfigInterface } from '@/graph/config'
 import { GraphData } from '@/graph/modules/GraphData'
-import { Points } from '@/graph/modules/Points'
+import type { Points } from '@/graph/modules/Points'
 import { Store } from '@/graph/modules/Store'
 
 export class CoreModule {

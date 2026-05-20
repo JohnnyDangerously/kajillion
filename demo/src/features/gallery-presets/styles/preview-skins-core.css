@@ -1,0 +1,111 @@
+.preset-preview.signal::before {
+  border: 2px solid rgba(245,245,237,0.92);
+  background:
+    linear-gradient(20deg, transparent 0 47%, rgba(244,244,238,0.9) 48% 50%, transparent 51% 100%),
+    linear-gradient(76deg, transparent 0 47%, rgba(244,244,238,0.72) 48% 50%, transparent 51% 100%),
+    linear-gradient(132deg, transparent 0 47%, rgba(244,244,238,0.68) 48% 50%, transparent 51% 100%),
+    radial-gradient(circle, transparent 34%, rgba(244,244,238,0.92) 35% 38%, transparent 39%);
+}
+
+.preset-preview.signal::after {
+  width: 34px;
+  height: 10px;
+  right: 6px;
+  bottom: 7px;
+  border-radius: 1px;
+  background: #ff430c;
+  opacity: 1;
+  filter: none;
+}
+
+.preset-preview.tokyo::before {
+  border: 1px solid rgba(246, 246, 242, 0.82);
+  background:
+    linear-gradient(18deg, transparent 0 48%, rgba(246,246,242,0.78) 49% 50%, transparent 51% 100%),
+    linear-gradient(72deg, transparent 0 49%, rgba(246,246,242,0.58) 50% 51%, transparent 52% 100%),
+    linear-gradient(126deg, transparent 0 49%, rgba(246,246,242,0.46) 50% 51%, transparent 52% 100%),
+    radial-gradient(circle at 50% 50%, transparent 0 34%, rgba(246,246,242,0.78) 35% 36%, transparent 37% 100%);
+}
+
+.preset-preview.tokyo::after {
+  width: 56px;
+  height: 56px;
+  right: -2px;
+  bottom: -8px;
+  border-radius: 50%;
+  background:
+    linear-gradient(38deg, transparent 0 44%, rgba(239,49,43,0.86) 45% 47%, transparent 48% 100%),
+    linear-gradient(112deg, transparent 0 44%, rgba(239,49,43,0.72) 45% 47%, transparent 48% 100%),
+    radial-gradient(circle, transparent 0 36%, rgba(239,49,43,0.82) 37% 39%, transparent 40% 100%);
+  opacity: 1;
+  filter: none;
+}
+
+.preset-preview.subnet {
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(36, 54, 86, 0.16) inset;
+}
+
+.preset-preview.insight {
+  background: #000;
+}
+
+.preset-preview.insight::before {
+  width: 70px;
+  height: 70px;
+  left: 5px;
+  top: 0;
+  border-radius: 50%;
+  filter: none;
+  background:
+    radial-gradient(circle at 35% 67%, #ffbb16 0 5%, transparent 6%),
+    radial-gradient(circle at 72% 31%, #ff69e4 0 5%, transparent 6%),
+    radial-gradient(circle at 50% 50%, #373737 0 4%, transparent 5%),
+    repeating-conic-gradient(from 12deg, rgba(84,84,84,0.58) 0deg 3deg, transparent 3deg 15deg),
+    radial-gradient(circle, transparent 0 28%, rgba(100,100,100,0.46) 29% 30%, transparent 31% 100%);
+}
+
+.preset-preview.insight::after {
+  width: 72px;
+  height: 72px;
+  left: 4px;
+  top: 0;
+  border-radius: 50%;
+  background:
+    linear-gradient(30deg, transparent 0 55%, rgba(255,105,228,0.72) 56% 57%, transparent 58% 100%),
+    linear-gradient(135deg, transparent 0 48%, rgba(255,187,22,0.72) 49% 50%, transparent 51% 100%);
+  opacity: 1;
+  filter: none;
+}
+
+.preset-preview.fintech {
+  background: #0d1f2b;
+}
+
+.preset-preview.fintech::before {
+  width: 76px;
+  height: 50px;
+  left: 2px;
+  top: 10px;
+  border-radius: 0;
+  filter: none;
+  background:
+    radial-gradient(circle at 18% 30%, #ef3b88 0 6%, transparent 7%),
+    radial-gradient(circle at 48% 54%, #2faee8 0 6%, transparent 7%),
+    radial-gradient(circle at 78% 34%, #8c42a5 0 6%, transparent 7%),
+    radial-gradient(circle at 83% 70%, #2faee8 0 5%, transparent 6%),
+    linear-gradient(22deg, transparent 0 30%, rgba(239,59,136,0.72) 31% 32%, transparent 33% 100%),
+    linear-gradient(158deg, transparent 0 40%, rgba(47,174,232,0.70) 41% 42%, transparent 43% 100%),
+    linear-gradient(86deg, transparent 0 49%, rgba(140,66,165,0.72) 50% 51%, transparent 52% 100%);
+}
+
+.preset-preview.fintech::after {
+  width: 72px;
+  height: 8px;
+  left: 4px;
+  top: 5px;
+  border-radius: 0;
+  background: rgba(245, 247, 250, 0.90);
+  opacity: 0.9;
+  filter: none;
+}

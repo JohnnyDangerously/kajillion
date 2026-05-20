@@ -1,0 +1,24 @@
+{
+  "feature": "points_draw_pass_helpers",
+  "purpose": "Own draw lifecycle and setup helpers used by the Points renderer.",
+  "owned_files": [
+    "src/modules/Points/passes/draw/**"
+  ],
+  "public_entrypoints": [
+    "@/graph/modules/Points/passes/draw/contracts",
+    "@/graph/modules/Points/passes/draw/lifecycle",
+    "@/graph/modules/Points/passes/draw/setup"
+  ],
+  "verify": [
+    "npm run build"
+  ],
+  "invariants": [
+    "Draw-specific UniformStore and Model setup helpers may live here; Points keeps resource lifetime and draw ordering.",
+    "Hot-path uniform helpers mutate caller-owned scratch payloads.",
+    "Draw order and resource binding cache ownership stay in src/modules/Points/index.ts."
+  ],
+  "change_protocols": [
+    "Changing a uniform field requires checking the matching shader declaration and Points UniformStore setup.",
+    "Changing draw classification thresholds requires preserving existing direct-vs-culled behavior unless explicitly requested."
+  ]
+}

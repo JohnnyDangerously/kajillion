@@ -55,7 +55,7 @@ float pointSizeF(float size) {
   if (scalePointsOnZoom > 0.0) { 
     pSize = size * ratio * scale;
   } else {
-    pSize = size * ratio * min(5.0, max(1.0, scale * 0.01));
+    pSize = size * ratio;
   }
   return min(pSize, maxPointSize * ratio);
 }
@@ -85,4 +85,3 @@ void main() {
     fragColor.r = 1.0;
   }
 }
-

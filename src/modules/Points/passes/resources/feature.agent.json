@@ -1,0 +1,22 @@
+{
+  "feature": "points_resource_lifecycle",
+  "purpose": "Own concrete resource lifecycle helpers for the Points renderer without hiding pass-local WebGPU contracts.",
+  "owned_files": [
+    "src/modules/Points/passes/resources/**"
+  ],
+  "public_entrypoints": [
+    "@/graph/modules/Points/passes/resources/lifecycle"
+  ],
+  "verify": [
+    "npm run build"
+  ],
+  "invariants": [
+    "Texture formats, usage flags, and shader binding names stay explicit at call sites.",
+    "Buffer reuse remains byte-length based and only recreates missing, destroyed, or resized buffers.",
+    "Helpers do not add draw hot-path allocation or virtual dispatch."
+  ],
+  "change_protocols": [
+    "Changing buffer or texture helper semantics requires checking every call site in src/modules/Points/index.ts.",
+    "Do not add generic cross-module GPU abstractions here."
+  ]
+}

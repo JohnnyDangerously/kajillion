@@ -10,6 +10,7 @@ struct CompactedAnchorUniforms {
 @group(0) @binding(0) var<uniform> compactedAnchor: CompactedAnchorUniforms;
 @group(0) @binding(1) var<storage, read> anchorPositions: array<vec4<f32>>;
 @group(0) @binding(2) var<storage, read> anchorColors: array<vec4<f32>>;
+@group(0) @binding(3) var<storage, read> visibleAnchorIndices: array<u32>;
 
 struct VertexInput {
   @location(0) quadCorner: vec2<f32>,
@@ -25,9 +26,10 @@ struct VertexOutput {
 @vertex
 fn vertexMain(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> VertexOutput {
   var output: VertexOutput;
-  let anchor = anchorPositions[instanceIdx];
+  let anchorIndex = visibleAnchorIndices[instanceIdx];
+  let anchor = anchorPositions[anchorIndex];
   output.local = input.quadCorner;
-  output.color = anchorColors[instanceIdx];
+  output.color = anchorColors[anchorIndex];
   output.alphaScale = 0.0;
   if (anchor.w == 0.0 || abs(anchor.x) > 1.05 || abs(anchor.y) > 1.05) {
     output.position = vec4<f32>(2.0, 2.0, 2.0, 1.0);

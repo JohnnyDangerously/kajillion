@@ -10,3 +10,4 @@ benchmarks/results/
 benchmarks/screenshots/
 demo/replays/
 .claude/
+.agent-map/

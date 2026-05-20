@@ -1,0 +1,24 @@
+{
+  "feature": "graph-runtime-shell",
+  "purpose": "Own small runtime contracts and pure tuning helpers for the public Graph entrypoint.",
+  "owned_files": [
+    "src/graph/**"
+  ],
+  "public_entrypoints": [
+    "@/graph/graph/runtime-contracts",
+    "@/graph/graph/device",
+    "@/graph/graph/picker-grid"
+  ],
+  "verify": [
+    "npm run build"
+  ],
+  "invariants": [
+    "Do not move GPU pass ownership or shader behavior into this shell.",
+    "Public Graph API compatibility remains in src/index.ts.",
+    "Helpers here are pure constants, types, device setup, or stateless data builders."
+  ],
+  "change_protocols": [
+    "Changing exported contracts requires checking src/index.ts re-exports.",
+    "Changing tuning constants requires comparing simulation and camera behavior."
+  ]
+}

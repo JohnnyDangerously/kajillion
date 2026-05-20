@@ -1,0 +1,69 @@
+.preset-preview.subnet::before {
+  width: 80px;
+  height: 64px;
+  left: 0;
+  top: 3px;
+  border-radius: 0;
+  filter: none;
+  background:
+    radial-gradient(circle at 18% 38%, #8e5cf7 0 5%, transparent 6%),
+    radial-gradient(circle at 35% 36%, #8e5cf7 0 5%, transparent 6%),
+    radial-gradient(circle at 48% 55%, #43d52c 0 6%, transparent 7%),
+    radial-gradient(circle at 68% 50%, #ffe900 0 6%, transparent 7%),
+    radial-gradient(circle at 77% 70%, #ff4b4b 0 5%, transparent 6%),
+    linear-gradient(24deg, transparent 0 18%, #8e5cf7 19% 20%, transparent 21% 100%),
+    linear-gradient(150deg, transparent 0 45%, #28aa12 46% 48%, transparent 49% 100%),
+    linear-gradient(9deg, transparent 0 56%, #ff9900 57% 60%, transparent 61% 100%);
+}
+
+.preset-preview.subnet::after {
+  width: 28px;
+  height: 28px;
+  right: 3px;
+  top: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #78b7ff 0 30%, transparent 32%);
+  opacity: 1;
+  filter: none;
+}
+
+.preset-preview.analyst {
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(22, 32, 45, 0.16) inset;
+}
+
+.preset-preview.analyst::before {
+  width: 82px;
+  height: 64px;
+  left: -1px;
+  top: 3px;
+  border-radius: 0;
+  filter: none;
+  opacity: 0.96;
+  background:
+    linear-gradient(10deg, transparent 0 21%, rgba(10,12,15,0.20) 22% 23%, transparent 24% 100%),
+    linear-gradient(28deg, transparent 0 34%, rgba(10,12,15,0.18) 35% 36%, transparent 37% 100%),
+    linear-gradient(156deg, transparent 0 42%, rgba(10,12,15,0.16) 43% 44%, transparent 45% 100%),
+    linear-gradient(116deg, transparent 0 52%, rgba(24,115,210,0.30) 53% 55%, transparent 56% 100%),
+    radial-gradient(circle at 58% 48%, #2c83d8 0 7%, transparent 8%),
+    radial-gradient(circle at 49% 38%, #8cc6f2 0 7%, transparent 8%),
+    radial-gradient(circle at 72% 56%, #c9e6fb 0 8%, transparent 9%),
+    radial-gradient(circle at 30% 62%, #ffffff 0 5%, rgba(20,24,30,0.62) 6%, transparent 7%),
+    radial-gradient(circle at 78% 24%, #ffffff 0 7%, rgba(20,24,30,0.62) 8%, transparent 9%);
+}
+
+.preset-preview.analyst::after {
+  width: 66px;
+  height: 54px;
+  left: 7px;
+  top: 8px;
+  border-radius: 0;
+  filter: none;
+  opacity: 0.82;
+  background:
+    radial-gradient(circle at 22% 44%, #ffffff 0 4%, rgba(14,16,20,0.72) 5%, transparent 6%),
+    radial-gradient(circle at 42% 58%, #ffffff 0 4%, rgba(14,16,20,0.72) 5%, transparent 6%),
+    radial-gradient(circle at 62% 36%, #92c6ee 0 6%, rgba(14,16,20,0.50) 7%, transparent 8%),
+    radial-gradient(circle at 72% 62%, #ffffff 0 4%, rgba(14,16,20,0.72) 5%, transparent 6%),
+    radial-gradient(circle at 52% 50%, rgba(42,132,220,0.42) 0 34%, transparent 36%);
+}

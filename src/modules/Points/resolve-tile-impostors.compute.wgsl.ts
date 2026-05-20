@@ -31,13 +31,35 @@ struct AtomicTile {
 @group(0) @binding(1) var<storage, read_write> atomicTiles: array<AtomicTile>;
 @group(0) @binding(2) var<storage, read_write> resolvedTiles: array<vec4<f32>>;
 
+const TILE_ATOMIC_LANES: u32 = 4u;
+
 @compute @workgroup_size(64)
 fn computeMain(@builtin(global_invocation_id) gid: vec3<u32>) {
   let i = gid.x;
   let tileCount = tileUniforms.tileColumns * tileUniforms.tileRows;
   if (i >= tileCount) { return; }
 
-  let count = atomicLoad(&atomicTiles[i].count);
+  var count = 0u;
+  var sumR = 0u;
+  var sumG = 0u;
+  var sumB = 0u;
+  var sumX = 0u;
+  var sumY = 0u;
+  var sumXX = 0u;
+  var sumYY = 0u;
+  var sumXY = 0u;
+  for (var lane = 0u; lane < TILE_ATOMIC_LANES; lane = lane + 1u) {
+    let atomicIndex = i * TILE_ATOMIC_LANES + lane;
+    count = count + atomicLoad(&atomicTiles[atomicIndex].count);
+    sumR = sumR + atomicLoad(&atomicTiles[atomicIndex].r);
+    sumG = sumG + atomicLoad(&atomicTiles[atomicIndex].g);
+    sumB = sumB + atomicLoad(&atomicTiles[atomicIndex].b);
+    sumX = sumX + atomicLoad(&atomicTiles[atomicIndex].x);
+    sumY = sumY + atomicLoad(&atomicTiles[atomicIndex].y);
+    sumXX = sumXX + atomicLoad(&atomicTiles[atomicIndex].xx);
+    sumYY = sumYY + atomicLoad(&atomicTiles[atomicIndex].yy);
+    sumXY = sumXY + atomicLoad(&atomicTiles[atomicIndex].xy);
+  }
   if (count == 0u) {
     resolvedTiles[i] = vec4<f32>(0.0);
     resolvedTiles[i + tileCount] = vec4<f32>(0.0);
@@ -45,21 +67,21 @@ fn computeMain(@builtin(global_invocation_id) gid: vec3<u32>) {
     return;
   }
 
-  let denom = f32(count * tileUniforms.colorScale);
-  let positionDenom = f32(count * tileUniforms.positionScale);
+  let denom = f32(count) * f32(tileUniforms.colorScale);
+  let positionDenom = f32(count) * f32(tileUniforms.positionScale);
   let color = vec3<f32>(
-    f32(atomicLoad(&atomicTiles[i].r)) / denom,
-    f32(atomicLoad(&atomicTiles[i].g)) / denom,
-    f32(atomicLoad(&atomicTiles[i].b)) / denom,
+    f32(sumR) / denom,
+    f32(sumG) / denom,
+    f32(sumB) / denom,
   );
   let local = vec2<f32>(
-    f32(atomicLoad(&atomicTiles[i].x)) / positionDenom,
-    f32(atomicLoad(&atomicTiles[i].y)) / positionDenom,
+    f32(sumX) / positionDenom,
+    f32(sumY) / positionDenom,
   );
   let secondMoment = vec3<f32>(
-    f32(atomicLoad(&atomicTiles[i].xx)) / positionDenom,
-    f32(atomicLoad(&atomicTiles[i].yy)) / positionDenom,
-    f32(atomicLoad(&atomicTiles[i].xy)) / positionDenom,
+    f32(sumXX) / positionDenom,
+    f32(sumYY) / positionDenom,
+    f32(sumXY) / positionDenom,
   );
   let variance = max(secondMoment.xy - local * local, vec2<f32>(0.0012));
   let covariance = clamp(secondMoment.z - local.x * local.y, -0.18, 0.18);

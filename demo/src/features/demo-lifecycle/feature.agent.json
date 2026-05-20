@@ -1,0 +1,26 @@
+{
+  "feature": "demo-lifecycle",
+  "purpose": "Own pure demo graph lifecycle helpers and shared work graph metadata contracts.",
+  "owned_tables": [],
+  "owned_events": [],
+  "public_entrypoints": [
+    "demo/src/features/demo-lifecycle/work-graph-types.ts",
+    "demo/src/features/demo-lifecycle/work-graph-generator.ts",
+    "demo/src/features/demo-lifecycle/work-graph-layout.ts",
+    "demo/src/features/demo-lifecycle/render-data.ts"
+  ],
+  "verify": [
+    "npm run demo:build"
+  ],
+  "invariants": [
+    "Feature helpers take explicit inputs instead of importing demo main state.",
+    "Graph construction, render calls, and hot render-loop behavior remain in demo/src/main.ts.",
+    "DOM IDs are not looked up from this feature.",
+    "Work graph metadata should be copied structurally without mutating source data."
+  ],
+  "change_protocols": [
+    "When adding work metadata fields, update work-graph-types.ts and attachWorkMetadata together.",
+    "When changing generated work graph topology, keep construction in work-graph-generator.ts and placement in work-graph-layout.ts.",
+    "When moving lifecycle code out of main.ts, keep Graph instance ownership in main.ts."
+  ]
+}

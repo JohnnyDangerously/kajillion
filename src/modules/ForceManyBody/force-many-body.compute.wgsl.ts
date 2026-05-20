@@ -1,41 +1,18 @@
-// WebGPU compute-shader port of force.repulsion (Barnes-Hut).
-//
-// The fragment-shader version (force-level.wgsl) costs ~6.5-9.5 ms total at
-// n=100k on M5 Max across 14 sequential render passes (one per quadtree
-// level), each writing into the same `velocityFbo` via additive blend. The
-// per-pass cost is dominated by rasterizer / tile-binner setup and the blend
-// pipeline state changes — the per-texel math is trivial.
-//
-// This shader collapses the 14 passes into ONE compute dispatch:
-//   - 1 thread per point, 8×8 workgroup tile, dispatched as ceil(N/8)²
-//   - All MAX_LEVELS quadtree level textures bound simultaneously
-//   - Outer level loop runs in registers; inner 12×4 cell iteration samples
-//     the current level's texture via a `switch`
-//   - Velocity accumulated in a register, written once at end
-//   - Final centermass + random-jitter step folded into the same dispatch
-//
-// MAX_LEVELS is a compile-time constant baked at shader-compile time. We
-// recompile when `levels` changes (handled by destroying the pipeline in
-// create()), same pattern as force-spring's maxLinks template.
-//
-// The host always binds MAX_LEVELS texture slots — for an actual level count
-// < MAX_LEVELS the unused tail slots are bound to a placeholder texture
-// (positionsTexture) and never sampled (loop bound is `force.levels`).
+import {
+  FORCE_MANY_BODY_VELOCITY_HELPERS_WGSL,
+  forceManyBodyLevelBindings,
+  forceManyBodySampleLevelCases
+} from './force-many-body.compute.fragments'
 
 export function forceManyBodyComputeWgsl (maxLevels: number): string {
-  // Generate the level-texture binding declarations.
   // @binding(0) uniforms, @binding(1) positions, @binding(2) randomValues,
   // @binding(3) velocityOut, @binding(4..4+maxLevels-1) levelFbo{0..N-1}.
-  const levelBindings = Array.from({ length: maxLevels }, (_, i) =>
-    `@group(0) @binding(${4 + i}) var levelFbo${i}: texture_2d<f32>;`
-  ).join('\n')
+  const levelBindings = forceManyBodyLevelBindings(maxLevels)
 
   // Switch statement to load from the correct level texture given a dynamic
   // level index. WGSL forbids dynamic indexing of texture bindings, but the
   // switch resolves at compile time once unrolled.
-  const sampleLevelCases = Array.from({ length: maxLevels }, (_, i) =>
-    `    case ${i}u: { return textureLoad(levelFbo${i}, ij, 0); }`
-  ).join('\n')
+  const sampleLevelCases = forceManyBodySampleLevelCases(maxLevels)
 
   return `
 struct ForceUniforms {
@@ -62,53 +39,7 @@ ${sampleLevelCases}
   }
 }
 
-// Per-cell contribution from Barnes-Hut node (matches force-level.wgsl).
-fn calculateAdditionalVelocity(level: u32, ij: vec2<i32>, pp: vec2<f32>) -> vec2<f32> {
-  var add = vec2<f32>(0.0);
-  let centermass = sampleLevelTexture(level, ij);
-  if (centermass.r > 0.0 && centermass.g > 0.0 && centermass.b > 0.0) {
-    let centermassPosition = centermass.rg / centermass.b;
-    let distVector = pp - centermassPosition;
-    var l = dot(distVector, distVector);
-    if (l > 0.0) {
-      let c = force.alpha * force.repulsion * centermass.b;
-      let distanceMin2: f32 = 1.0;
-      if (l < distanceMin2) {
-        l = sqrt(distanceMin2 * l);
-      }
-      let addV = c / sqrt(l);
-      add = addV * normalize(distVector);
-    }
-  }
-  return add;
-}
-
-// Centermass fallback for the deepest level (matches force-centermass.wgsl).
-fn calculateCentermassVelocity(level: u32, levelTextureSizeF: f32, pp: vec2<f32>) -> vec2<f32> {
-  var add = vec2<f32>(0.0);
-  let ij = vec2<i32>(
-    i32(pp.x / force.spaceSize * levelTextureSizeF),
-    i32(pp.y / force.spaceSize * levelTextureSizeF),
-  );
-  let centermass = sampleLevelTexture(level, ij);
-  if (centermass.r > 0.0 && centermass.g > 0.0 && centermass.b > 0.0) {
-    let centermassPosition = centermass.rg / centermass.b;
-    let distVector = pp - centermassPosition;
-    var l = dot(distVector, distVector);
-    if (l > 0.0) {
-      let c = force.alpha * force.repulsion * centermass.b;
-      let distanceMin2: f32 = 1.0;
-      if (l < distanceMin2) {
-        l = sqrt(distanceMin2 * l);
-      }
-      let addV = c / sqrt(l);
-      // normalize(distVector) replaces the legacy atan2+cos/sin reconstruction;
-      // identical output (unit vector along distVector), 6 ALU ops saved.
-      add = addV * normalize(distVector);
-    }
-  }
-  return add;
-}
+${FORCE_MANY_BODY_VELOCITY_HELPERS_WGSL}
 
 // Apple GPU subgroup is 32 threads; (8,4)=32 = exactly 1 subgroup, whereas
 // (8,8)=64 = 2 subgroups per workgroup. Smaller groups reduce divergence

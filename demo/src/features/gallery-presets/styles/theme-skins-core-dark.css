@@ -1,0 +1,80 @@
+:root[data-palette="signal"][data-theme="dark"] {
+  --page-bg: #020202;
+  --graph-bg: #020202;
+  --graph-field:
+    radial-gradient(circle at 50% 48%, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.012) 21%, transparent 38%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.026) 0 1px, transparent 1px 46px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 46px),
+    #020202;
+  --button-active-bg: rgba(255, 70, 18, 0.20);
+  --button-active-border: #ff4a16;
+  --overlay-hot: #ff4a16;
+  --label-bg: #ff430c;
+  --label-fg: #0c0704;
+  --label-border: rgba(255, 104, 52, 0.92);
+}
+
+:root[data-palette="tokyo"][data-theme="dark"] {
+  --page-bg: #000000;
+  --graph-bg: #000000;
+  --graph-field:
+    radial-gradient(circle at 50% 47%, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.012) 25%, transparent 47%),
+    #000000;
+  --button-active-bg: rgba(238, 49, 43, 0.20);
+  --button-active-border: #ef312b;
+  --overlay-hot: #ef312b;
+  --label-bg: transparent;
+  --label-fg: rgba(247, 247, 244, 0.90);
+  --label-border: transparent;
+}
+
+:root[data-palette="insight"][data-theme="dark"] {
+  --page-bg: #000000;
+  --graph-bg: #000000;
+  --graph-field: #000000;
+  --button-active-bg: rgba(28, 134, 214, 0.22);
+  --button-active-border: #1688d9;
+  --overlay-hot: #16a3ff;
+  --label-bg: rgba(0, 0, 0, 0.52);
+  --label-fg: rgba(246, 246, 246, 0.94);
+  --label-border: transparent;
+}
+
+:root[data-palette="insight"][data-theme="dark"] #graph-host::before {
+  content: "This discourse's structure is Diversified. It has a balanced representation of several perspectives.\A\AYou can make it more focused if you develop the ideas around the main keywords — day, negro, dream, freedom — or by identifying the structural gap between the less represented topics below and developing the themes they represent:";
+  position: absolute;
+  left: 48px;
+  top: 48px;
+  z-index: 2;
+  width: 250px;
+  padding: 12px 10px;
+  border-radius: 3px;
+  background: rgba(22, 22, 22, 0.92);
+  color: rgba(230, 230, 230, 0.82);
+  white-space: pre-line;
+  font: 12px/1.38 Arial, Helvetica, sans-serif;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset;
+  pointer-events: none;
+}
+
+:root[data-palette="insight"][data-theme="dark"] #graph-host::after {
+  content: "What is the relation between:\A ■ nation  ■ great  ■ check\A and\A ■ back  ■ mississippi  ■ faith";
+  position: absolute;
+  left: 48px;
+  top: 312px;
+  z-index: 2;
+  width: 250px;
+  padding: 12px 10px;
+  border-radius: 3px;
+  background: rgba(22, 22, 22, 0.92);
+  color: rgba(238, 238, 238, 0.84);
+  white-space: pre-line;
+  font: 12px/1.55 Arial, Helvetica, sans-serif;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset;
+  pointer-events: none;
+}
+
+:root[data-palette="insight"][data-theme="dark"] #overlay,
+:root[data-palette="insight"][data-theme="dark"] header {
+  display: none;
+}

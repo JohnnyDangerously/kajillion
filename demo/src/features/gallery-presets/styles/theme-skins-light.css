@@ -1,0 +1,23 @@
+:root[data-palette="subnet"][data-theme="light"] {
+  --page-bg: #ffffff;
+  --graph-bg: #ffffff;
+  --graph-field: #ffffff;
+  --button-active-bg: #eef4ff;
+  --button-active-border: #2f7df6;
+  --overlay-hot: #275bd6;
+  --label-bg: transparent;
+  --label-fg: rgba(27, 32, 43, 0.82);
+  --label-border: transparent;
+}
+
+:root[data-palette="analyst"][data-theme="light"] {
+  --page-bg: #ffffff;
+  --graph-bg: #ffffff;
+  --graph-field: #ffffff;
+  --button-active-bg: #e9f2ff;
+  --button-active-border: #2375d8;
+  --overlay-hot: #2362c5;
+  --label-bg: rgba(255, 255, 255, 0.58);
+  --label-fg: rgba(23, 31, 42, 0.72);
+  --label-border: rgba(26, 42, 62, 0.10);
+}

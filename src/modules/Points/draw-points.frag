@@ -264,6 +264,22 @@ void main() {
         finalPointAlpha
     );
 
+    if (pointShape == CIRCLE && isOutlined <= 0.0 && imageAtlasUV.x == -1.0) {
+        float bgLuma = dot(backgroundColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+        if (bgLuma > 0.78) {
+            vec2 rimCoord = pointCoord;
+            if (overallSize > shapeSize && shapeSize > 0.0) {
+                rimCoord = pointCoord / (shapeSize / overallSize);
+            }
+            float rim = smoothstep(0.66, 0.98, length(rimCoord)) * finalShapeColor.a;
+            float rimOpacity = rim * 0.34 * finalPointAlpha;
+            fragColor = vec4(
+                mix(fragColor.rgb, vec3(0.06, 0.08, 0.11), rimOpacity),
+                fragColor.a
+            );
+        }
+    }
+
     // Render outline ring around the point
     if (isOutlined > 0.0) {
         float r = length(pointCoord);

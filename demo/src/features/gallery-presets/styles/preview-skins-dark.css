@@ -1,0 +1,68 @@
+.preset-preview.influence {
+  background: #000;
+}
+
+.preset-preview.influence::before {
+  width: 78px;
+  height: 70px;
+  left: 1px;
+  top: 2px;
+  border-radius: 50%;
+  filter: none;
+  background:
+    radial-gradient(circle at 50% 50%, #ff3214 0 7%, transparent 8%),
+    radial-gradient(circle at 62% 67%, #ff3214 0 5%, transparent 6%),
+    radial-gradient(circle at 33% 38%, #ffcb00 0 4%, transparent 5%),
+    radial-gradient(circle at 22% 65%, #f6f6f0 0 4%, transparent 5%),
+    radial-gradient(circle at 43% 72%, #05d6f0 0 3%, transparent 4%),
+    radial-gradient(circle at 72% 30%, #b7fbff 0 3%, transparent 4%),
+    repeating-conic-gradient(from 3deg, rgba(255, 68, 18, 0.72) 0deg 1deg, transparent 1deg 6deg),
+    radial-gradient(circle, transparent 0 24%, rgba(255,203,0,0.62) 25% 27%, transparent 28% 100%);
+}
+
+.preset-preview.influence::after {
+  width: 46px;
+  height: 14px;
+  left: 18px;
+  top: 30px;
+  border-radius: 0;
+  background: rgba(255,255,255,0.92);
+  opacity: 1;
+  filter: none;
+  box-shadow: 0 12px 0 rgba(255, 58, 18, 0.72);
+}
+
+.preset-preview.talent {
+  background:
+    linear-gradient(112deg, rgba(255,255,255,0.05) 0 34%, transparent 35% 100%),
+    #172333;
+}
+
+.preset-preview.talent::before {
+  width: 62px;
+  height: 62px;
+  left: 11px;
+  top: 5px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 43% 46%, #2f9ada 0 11%, transparent 12%),
+    radial-gradient(circle at 56% 33%, #f4d033 0 8%, transparent 9%),
+    radial-gradient(circle at 66% 50%, #f05d74 0 9%, transparent 10%),
+    radial-gradient(circle at 35% 62%, #4fbfac 0 8%, transparent 9%),
+    radial-gradient(circle at 51% 64%, #f19745 0 7%, transparent 8%),
+    radial-gradient(circle, rgba(255,255,255,0.12) 0 58%, transparent 59%);
+  filter: none;
+}
+
+.preset-preview.talent::after {
+  width: 18px;
+  height: 64px;
+  left: 4px;
+  top: 5px;
+  border-radius: 0;
+  background:
+    linear-gradient(#dbe6f0 0 2px, transparent 2px 9px) 0 0 / 18px 9px,
+    rgba(255,255,255,0.06);
+  opacity: 0.85;
+  filter: none;
+}

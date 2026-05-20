@@ -1,0 +1,107 @@
+<aside id="sidebar">
+  <div class="group">
+    <h2>Graph</h2>
+    <div class="button-row" id="n-buttons">
+      <button type="button" data-n="500" data-mode="work">500</button>
+      <button type="button" data-n="4000" data-mode="work">4k</button>
+      <button type="button" data-n="10000">10k</button>
+      <button type="button" data-n="50000">50k</button>
+      <button type="button" data-n="100000">100k</button>
+      <button type="button" data-n="250000">250k</button>
+    </div>
+    <label>nodes
+      <select id="c-n" style="display:none">
+        <option value="500">500</option>
+        <option value="4000">4 k</option>
+        <option value="10000">10 k</option>
+        <option value="50000">50 k</option>
+        <option value="100000" selected>100 k</option>
+        <option value="250000">250 k</option>
+        <option value="500000">500 k</option>
+        <option value="1000000">1 M</option>
+      </select>
+    </label>
+    <label>data
+      <select id="c-data">
+        <option value="work">work graph</option>
+        <option value="cosmo" selected>cosmo-lab</option>
+        <option value="ba">BA</option>
+      </select>
+    </label>
+    <label>seed
+      <input id="c-seed" type="number" value="42" style="width:80px"/>
+    </label>
+  </div>
+  <div class="group">
+    <h2>Render</h2>
+    <div class="toggle-row">
+      <button type="button" id="btn-theme" class="active">dark</button>
+      <button type="button" id="btn-density">density</button>
+      <button type="button" id="btn-edges" class="active">edges</button>
+      <button type="button" id="btn-lod">LOD</button>
+      <button type="button" id="btn-lanes" class="active">lanes</button>
+      <button type="button" id="btn-tilt">flat</button>
+    </div>
+    <div class="mode-readout" id="mode-readout"></div>
+    <input id="c-webgpu" type="checkbox" checked hidden/>
+    <div class="control-status"><span>engine</span><strong>WebGPU</strong></div>
+    <label id="row-msaa">MSAA 4x<input id="c-msaa" type="checkbox" checked/></label>
+    <label id="row-adpr">adaptive DPR<input id="c-adpr" type="checkbox" checked/></label>
+    <label id="row-blend">blend
+      <select id="c-blend">
+        <option value="add" selected>add</option>
+        <option value="normal">normal</option>
+      </select>
+    </label>
+    <label>frame cap
+      <select id="c-frame-cap">
+        <option value="0" selected>native</option>
+        <option value="headroom-3">display -3</option>
+        <option value="120">120 fps</option>
+        <option value="60">60 fps</option>
+        <option value="30">30 fps</option>
+      </select>
+    </label>
+  </div>
+  <div class="group">
+    <h2>2.5D</h2>
+    <label>depth preset
+      <select id="c-depth-preset">
+        <option value="off">off</option>
+        <option value="subtle">subtle</option>
+        <option value="standard" selected>standard</option>
+        <option value="vivid">vivid</option>
+        <option value="custom">custom</option>
+      </select>
+    </label>
+    <label class="tuning-label"><span>strength</span><input id="c-depth-strength" type="range" min="0" max="1" step="0.01" value="0.34"/><span class="tuning-value" id="v-depth-strength">0.34</span></label>
+    <label class="tuning-label"><span>size</span><input id="c-depth-size" type="range" min="0" max="0.25" step="0.005" value="0.075"/><span class="tuning-value" id="v-depth-size">0.075</span></label>
+    <label class="tuning-label"><span>light</span><input id="c-depth-brightness" type="range" min="0" max="0.4" step="0.01" value="0.13"/><span class="tuning-value" id="v-depth-brightness">0.13</span></label>
+    <label class="tuning-label"><span>opacity</span><input id="c-depth-opacity" type="range" min="0" max="0.4" step="0.01" value="0.12"/><span class="tuning-value" id="v-depth-opacity">0.12</span></label>
+    <label class="tuning-label"><span>moat</span><input id="c-depth-moat" type="range" min="0" max="0.5" step="0.01" value="0.20"/><span class="tuning-value" id="v-depth-moat">0.20</span></label>
+    <label class="tuning-label"><span>glint</span><input id="c-depth-highlight" type="range" min="0" max="0.75" step="0.01" value="0.18"/><span class="tuning-value" id="v-depth-highlight">0.18</span></label>
+    <label class="tuning-label"><span>shadow</span><input id="c-depth-shadow" type="range" min="0" max="0.75" step="0.01" value="0.18"/><span class="tuning-value" id="v-depth-shadow">0.18</span></label>
+    <label class="tuning-label"><span>sat</span><input id="c-depth-saturation" type="range" min="0" max="0.5" step="0.01" value="0.12"/><span class="tuning-value" id="v-depth-saturation">0.12</span></label>
+  </div>
+  <div class="group">
+    <h2>Budget</h2>
+    <label class="tuning-label"><span>points</span><input id="c-tile-budget" type="range" min="0" max="16" step="1" value="5"/><span class="tuning-value" id="v-tile-budget">5/tile</span></label>
+    <label class="tuning-label"><span>tile</span><input id="c-tile-size" type="range" min="8" max="48" step="1" value="20"/><span class="tuning-value" id="v-tile-size">20px</span></label>
+    <label class="tuning-label"><span>scale</span><input id="c-tile-max-scale" type="range" min="0" max="2.5" step="0.01" value="0.72"/><span class="tuning-value" id="v-tile-max-scale">0.72</span></label>
+  </div>
+  <div class="group"><h2>Simulation</h2><label id="row-sim">active<input id="c-sim" type="checkbox"/></label></div>
+  <div class="group"><h2>Baseline</h2><button id="btn-record">Record 5-repeat baseline</button><div class="status" id="record-status"></div></div>
+  <div class="group"><h2>Replay</h2><button id="btn-replay">Run replay capture</button><div class="status" id="replay-status"></div></div>
+  <div class="group">
+    <h2>Pre-bake layout</h2>
+    <label>label <input id="c-bake-label" type="text" value="100k" style="width:80px"/></label>
+    <label style="margin-bottom:6px">points only <input id="c-bake-points-only" type="checkbox"/></label>
+    <button id="btn-bake">Bake current layout</button>
+    <div class="status" id="bake-status"></div>
+    <button id="btn-load" style="margin-top:8px">Load baked layout</button>
+    <div class="status" id="load-status"></div>
+  </div>
+  <div class="group compact-note" style="font-size: 11px; color: #6c7891;">
+    This is a <strong>baseline</strong> measurement page. Numbers here become the reference point against which a future polish pass is compared. Not for publication.
+  </div>
+</aside>

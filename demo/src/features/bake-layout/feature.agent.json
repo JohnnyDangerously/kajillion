@@ -1,0 +1,10 @@
+{
+  "name": "bake-layout",
+  "description": "Demo baked-layout export and load controls.",
+  "entrypoints": [
+    "bake-load.ts"
+  ],
+  "owners": [
+    "demo/src/features/bake-layout"
+  ]
+}

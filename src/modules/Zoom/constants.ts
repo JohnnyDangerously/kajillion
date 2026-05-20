@@ -1,0 +1,5 @@
+export const WHEEL_ZOOM_SPEED = 0.008
+export const WHEEL_END_DELAY_MS = 120
+export const WHEEL_LINE_DELTA_PIXELS = 16
+export const CTRL_WHEEL_DELTA_SCALE = 0.25
+export const PRIMARY_POINTER_BUTTON = 0

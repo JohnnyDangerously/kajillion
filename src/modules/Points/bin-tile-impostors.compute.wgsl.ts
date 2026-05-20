@@ -32,6 +32,8 @@ struct AtomicTile {
 @group(0) @binding(2) var<storage, read> colors: array<vec4<f32>>;
 @group(0) @binding(3) var<storage, read_write> atomicTiles: array<AtomicTile>;
 
+const TILE_ATOMIC_LANES: u32 = 4u;
+
 fn projectPoint(point: vec2<f32>) -> vec2<f32> {
   var normalizedPosition = 2.0 * point / tileUniforms.spaceSize - vec2<f32>(1.0);
   normalizedPosition = normalizedPosition * (tileUniforms.spaceSize / tileUniforms.screenSize);
@@ -45,6 +47,14 @@ fn hash01(index: u32) -> f32 {
   x = (x ^ (x >> 15u)) * 0x846ca68bu;
   x = x ^ (x >> 16u);
   return f32(x & 0x00ffffffu) / 16777216.0;
+}
+
+fn hashU32(index: u32) -> u32 {
+  var x = index + 1u;
+  x = (x ^ (x >> 16u)) * 0x7feb352du;
+  x = (x ^ (x >> 15u)) * 0x846ca68bu;
+  x = x ^ (x >> 16u);
+  return x;
 }
 
 @compute @workgroup_size(64)
@@ -65,6 +75,8 @@ fn computeMain(@builtin(global_invocation_id) gid: vec3<u32>) {
   let tileX = u32(clamp(floor(pixel.x / tileUniforms.tileSize), 0.0, f32(tileUniforms.tileColumns - 1u)));
   let tileY = u32(clamp(floor(pixel.y / tileUniforms.tileSize), 0.0, f32(tileUniforms.tileRows - 1u)));
   let tileIndex = tileY * tileUniforms.tileColumns + tileX;
+  let lane = hashU32(i ^ (tileIndex * 0x9e3779b9u)) % TILE_ATOMIC_LANES;
+  let atomicIndex = tileIndex * TILE_ATOMIC_LANES + lane;
 
   let colorScale = f32(tileUniforms.colorScale);
   let positionScale = f32(tileUniforms.positionScale);
@@ -72,15 +84,15 @@ fn computeMain(@builtin(global_invocation_id) gid: vec3<u32>) {
   let local = clamp((pixel - tileOrigin) / tileUniforms.tileSize, vec2<f32>(0.0), vec2<f32>(1.0));
   let color = clamp(colors[i], vec4<f32>(0.0), vec4<f32>(1.0));
   let sampleWeight = max(tileUniforms.buildSampleWeight, 1u);
-  atomicAdd(&atomicTiles[tileIndex].count, sampleWeight);
-  atomicAdd(&atomicTiles[tileIndex].r, u32(round(color.r * colorScale)) * sampleWeight);
-  atomicAdd(&atomicTiles[tileIndex].g, u32(round(color.g * colorScale)) * sampleWeight);
-  atomicAdd(&atomicTiles[tileIndex].b, u32(round(color.b * colorScale)) * sampleWeight);
-  atomicAdd(&atomicTiles[tileIndex].x, u32(round(local.x * positionScale)) * sampleWeight);
-  atomicAdd(&atomicTiles[tileIndex].y, u32(round(local.y * positionScale)) * sampleWeight);
-  atomicAdd(&atomicTiles[tileIndex].xx, u32(round(local.x * local.x * positionScale)) * sampleWeight);
-  atomicAdd(&atomicTiles[tileIndex].yy, u32(round(local.y * local.y * positionScale)) * sampleWeight);
-  atomicAdd(&atomicTiles[tileIndex].xy, u32(round(local.x * local.y * positionScale)) * sampleWeight);
+  atomicAdd(&atomicTiles[atomicIndex].count, sampleWeight);
+  atomicAdd(&atomicTiles[atomicIndex].r, u32(round(color.r * colorScale)) * sampleWeight);
+  atomicAdd(&atomicTiles[atomicIndex].g, u32(round(color.g * colorScale)) * sampleWeight);
+  atomicAdd(&atomicTiles[atomicIndex].b, u32(round(color.b * colorScale)) * sampleWeight);
+  atomicAdd(&atomicTiles[atomicIndex].x, u32(round(local.x * positionScale)) * sampleWeight);
+  atomicAdd(&atomicTiles[atomicIndex].y, u32(round(local.y * positionScale)) * sampleWeight);
+  atomicAdd(&atomicTiles[atomicIndex].xx, u32(round(local.x * local.x * positionScale)) * sampleWeight);
+  atomicAdd(&atomicTiles[atomicIndex].yy, u32(round(local.y * local.y * positionScale)) * sampleWeight);
+  atomicAdd(&atomicTiles[atomicIndex].xy, u32(round(local.x * local.y * positionScale)) * sampleWeight);
 }
 `
 }

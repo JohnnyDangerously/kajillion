@@ -1,0 +1,24 @@
+{
+  "feature": "demo-node-treatment-lab",
+  "purpose": "Own demo-only node treatment lab contracts, presets, palettes, and bounded helper logic.",
+  "owned_tables": [],
+  "owned_events": [],
+  "public_entrypoints": [
+    "demo/src/node-treatment-lab.ts",
+    "demo/src/features/node-treatment-lab/types.ts",
+    "demo/src/features/node-treatment-lab/presets.ts"
+  ],
+  "verify": [
+    "npm run demo:build"
+  ],
+  "invariants": [
+    "Keep rendered treatments visually unchanged unless the task explicitly asks for visual changes.",
+    "Preset/data helpers do not import DOM state or canvas rendering code.",
+    "The legacy demo/src/node-treatment-lab.ts entrypoint remains the only initializer imported by the demo shell."
+  ],
+  "change_protocols": [
+    "Add treatment state contracts in types.ts before wiring UI controls.",
+    "Add static treatment defaults and color palettes in presets.ts.",
+    "Keep drawing and event wiring changes narrow in demo/src/node-treatment-lab.ts."
+  ]
+}

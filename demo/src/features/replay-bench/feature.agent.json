@@ -1,0 +1,12 @@
+{
+  "name": "replay-bench",
+  "description": "Demo benchmark and deterministic replay capture helpers.",
+  "entrypoints": [
+    "baseline-recorder.ts",
+    "replay-capture.ts",
+    "metrics.ts"
+  ],
+  "owners": [
+    "demo/src/features/replay-bench"
+  ]
+}

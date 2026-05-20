@@ -1,15 +1,26 @@
-import { Buffer, Framebuffer, Texture, UniformStore } from '@luma.gl/core'
-import { Model } from '@luma.gl/engine'
+import { Buffer, Texture } from '@luma.gl/core'
+import type { Framebuffer, UniformStore } from '@luma.gl/core'
+import type { Model } from '@luma.gl/engine'
 import { CoreModule } from '@/graph/modules/core-module'
 
-import calculateCentermassFrag from '@/graph/modules/ForceCenter/calculate-centermass.frag?raw'
-import calculateCentermassVert from '@/graph/modules/ForceCenter/calculate-centermass.vert?raw'
-import calculateCentermassWgsl from '@/graph/modules/ForceCenter/calculate-centermass.wgsl?raw'
-import forceFrag from '@/graph/modules/ForceCenter/force-center.frag?raw'
-import forceCenterWgsl from '@/graph/modules/ForceCenter/force-center.wgsl?raw'
 import { createIndexesForBuffer } from '@/graph/modules/Shared/buffer'
 import { getBytesPerRow } from '@/graph/modules/Shared/texture-utils'
-import updateVert from '@/graph/modules/Shared/quad.vert?raw'
+import type {
+  CalculateCentermassUniformStoreShape,
+  ForceCenterUniformStoreShape,
+} from './contracts'
+import {
+  createCalculateCentermassCommand,
+  createForceCenterCommand,
+} from './pass-setup'
+import {
+  applyForceCenterPass,
+  calculateCentermassPass,
+} from './run'
+import {
+  createCalculateCentermassUniformStore,
+  createForceCenterUniformStore,
+} from './uniforms'
 
 export class ForceCenter extends CoreModule {
   private centermassTexture: Texture | undefined
@@ -21,18 +32,9 @@ export class ForceCenter extends CoreModule {
 
   private forceVertexCoordBuffer: Buffer | undefined
 
-  private calculateUniformStore: UniformStore<{
-    calculateCentermassUniforms: {
-      pointsTextureSize: number;
-    };
-  }> | undefined
+  private calculateUniformStore: UniformStore<CalculateCentermassUniformStoreShape> | undefined
 
-  private forceUniformStore: UniformStore<{
-    forceCenterUniforms: {
-      centerForce: number;
-      alpha: number;
-    };
-  }> | undefined
+  private forceUniformStore: UniformStore<ForceCenterUniformStoreShape> | undefined
 
   private previousPointsTextureSize: number | undefined
 
@@ -88,82 +90,21 @@ export class ForceCenter extends CoreModule {
       data: new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
     })
 
-    this.calculateUniformStore ||= new UniformStore({
-      calculateCentermassUniforms: {
-        uniformTypes: {
-          pointsTextureSize: 'f32',
-        },
-      },
-    })
+    this.calculateUniformStore ||= createCalculateCentermassUniformStore()
 
-    this.forceUniformStore ||= new UniformStore({
-      forceCenterUniforms: {
-        uniformTypes: {
-          centerForce: 'f32',
-          alpha: 'f32',
-        },
-      },
-    })
+    this.forceUniformStore ||= createForceCenterUniformStore()
 
-    this.calculateCentermassCommand ||= new Model(device, {
-      source: calculateCentermassWgsl,
-      fs: calculateCentermassFrag,
-      vs: calculateCentermassVert,
-      topology: 'point-list',
-      colorAttachmentFormats: ['rgba32float'],
-      attributes: {
-        ...this.pointIndices && { pointIndices: this.pointIndices },
-      },
-      bufferLayout: [
-        { name: 'pointIndices', format: 'float32x2' },
-      ],
-      defines: {
-        USE_UNIFORM_BUFFERS: true,
-      },
-      bindings: {
-        // Create uniform buffer binding
-        // Update it later by calling uniformStore.setUniforms()
-        calculateCentermassUniforms: this.calculateUniformStore.getManagedUniformBuffer(device, 'calculateCentermassUniforms'),
-        // All texture bindings will be set dynamically in run() method
-      },
-      parameters: {
-        blend: true,
-        blendColorOperation: 'add',
-        blendColorSrcFactor: 'one',
-        blendColorDstFactor: 'one',
-        blendAlphaOperation: 'add',
-        blendAlphaSrcFactor: 'one',
-        blendAlphaDstFactor: 'one',
-        depthWriteEnabled: false,
-      },
+    this.calculateCentermassCommand ||= createCalculateCentermassCommand({
+      device,
+      pointIndices: this.pointIndices,
+      uniformStore: this.calculateUniformStore,
     })
     this.calculateCentermassCommand.setVertexCount(this.data.pointsNumber ?? 0)
 
-    this.runCommand ||= new Model(device, {
-      source: forceCenterWgsl,
-      fs: forceFrag,
-      vs: updateVert,
-      topology: 'triangle-strip',
-      colorAttachmentFormats: ['rgba32float'],
-      vertexCount: 4,
-      attributes: {
-        vertexCoord: this.forceVertexCoordBuffer,
-      },
-      bufferLayout: [
-        { name: 'vertexCoord', format: 'float32x2' },
-      ],
-      defines: {
-        USE_UNIFORM_BUFFERS: true,
-      },
-      bindings: {
-        // Create uniform buffer binding
-        // Update it later by calling uniformStore.setUniforms()
-        forceCenterUniforms: this.forceUniformStore.getManagedUniformBuffer(device, 'forceCenterUniforms'),
-        // All texture bindings will be set dynamically in run() method
-      },
-      parameters: {
-        depthWriteEnabled: false,
-      },
+    this.runCommand ||= createForceCenterCommand({
+      device,
+      vertexCoordBuffer: this.forceVertexCoordBuffer,
+      uniformStore: this.forceUniformStore,
     })
   }
 
@@ -181,45 +122,25 @@ export class ForceCenter extends CoreModule {
     // Ensure pointIndices is set (Model might exist but attributes not set yet)
     if (!this.pointIndices) return
 
-    // Clear centermass framebuffer and accumulate point positions
-    const centermassPass = device.beginRenderPass({
+    calculateCentermassPass({
+      device,
       framebuffer: this.centermassFbo,
-      clearColor: [0, 0, 0, 0],
-    })
-
-    this.calculateUniformStore.setUniforms({
-      calculateCentermassUniforms: {
-        pointsTextureSize: store.pointsTextureSize ?? 0,
-      },
-    })
-    // Update texture bindings dynamically
-    this.calculateCentermassCommand.setBindings({
+      pointsTextureSize: store.pointsTextureSize ?? 0,
       positionsTexture: points.previousPositionTexture,
+      uniformStore: this.calculateUniformStore,
+      command: this.calculateCentermassCommand,
     })
 
-    this.calculateCentermassCommand.draw(centermassPass)
-    centermassPass.end()
-
-    // Apply center force into velocity
-    this.forceUniformStore.setUniforms({
-      forceCenterUniforms: {
-        centerForce: this.config.simulationCenter,
-        alpha: store.alpha,
-      },
-    })
-    // Update texture bindings dynamically
-    this.runCommand.setBindings({
+    applyForceCenterPass({
+      device,
+      framebuffer: points.velocityFbo,
       positionsTexture: points.previousPositionTexture,
       centermassTexture: this.centermassTexture,
+      centerForce: this.config.simulationCenter,
+      alpha: store.alpha,
+      uniformStore: this.forceUniformStore,
+      command: this.runCommand,
     })
-
-    const pass = device.beginRenderPass({
-      framebuffer: points.velocityFbo,
-      clearColor: [0, 0, 0, 0],
-    })
-
-    this.runCommand.draw(pass)
-    pass.end()
   }
 
   /**

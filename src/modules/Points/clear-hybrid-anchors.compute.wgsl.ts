@@ -18,14 +18,23 @@ struct HybridAnchorBuildUniforms {
 @group(0) @binding(1) var<storage, read_write> anchorCounts: array<atomic<u32>>;
 @group(0) @binding(2) var<storage, read_write> anchorPositions: array<vec4<f32>>;
 @group(0) @binding(3) var<storage, read_write> anchorColors: array<vec4<f32>>;
+@group(0) @binding(4) var<storage, read_write> anchorIndirectArgs: array<atomic<u32>>;
 
 @compute @workgroup_size(64)
 fn computeMain(@builtin(global_invocation_id) gid: vec3<u32>) {
   let i = gid.x;
   let tileCount = anchorUniforms.tileColumns * anchorUniforms.tileRows;
   let anchorCapacity = tileCount * anchorUniforms.anchorsPerTile;
+  let priorityOffset = anchorCapacity;
+  if (i == 0u) {
+    atomicStore(&anchorIndirectArgs[0], 4u);
+    atomicStore(&anchorIndirectArgs[1], 0u);
+    atomicStore(&anchorIndirectArgs[2], 0u);
+    atomicStore(&anchorIndirectArgs[3], 0u);
+  }
   if (i < anchorCapacity) {
     atomicStore(&anchorCounts[i], 0u);
+    atomicStore(&anchorCounts[priorityOffset + i], 0u);
   }
   if (i < anchorCapacity) {
     anchorPositions[i] = vec4<f32>(2.0, 2.0, 0.0, 0.0);

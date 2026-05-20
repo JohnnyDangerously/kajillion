@@ -1,0 +1,23 @@
+{
+  "feature": "demo_shell",
+  "purpose": "Own static demo shell styling and keep demo/index.html small.",
+  "owned_files": [
+    "demo/index.html",
+    "demo/src/features/demo-shell/**"
+  ],
+  "public_entrypoints": [
+    "demo/index.html",
+    "demo/src/features/demo-shell/demo-shell.css"
+  ],
+  "verify": [
+    "npm run demo:build"
+  ],
+  "invariants": [
+    "DOM ids and classes stay compatible with demo control-plane lookups.",
+    "The shell does not import renderer or graph data code."
+  ],
+  "change_protocols": [
+    "CSS extraction must preserve Vite demo build behavior.",
+    "Markup changes require checking demo/src/features/control-plane/dom.ts."
+  ]
+}

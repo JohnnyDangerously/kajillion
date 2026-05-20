@@ -33,6 +33,14 @@ layout(std140) uniform drawVertexUniforms {
   float imageCount;
   float imageAtlasCoordsTextureSize;
   float pointMinPixelSize;
+  float pointDepthCueStrength;
+  float pointDepthCueSize;
+  float pointDepthCueBrightness;
+  float pointDepthCueOpacity;
+  float pointDepthCueMoat;
+  float pointDepthCueHighlight;
+  float pointDepthCueShadow;
+  float pointDepthCueSaturation;
 } drawVertex;
 
 #define ratio drawVertex.ratio
@@ -52,6 +60,14 @@ layout(std140) uniform drawVertexUniforms {
 #define imageCount drawVertex.imageCount
 #define imageAtlasCoordsTextureSize drawVertex.imageAtlasCoordsTextureSize
 #define pointMinPixelSize drawVertex.pointMinPixelSize
+#define pointDepthCueStrength drawVertex.pointDepthCueStrength
+#define pointDepthCueSize drawVertex.pointDepthCueSize
+#define pointDepthCueBrightness drawVertex.pointDepthCueBrightness
+#define pointDepthCueOpacity drawVertex.pointDepthCueOpacity
+#define pointDepthCueMoat drawVertex.pointDepthCueMoat
+#define pointDepthCueHighlight drawVertex.pointDepthCueHighlight
+#define pointDepthCueShadow drawVertex.pointDepthCueShadow
+#define pointDepthCueSaturation drawVertex.pointDepthCueSaturation
 #else
 uniform float ratio;
 uniform mat3 transformationMatrix;
@@ -70,6 +86,14 @@ uniform float hasImages;
 uniform float imageCount;
 uniform float imageAtlasCoordsTextureSize;
 uniform float pointMinPixelSize;
+uniform float pointDepthCueStrength;
+uniform float pointDepthCueSize;
+uniform float pointDepthCueBrightness;
+uniform float pointDepthCueOpacity;
+uniform float pointDepthCueMoat;
+uniform float pointDepthCueHighlight;
+uniform float pointDepthCueShadow;
+uniform float pointDepthCueSaturation;
 #endif
 
 out float pointShape;
@@ -87,7 +111,7 @@ float calculatePointSize(float size) {
   if (scalePointsOnZoom > 0.0) {
     pSize = size * ratio * transformationMatrix[0][0];
   } else {
-    pSize = size * ratio * min(5.0, max(1.0, transformationMatrix[0][0] * 0.01));
+    pSize = size * ratio;
   }
 
   return min(pSize, maxPointSize * ratio);

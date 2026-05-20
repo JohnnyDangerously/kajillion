@@ -43,7 +43,7 @@ fn calculatePointSize(size: f32) -> f32 {
   if (findHoveredPoint.scalePointsOnZoom > 0.0) {
     pSize = size * findHoveredPoint.ratio * scale;
   } else {
-    pSize = size * findHoveredPoint.ratio * min(5.0, max(1.0, scale * 0.01));
+    pSize = size * findHoveredPoint.ratio;
   }
   return min(pSize, findHoveredPoint.maxPointSize * findHoveredPoint.ratio);
 }

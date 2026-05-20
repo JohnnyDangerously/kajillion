@@ -1,0 +1,7 @@
+export type { DemoRuntimeContext, DemoRuntimeState } from './context'
+export { applyDemoControlChange } from './control-change'
+export { bootDemo } from './boot'
+export { createDemoRuntimeActions } from './runtime-actions'
+export { exposeDemoDebugGraph } from './debug-expose'
+export { installDemoBenchmarkControls, updateDemoBakeLoadButtons } from './benchmark-controls'
+export { rebuildDemoGraph } from './rebuild-graph'

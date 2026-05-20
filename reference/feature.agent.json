@@ -1,0 +1,22 @@
+{
+  "feature": "visual-reference-library",
+  "purpose": "Preserve visual inspiration assets and the concrete rendering lessons attached to them.",
+  "owned_files": [
+    "reference/**"
+  ],
+  "public_entrypoints": [
+    "reference/README.md"
+  ],
+  "verify": [
+    "file reference/*.png"
+  ],
+  "invariants": [
+    "Do not overwrite references without preserving the original visual target.",
+    "Every image should have a short note explaining the rendering lesson.",
+    "Reference assets are inspiration targets, not runtime demo dependencies."
+  ],
+  "change_protocols": [
+    "When adding a reference image, use a stable descriptive filename.",
+    "Update reference/README.md with why the image matters."
+  ]
+}

@@ -1,0 +1,48 @@
+:root {
+  color-scheme: dark;
+	      --page-bg: #06090d;
+	      --graph-bg: #06090d;
+	      --graph-field: radial-gradient(circle at 48% 43%, #111923 0%, #090d13 48%, #05070a 100%);
+  --text: #d7dfef;
+  --muted: #7e8aa1;
+  --panel: rgba(11, 14, 20, 0.96);
+  --panel-border: rgba(255,255,255,0.04);
+  --control-bg: #151a24;
+  --control-border: #293241;
+  --button-bg: #151a24;
+  --button-fg: #aeb8c9;
+  --button-border: #293241;
+  --button-active-bg: #0d463d;
+  --button-active-border: #1aa38d;
+  --overlay-bg: rgba(0, 0, 0, 0.48);
+  --overlay-key: #9aa5b7;
+  --overlay-value: #dce5f5;
+  --overlay-hot: #b7ff3c;
+	      --label-bg: transparent;
+	      --label-fg: rgba(242, 245, 251, 0.74);
+	      --label-border: transparent;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --page-bg: #fbfdff;
+  --graph-bg: #fbfdff;
+  --graph-field: radial-gradient(circle at 50% 44%, #ffffff 0%, #fbfdff 42%, #f2f7fd 76%, #e9f1fa 100%);
+  --text: #111827;
+  --muted: #526078;
+  --panel: rgba(255, 255, 255, 0.94);
+  --panel-border: rgba(36, 54, 86, 0.14);
+  --control-bg: #ffffff;
+  --control-border: #b8c6d8;
+  --button-bg: #ffffff;
+  --button-fg: #34425a;
+  --button-border: #b8c6d8;
+  --button-active-bg: #d8f3ff;
+  --button-active-border: #1586d8;
+  --overlay-bg: rgba(255, 255, 255, 0.84);
+  --overlay-key: #526078;
+  --overlay-value: #172033;
+  --overlay-hot: #007a4d;
+	      --label-bg: rgba(255, 255, 255, 0.48);
+	      --label-fg: rgba(19, 30, 49, 0.76);
+	      --label-border: rgba(52, 72, 105, 0.10);
+}

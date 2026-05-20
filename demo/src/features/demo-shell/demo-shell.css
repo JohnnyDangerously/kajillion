@@ -1,0 +1,11 @@
+/* Demo shell modules are ordered to preserve the original cascade. */
+
+@import './styles/theme.css';
+@import './styles/shell-scene.css';
+@import './styles/overlay.css';
+@import './styles/focus-work.css';
+@import './styles/cosmic-intro.css';
+@import './styles/sidebar-controls.css';
+@import './styles/presentation-state.css';
+@import './styles/node-lab.css';
+@import './styles/preset-gallery.css';

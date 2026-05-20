@@ -1,0 +1,23 @@
+{
+  "feature": "demo-ui-state",
+  "purpose": "Own demo-only UI state projection helpers for labels, readouts, and focus panel text.",
+  "owned_tables": [],
+  "owned_events": [],
+  "public_entrypoints": [
+    "demo/src/features/ui-state/mode-readout.ts",
+    "demo/src/features/ui-state/work-focus-panel.ts"
+  ],
+  "verify": [
+    "npm run demo:build"
+  ],
+  "invariants": [
+    "Feature helpers take explicit inputs instead of importing demo main state.",
+    "Graph render-loop behavior remains in demo/src/main.ts.",
+    "DOM IDs stay centralized in features/control-plane/dom.ts.",
+    "Visible labels and separators should remain behavior-compatible unless intentionally changed."
+  ],
+  "change_protocols": [
+    "When adding a focus panel field, update projection and DOM application together.",
+    "When changing toggle labels, keep mode readout formatting in mode-readout.ts."
+  ]
+}

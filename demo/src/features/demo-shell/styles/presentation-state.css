@@ -1,0 +1,53 @@
+:root[data-tilt="on"] #graph,
+:root[data-tilt="on"] #cluster-labels,
+:root[data-tilt="on"] #work-regions {
+  transform-origin: 48% 56%;
+  transform: perspective(980px) rotateX(58deg) rotateZ(-7deg) scale(1.22) translateY(6%);
+}
+:root[data-tilt="on"] #graph {
+  filter: contrast(1.08) saturate(1.08);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 50%, #000 0 62%, rgba(0,0,0,0.88) 74%, transparent 96%);
+  mask-image: radial-gradient(ellipse at 50% 50%, #000 0 62%, rgba(0,0,0,0.88) 74%, transparent 96%);
+}
+:root[data-tilt="on"] #cluster-labels {
+  pointer-events: none;
+}
+:root[data-presentation="cosmic-intro"] #graph-host,
+:root[data-presentation="cosmic-dive"] #graph-host {
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 18% 28%, rgba(255, 137, 48, 0.11), transparent 24%),
+    radial-gradient(ellipse at 72% 42%, rgba(88, 184, 255, 0.10), transparent 26%),
+    radial-gradient(ellipse at 52% 74%, rgba(116, 82, 255, 0.13), transparent 34%),
+    linear-gradient(180deg, #02040a 0%, #02040a 100%);
+}
+:root[data-presentation="cosmic-intro"] #graph,
+:root[data-presentation="cosmic-dive"] #graph {
+  transition: opacity 900ms ease, filter 900ms ease;
+  pointer-events: none;
+}
+:root[data-presentation="cosmic-intro"] #graph {
+  opacity: 0.08;
+  filter: contrast(1.08) saturate(1.05) brightness(0.82);
+}
+:root[data-presentation="cosmic-dive"] #graph {
+  opacity: 1;
+  filter: contrast(1.12) saturate(1.10) brightness(1.02);
+}
+:root[data-presentation="cosmic-intro"] #cluster-labels,
+:root[data-presentation="cosmic-intro"] #work-regions,
+:root[data-presentation="cosmic-dive"] #cluster-labels,
+:root[data-presentation="cosmic-dive"] #work-regions {
+  opacity: 0;
+}
+:root[data-presentation="cosmic-intro"] #sidebar,
+:root[data-presentation="cosmic-intro"] #overlay,
+:root[data-presentation="cosmic-intro"] header {
+  opacity: 0.07;
+  transition: opacity 180ms ease;
+}
+:root[data-presentation="cosmic-intro"] #sidebar:hover,
+:root[data-presentation="cosmic-intro"] #overlay:hover {
+  opacity: 1;
+}
+.compact-note { display: none; }

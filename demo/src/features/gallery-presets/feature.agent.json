@@ -1,0 +1,28 @@
+{
+  "feature": "demo-gallery-presets",
+  "purpose": "Own demo-only gallery preset parsing, URL defaults, graph layout presets, color palettes, and gallery-only CSS skins.",
+  "owned_tables": [],
+  "owned_events": [],
+  "public_entrypoints": [
+    "demo/src/gallery-presets.ts",
+    "demo/src/gallery-presets.css",
+    "demo/src/features/gallery-presets/index.ts",
+    "demo/src/features/gallery-presets/types.ts",
+    "demo/src/features/gallery-presets/url-defaults.ts",
+    "demo/src/features/gallery-presets/render-data.ts",
+    "demo/src/features/gallery-presets/colors.ts"
+  ],
+  "verify": [
+    "npm run demo:build"
+  ],
+  "invariants": [
+    "Legacy gallery-presets barrels preserve existing imports.",
+    "Preset helpers take explicit inputs and do not import demo main state.",
+    "Gallery-only CSS remains reachable from demo/src/gallery-presets.css."
+  ],
+  "change_protocols": [
+    "Add new preset layouts in a family-specific module and dispatch from render-data.ts.",
+    "Add URL default changes in url-defaults.ts alongside palette parsing changes.",
+    "Keep CSS split by theme variables, label skins, and preview skins unless a family-specific split becomes clearer."
+  ]
+}

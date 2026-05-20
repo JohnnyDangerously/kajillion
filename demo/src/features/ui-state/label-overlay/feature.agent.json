@@ -1,0 +1,21 @@
+{
+  "feature": "demo-label-overlay",
+  "purpose": "Own demo-only cluster label anchor projection helpers.",
+  "owned_tables": [],
+  "owned_events": [],
+  "public_entrypoints": [
+    "demo/src/features/ui-state/label-overlay/label-anchors.ts"
+  ],
+  "verify": [
+    "npm run demo:build"
+  ],
+  "invariants": [
+    "Feature helpers take explicit config and graph-data inputs instead of importing demo main state.",
+    "Graph construction, render-loop scheduling, and DOM mutation remain in demo/src/main.ts.",
+    "Preserve existing label text, anchor math, and palette-specific behavior unless intentionally changing visuals."
+  ],
+  "change_protocols": [
+    "When adding a new palette label mode, update buildLabelAnchors and verify the demo build.",
+    "When moving label DOM behavior, keep live Graph calls owned by demo/src/main.ts."
+  ]
+}

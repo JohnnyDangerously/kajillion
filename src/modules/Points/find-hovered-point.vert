@@ -58,7 +58,7 @@ float calculatePointSize(float size) {
   if (scalePointsOnZoom > 0.0) { 
     pSize = size * ratio * transformationMatrix[0][0];
   } else {
-    pSize = size * ratio * min(5.0, max(1.0, transformationMatrix[0][0] * 0.01));
+    pSize = size * ratio;
   }
 
   return min(pSize, maxPointSize * ratio);

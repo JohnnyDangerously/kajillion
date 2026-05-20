@@ -1,0 +1,61 @@
+#cosmic-intro {
+  --cosmic-target-x: 56.5%;
+  --cosmic-target-y: 52%;
+  position: absolute; inset: 0; z-index: 5;
+  pointer-events: none; opacity: 0;
+  transition: opacity 260ms ease, transform 680ms cubic-bezier(.18,.82,.24,1);
+}
+#cosmic-intro:not([hidden]) { opacity: 1; }
+#cosmic-intro.entered { opacity: 0; transform: scale(1.08); }
+#cosmic-intro .cosmic-target {
+  position: absolute; left: var(--cosmic-target-x); top: var(--cosmic-target-y);
+  transform: translate(-50%, -50%);
+  width: 90px; height: 90px; border-radius: 50%;
+  border: 1px solid rgba(176, 218, 255, 0.44);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,236,176,0.84) 0 3px, rgba(117,185,255,0.22) 4px 6px, transparent 7px),
+    radial-gradient(circle at 50% 50%, transparent 0 27px, rgba(119,184,255,0.32) 28px, transparent 30px),
+    conic-gradient(from 0deg, transparent 0 13%, rgba(255,192,96,0.62) 14% 16%, transparent 17% 48%, rgba(95,202,255,0.45) 49% 51%, transparent 52% 100%);
+  box-shadow: 0 0 22px rgba(122, 192, 255, 0.28), 0 0 78px rgba(255, 147, 56, 0.10);
+}
+#cosmic-intro .cosmic-copy {
+  position: absolute; left: var(--cosmic-target-x); top: calc(var(--cosmic-target-y) + 62px);
+  transform: translateX(-50%);
+  color: rgba(232, 241, 255, 0.78);
+  font: 700 11px/1.3 ui-monospace, SFMono-Regular, monospace;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  text-shadow: 0 0 18px rgba(65, 154, 255, 0.38);
+}
+#cosmic-begin {
+  position: absolute; left: var(--cosmic-target-x); top: calc(var(--cosmic-target-y) + 92px);
+  transform: translateX(-50%);
+  pointer-events: auto; min-width: 128px; border-radius: 999px;
+  border: 1px solid rgba(255, 186, 98, 0.54);
+  color: #fff2cf; background: rgba(28, 18, 12, 0.56);
+  padding: 9px 18px;
+  font: 800 12px/1 ui-monospace, SFMono-Regular, monospace;
+  letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+  box-shadow: 0 0 22px rgba(255, 152, 48, 0.16), inset 0 0 18px rgba(255, 183, 84, 0.08);
+  backdrop-filter: blur(6px);
+}
+#cosmic-begin:hover {
+  border-color: rgba(255, 220, 142, 0.78);
+  background: rgba(48, 27, 12, 0.70);
+  color: #fff8df;
+}
+:root[data-palette="cosmic"] {
+  --page-bg: #02040a;
+  --graph-bg: #02040a;
+  --graph-field:
+    radial-gradient(ellipse at 18% 34%, rgba(255,126,35,0.11) 0%, transparent 19%),
+    radial-gradient(ellipse at 52% 42%, rgba(255,176,64,0.12) 0%, transparent 24%),
+    radial-gradient(ellipse at 76% 52%, rgba(94,159,255,0.10) 0%, transparent 22%),
+    radial-gradient(ellipse at 44% 78%, rgba(83,21,170,0.15) 0%, transparent 27%),
+    linear-gradient(115deg, rgba(3,16,25,0.75), rgba(8,4,18,0.92) 46%, rgba(8,22,27,0.78));
+  --label-bg: transparent;
+  --label-fg: rgba(232,241,255,0.60);
+  --label-border: transparent;
+}
+:root[data-palette="cosmic"] #graph-host {
+  inset: 0;
+}

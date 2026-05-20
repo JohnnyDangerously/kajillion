@@ -1,0 +1,29 @@
+{
+  "feature": "points_passes",
+  "purpose": "Own pass-local contracts and pure configuration helpers for the Points WebGPU renderer.",
+  "owned_files": [
+    "src/modules/Points/passes/**"
+  ],
+  "public_entrypoints": [
+    "@/graph/modules/Points/passes/draw/contracts",
+    "@/graph/modules/Points/passes/impostors/config",
+    "@/graph/modules/Points/passes/impostors/contracts",
+    "@/graph/modules/Points/passes/shared/constants",
+    "@/graph/modules/Points/passes/shared/contracts",
+    "@/graph/modules/Points/passes/visible-culling/activeMask",
+    "@/graph/modules/Points/passes/visible-culling/config",
+    "@/graph/modules/Points/passes/visible-culling/contracts"
+  ],
+  "verify": [
+    "npm run build"
+  ],
+  "invariants": [
+    "WGSL and GLSL resource contract names stay unchanged.",
+    "Shader files remain import-path stable unless deliberately moved with neutral import aliases.",
+    "Pass helpers are pure or type-only and do not add per-frame allocation."
+  ],
+  "change_protocols": [
+    "Changing a uniform payload type requires checking the matching WGSL/GLSL declaration and binding setup.",
+    "Changing config helper math requires preserving existing runtime defaults and thresholds."
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "feature": "graph_control_plane",
+  "purpose": "Own demo graph interaction contracts, snapshot summaries, and analytics worker RPC.",
+  "owned_files": [
+    "demo/src/features/graph-control-plane/**",
+    "demo/src/visual-lab-control-plane.ts"
+  ],
+  "public_entrypoints": [
+    "demo/src/visual-lab-control-plane.ts",
+    "demo/src/features/graph-control-plane/control-plane.ts"
+  ],
+  "verify": [
+    "npm run demo:build"
+  ],
+  "invariants": [
+    "Rendering lifecycle stays outside this feature.",
+    "Worker RPC remains request-id guarded.",
+    "The top-level visual-lab-control-plane compatibility barrel remains import-stable."
+  ],
+  "change_protocols": [
+    "New control-plane methods require adding a type contract and facade implementation together.",
+    "Worker request changes require updating analytics-worker message handling."
+  ]
+}

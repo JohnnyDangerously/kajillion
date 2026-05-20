@@ -1,0 +1,22 @@
+{
+  "feature": "points_position_lifecycle",
+  "purpose": "Own CPU-side point-position preparation helpers before texture and storage-buffer upload.",
+  "owned_files": [
+    "src/modules/Points/passes/positions/**"
+  ],
+  "public_entrypoints": [
+    "@/graph/modules/Points/passes/positions/rescale"
+  ],
+  "verify": [
+    "npm run build"
+  ],
+  "invariants": [
+    "Position arrays are mutated in place to preserve upload behavior.",
+    "Returned scaleX and scaleY callbacks remain available to Points.",
+    "This island does not own GPU resources, shader bindings, or per-frame work."
+  ],
+  "change_protocols": [
+    "Changing rescale math requires comparing dense and sparse graph startup layouts.",
+    "Keep helpers deterministic and allocation-light."
+  ]
+}

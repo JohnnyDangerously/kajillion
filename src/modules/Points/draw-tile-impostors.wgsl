@@ -8,6 +8,11 @@ struct TileRenderUniforms {
   strength: f32,
   microSplats: u32,
   sparseTileThreshold: f32,
+  massRadiusScale: f32,
+  massThreshold: f32,
+  massMaxAlpha: f32,
+  massColorBoost: f32,
+  massExtrusion: f32,
 };
 
 @group(0) @binding(0) var<uniform> tileRender: TileRenderUniforms;
@@ -82,24 +87,32 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) rawInstanceIdx: u32) 
   let delta = sqrt(max((variance.x - variance.y) * (variance.x - variance.y) + 4.0 * covariance * covariance, 0.0));
   let lambdaMajor = max(0.0008, (variance.x + variance.y + delta) * 0.5);
   let lambdaMinor = max(0.0008, (variance.x + variance.y - delta) * 0.5);
-  let density = clamp(log2(data.x + 1.0) * 0.15 * max(tileRender.strength, 0.001), 0.0, 1.0);
-  let massScale = mix(1.55, 2.35, density);
+  let rawDensity = clamp(log2(data.x + 1.0) * 0.15 * max(tileRender.strength, 0.001), 0.0, 1.0);
+  let threshold = clamp(tileRender.massThreshold, 0.0, 0.95);
+  let density = smoothstep(threshold, 1.0, rawDensity);
+  if (density <= 0.0001) {
+    return hiddenVertex(input);
+  }
+
+  let radiusScale = max(tileRender.massRadiusScale, 0.05);
+  let massScale = mix(1.35, 2.45, density) * radiusScale;
   let radiusMajorPx = clamp(sqrt(lambdaMajor) * tileRender.tileSize * massScale, 1.15, tileRender.tileSize * 1.55);
   let radiusMinorPx = clamp(sqrt(lambdaMinor) * tileRender.tileSize * massScale, 0.95, tileRender.tileSize * 1.20);
   let axes = covarianceAxes(variance, covariance);
   let pixelOffset = axes[0] * input.quadCorner.x * radiusMajorPx + axes[1] * input.quadCorner.y * radiusMinorPx;
+  let extrusionPx = -density * max(tileRender.massExtrusion, 0.0) * tileRender.tileSize;
   let clipOffset = vec2<f32>(
     pixelOffset.x / framebufferSize.x * 2.0,
-    -pixelOffset.y / framebufferSize.y * 2.0,
+    (-pixelOffset.y + extrusionPx) / framebufferSize.y * 2.0,
   );
 
   var output: VertexOutput;
   output.position = vec4<f32>(clipCenter + clipOffset, 0.0, 1.0);
   output.local = input.quadCorner;
-  output.color = data.yzw;
+  output.color = clamp(data.yzw * max(tileRender.massColorBoost, 0.0), vec3<f32>(0.0), vec3<f32>(4.0));
 
   let opticalDepth = max(0.0, data.x - tileRender.sparseTileThreshold) * tileRender.opacity * max(tileRender.strength, 0.001);
-  output.alphaScale = clamp(1.0 - exp(-opticalDepth * 0.10), 0.0, 0.08);
+  output.alphaScale = clamp(1.0 - exp(-opticalDepth * 0.10), 0.0, max(tileRender.massMaxAlpha, 0.0));
   return output;
 }
 
@@ -112,6 +125,6 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
 
   let gaussian = exp(-r2 * 3.2);
   let edgeFade = 1.0 - smoothstep(0.82, 1.0, r2);
-  let alpha = clamp(gaussian * edgeFade * input.alphaScale, 0.0, 0.075);
+  let alpha = clamp(gaussian * edgeFade * input.alphaScale, 0.0, max(tileRender.massMaxAlpha, 0.0));
   return vec4<f32>(input.color * alpha, alpha);
 }

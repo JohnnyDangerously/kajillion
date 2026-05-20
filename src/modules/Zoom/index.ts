@@ -1,150 +1,94 @@
-import { zoom, ZoomTransform, zoomIdentity, D3ZoomEvent } from 'd3-zoom'
-import { mat3 } from 'gl-matrix'
 import { Store } from '@/graph/modules/Store'
 import { type GraphConfigInterface } from '@/graph/config'
-import { clamp } from '@/graph/helper'
+import { type EasingFunction } from './animation'
+import {
+  convertScreenToSpacePosition,
+  convertSpaceToScreenPosition,
+  convertSpaceToScreenRadius,
+} from './coordinates'
+import { ZoomEventController } from './events'
+import { ZoomInputController } from './input-controller'
+import {
+  applyNativeZoomMatrix,
+  NativeZoomTransform,
+  type ZoomCallback,
+} from './native'
+import { ZoomTransformController } from './transform-controller'
+import { ZoomViewportController } from './viewport-controller'
+
+export { type NativeZoomEvent, NativeZoomTransform } from './native'
 
 export class Zoom {
   public readonly store: Store
   public readonly config: GraphConfigInterface
-  public eventTransform = zoomIdentity
-  public behavior = zoom<HTMLCanvasElement, undefined>()
-    .scaleExtent([0.001, Infinity])
-    .on('start', (e: D3ZoomEvent<HTMLCanvasElement, undefined>) => {
-      this.isRunning = true
-      // User-driven zooms (scroll, pinch) clear any programmatic override
-      // so they fall back to the config value.
-      const userDriven = !!e.sourceEvent
-      if (userDriven) {
-        this.shouldEnableSimulationDuringZoomOverride = undefined
-      }
-      this.config.onZoomStart?.(e, userDriven)
-    })
-    .on('zoom', (e: D3ZoomEvent<HTMLCanvasElement, undefined>) => {
-      this.eventTransform = e.transform
-      const { eventTransform: { x, y, k }, store: { transform, screenSize } } = this
-      const w = screenSize[0]
-      const h = screenSize[1]
-      if (!w || !h) return
-      mat3.projection(transform, w, h)
-      mat3.translate(transform, transform, [x, y])
-      mat3.scale(transform, transform, [k, k])
-      mat3.translate(transform, transform, [w / 2, h / 2])
-      mat3.scale(transform, transform, [w / 2, h / 2])
-      mat3.scale(transform, transform, [1, -1])
-
-      const userDriven = !!e.sourceEvent
-      this.config.onZoom?.(e, userDriven)
-    })
-    .on('end', (e: D3ZoomEvent<HTMLCanvasElement, undefined>) => {
-      this.isRunning = false
-
-      const userDriven = !!e.sourceEvent
-      this.config.onZoomEnd?.(e, userDriven)
-    })
-
+  public eventTransform = new NativeZoomTransform()
   public isRunning = false
-  /** Per-call override for `enableSimulationDuringZoom` config, set by programmatic zoom methods.
-   * Stale value after transition ends is harmless since `isRunning` is `false` at that point.
-   * Cleared on user-driven zoom start. */
   public shouldEnableSimulationDuringZoomOverride: boolean | undefined = undefined
+  public onStart: ZoomCallback | undefined
+  public onZoom: ZoomCallback | undefined
+  public onEnd: ZoomCallback | undefined
+
+  private readonly viewport: ZoomViewportController
+  private readonly events = new ZoomEventController({
+    getConfig: () => this.config,
+    getTransform: () => this.eventTransform,
+    setRunning: value => { this.isRunning = value },
+    clearSimulationOverride: () => { this.shouldEnableSimulationDuringZoomOverride = undefined },
+    getCallbacks: () => ({ onStart: this.onStart, onZoom: this.onZoom, onEnd: this.onEnd }),
+  })
+  private readonly transforms = new ZoomTransformController({
+    getTransform: () => this.eventTransform,
+    constrainTransform: transform => this.constrainTransform(transform),
+    applyTransform: transform => this.applyTransform(transform),
+    notifyStart: () => this.events.notifyStart(undefined),
+    notifyEnd: () => this.events.notifyEnd(undefined),
+  })
+  private readonly input = new ZoomInputController({
+    isZoomEnabled: () => this.config.enableZoom,
+    isRunning: () => this.isRunning,
+    shouldIgnorePointerDown: () => !!this.store.hoveredPoint && !this.store.isSpaceKeyPressed,
+    cancelAnimation: () => this.cancelAnimation(),
+    notifyStart: event => this.events.notifyStart(event),
+    notifyEnd: event => this.events.notifyEnd(event),
+    applyTransform: (transform, event) => this.applyTransform(transform, event),
+    getTransform: () => this.eventTransform,
+    scaleAround: (anchorX, anchorY, zoomLevel) => this.scaleAround(anchorX, anchorY, zoomLevel),
+  })
 
   public constructor (store: Store, config: GraphConfigInterface) {
     this.store = store
     this.config = config
+    this.viewport = new ZoomViewportController(store, config)
     this.updateScaleExtent()
   }
 
+  public attach (canvas: HTMLCanvasElement): void {
+    if (this.input.isAttachedTo(canvas)) return
+    this.detach()
+    this.input.attach(canvas)
+  }
+
+  public detach (): void {
+    if (!this.input.isAttached()) return
+    this.cancelAnimation()
+    this.input.detach()
+    this.isRunning = false
+  }
+
   public updateScaleExtent (): void {
-    this.behavior.scaleExtent([this.getMinZoomLevel(), this.getMaxZoomLevel()])
+    this.applyTransform(this.constrainTransform(this.eventTransform))
   }
 
   public updateTranslateExtent (): void {
-    if (!this.config.constrainCameraToGraph) {
-      this.behavior.translateExtent([
-        [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY],
-        [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY],
-      ])
-      return
-    }
-
-    const [width, height] = this.store.screenSize
-    const spaceSize = this.store.adjustedSpaceSize
-    if (!width || !height || !Number.isFinite(spaceSize) || spaceSize <= 0) return
-
-    const padding = spaceSize * Math.max(0, this.config.cameraBoundsPadding)
-    const minX = (width - spaceSize) / 2 - padding
-    const maxX = (width + spaceSize) / 2 + padding
-    const minY = (height - spaceSize) / 2 - padding
-    const maxY = (height + spaceSize) / 2 + padding
-    this.behavior.translateExtent([
-      [minX, minY],
-      [maxX, maxY],
-    ])
+    this.viewport.updateTranslateExtent(this.eventTransform, transform => this.applyTransform(transform))
   }
 
-  public constrainTransform (transform: ZoomTransform): ZoomTransform {
-    const [width, height] = this.store.screenSize
-    if (!width || !height) return transform
-    return this.behavior.constrain()(
-      transform,
-      [[0, 0], [width, height]],
-      this.behavior.translateExtent()
-    )
+  public constrainTransform (transform: NativeZoomTransform): NativeZoomTransform {
+    return this.viewport.constrainTransform(transform)
   }
 
-  /**
-   * Returns the zoom transform that fits the given point positions into the viewport.
-   *
-   * @param positions Flat array of point coordinates as `[x0, y0, x1, y1, ...]` (number[] or Float32Array).
-   * @param scale Optional scale factor to apply to the transform.
-   * @param padding Padding around the viewport as a fraction of the viewport size (e.g. 0.1 = 10%).
-   * @returns The zoom transform that fits the positions.
-   */
-  public getTransform (positions: number[] | Float32Array, scale?: number, padding = 0.1): ZoomTransform {
-    if (positions.length === 0) return this.eventTransform
-    const { store: { screenSize } } = this
-    const width = screenSize[0]
-    const height = screenSize[1]
-
-    let minX = Infinity
-    let maxX = -Infinity
-    let minY = Infinity
-    let maxY = -Infinity
-    for (let i = 0; i < positions.length; i += 2) {
-      const x = positions[i] as number
-      const y = positions[i + 1] as number
-      if (x < minX) minX = x
-      if (x > maxX) maxX = x
-      if (y < minY) minY = y
-      if (y > maxY) maxY = y
-    }
-
-    const xExtent: [number, number] = [this.store.scaleX(minX), this.store.scaleX(maxX)]
-    const yExtent: [number, number] = [this.store.scaleY(minY), this.store.scaleY(maxY)]
-    // Adjust extent with one screen pixel if one point coordinate is set
-    if (xExtent[0] === xExtent[1]) {
-      xExtent[0] -= 0.5
-      xExtent[1] += 0.5
-    }
-    if (yExtent[0] === yExtent[1]) {
-      yExtent[0] += 0.5
-      yExtent[1] -= 0.5
-    }
-
-    const xScale = (width * (1 - padding * 2)) / (xExtent[1] - xExtent[0])
-    const yScale = (height * (1 - padding * 2)) / (yExtent[0] - yExtent[1])
-    const clampedScale = clamp(scale ?? Math.min(xScale, yScale), ...this.behavior.scaleExtent())
-    const xCenter = (xExtent[1] + xExtent[0]) / 2
-    const yCenter = (yExtent[1] + yExtent[0]) / 2
-    const translateX = width / 2 - xCenter * clampedScale
-    const translateY = height / 2 - yCenter * clampedScale
-
-    const transform = zoomIdentity
-      .translate(translateX, translateY)
-      .scale(clampedScale)
-
-    return transform
+  public getTransform (positions: number[] | Float32Array, scale?: number, padding = 0.1): NativeZoomTransform {
+    return this.viewport.getTransform(positions, this.eventTransform, scale, padding)
   }
 
   public getDistanceToPoint (position: [number, number]): number {
@@ -155,62 +99,81 @@ export class Zoom {
     return Math.sqrt(dx * dx + dy * dy)
   }
 
-  public getMiddlePointTransform (position: [number, number]): ZoomTransform {
-    const { store: { screenSize }, eventTransform: { x, y, k } } = this
-    const width = screenSize[0]
-    const height = screenSize[1]
-    const currX = (width / 2 - x) / k
-    const currY = (height / 2 - y) / k
-    const pointX = this.store.scaleX(position[0])
-    const pointY = this.store.scaleY(position[1])
-    const centerX = (currX + pointX) / 2
-    const centerY = (currY + pointY) / 2
+  public getMiddlePointTransform (position: [number, number]): NativeZoomTransform {
+    return this.viewport.getMiddlePointTransform(position, this.eventTransform)
+  }
 
-    const scale = 1
-    const translateX = width / 2 - centerX * scale
-    const translateY = height / 2 - centerY * scale
+  public setZoomLevel (zoomLevel: number, duration = 0, ease?: EasingFunction, onComplete?: () => void): void {
+    const [width, height] = this.store.screenSize
+    const anchorX = width / 2
+    const anchorY = height / 2
+    const transform = this.scaleAround(anchorX, anchorY, zoomLevel)
+    this.setTransform(transform, duration, ease, onComplete)
+  }
 
-    return zoomIdentity
-      .translate(translateX, translateY)
-      .scale(scale)
+  public setTransform (transform: NativeZoomTransform, duration = 0, ease?: EasingFunction, onComplete?: () => void): void {
+    this.transforms.setTransform(transform, duration, ease, onComplete)
   }
 
   public convertScreenToSpacePosition (screenPosition: [number, number]): [number, number] {
-    const { eventTransform: { x, y, k }, store: { screenSize } } = this
-    const w = screenSize[0]
-    const h = screenSize[1]
-    const invertedX = (screenPosition[0] - x) / k
-    const invertedY = (screenPosition[1] - y) / k
-    const spacePosition = [invertedX, (h - invertedY)] as [number, number]
-    spacePosition[0] -= (w - this.store.adjustedSpaceSize) / 2
-    spacePosition[1] -= (h - this.store.adjustedSpaceSize) / 2
-    return spacePosition
+    return convertScreenToSpacePosition(
+      screenPosition,
+      this.eventTransform,
+      this.store.screenSize,
+      this.store.adjustedSpaceSize
+    )
   }
 
   public convertSpaceToScreenPosition (spacePosition: [number, number]): [number, number] {
-    const screenPointX = this.eventTransform.applyX(this.store.scaleX(spacePosition[0]))
-    const screenPointY = this.eventTransform.applyY(this.store.scaleY(spacePosition[1]))
-    return [screenPointX, screenPointY]
+    return convertSpaceToScreenPosition(
+      spacePosition,
+      this.eventTransform,
+      this.store.scaleX.bind(this.store),
+      this.store.scaleY.bind(this.store)
+    )
   }
 
   public convertSpaceToScreenRadius (spaceRadius: number): number {
-    const { config: { scalePointsOnZoom }, store: { maxPointSize }, eventTransform: { k } } = this
-    let size = spaceRadius * 2
-    if (scalePointsOnZoom) {
-      size *= k
-    } else {
-      size *= Math.min(5.0, Math.max(1.0, k * 0.01))
-    }
-    return Math.min(size, maxPointSize) / 2
+    return convertSpaceToScreenRadius(
+      spaceRadius,
+      this.config.scalePointsOnZoom,
+      this.store.maxPointSize,
+      this.eventTransform.k
+    )
   }
 
-  private getMinZoomLevel (): number {
-    return Math.max(0.001, Number.isFinite(this.config.minZoomLevel) ? this.config.minZoomLevel : 0.001)
+  public zoomLevelToDistance (zoomLevel: number): number {
+    return this.viewport.zoomLevelToDistance(zoomLevel)
   }
 
-  private getMaxZoomLevel (): number {
-    const maxZoom = this.config.maxZoomLevel
-    if (maxZoom === Infinity) return Infinity
-    return Math.max(this.getMinZoomLevel(), Number.isFinite(maxZoom) ? maxZoom : Infinity)
+  public zoomDistanceToLevel (distance: number): number {
+    return this.viewport.zoomDistanceToLevel(distance)
+  }
+
+  public getZoomDistance (): number {
+    return this.zoomLevelToDistance(this.eventTransform.k)
+  }
+
+  private scaleAround (anchorX: number, anchorY: number, zoomLevel: number): NativeZoomTransform {
+    return this.viewport.scaleAround(
+      this.eventTransform,
+      anchorX,
+      anchorY,
+      zoomLevel
+    )
+  }
+
+  private applyTransform (transform: NativeZoomTransform, sourceEvent?: Event): void {
+    this.eventTransform = this.constrainTransform(transform)
+    this.updateMatrix()
+    this.events.notifyZoom(sourceEvent)
+  }
+
+  private updateMatrix (): void {
+    applyNativeZoomMatrix(this.store.transform, this.store.screenSize, this.eventTransform)
+  }
+
+  private cancelAnimation (): void {
+    this.transforms.cancel()
   }
 }
