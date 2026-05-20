@@ -1,0 +1,6 @@
+id: no-dynamic-eval
+language: TypeScript
+message: Do not use eval; keep agent-authored code statically inspectable.
+severity: error
+rule:
+  pattern: eval($$$ARGS)

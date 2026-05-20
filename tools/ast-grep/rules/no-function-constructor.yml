@@ -1,0 +1,6 @@
+id: no-function-constructor
+language: TypeScript
+message: Do not use the Function constructor; keep code review and bundling static.
+severity: error
+rule:
+  pattern: new Function($$$ARGS)

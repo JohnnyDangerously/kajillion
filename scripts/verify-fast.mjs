@@ -6,6 +6,8 @@ const COMMANDS = [
   ['npm', ['run', 'check:source-size']],
   ['npm', ['run', 'check:wgsl']],
   ['npm', ['run', 'typecheck']],
+  ['npm', ['run', 'ast:scan']],
+  ['npm', ['run', 'arch:check']],
 ];
 
 for (const [command, args] of COMMANDS) {

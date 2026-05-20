@@ -36,6 +36,7 @@ export const ignoredDirs = new Set([
 ])
 
 export const ignoredFiles = new Set([
+  '.dependency-cruiser-known-violations.json',
   'package-lock.json',
   'npm-shrinkwrap.json',
   'pnpm-lock.yaml',

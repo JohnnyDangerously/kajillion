@@ -11,3 +11,4 @@ benchmarks/screenshots/
 demo/replays/
 .claude/
 .agent-map/
+.code-review-graph/
