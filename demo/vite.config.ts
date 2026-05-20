@@ -6,6 +6,7 @@ import { agentCommandPlugin } from './vite/agent-command-plugin'
 import { captureBakePlugin } from './vite/capture-bake-plugin'
 import { captureJsonPlugin } from './vite/capture-json-plugin'
 import { MAX_BASELINE_BYTES, MAX_REPLAY_BYTES } from './vite/constants'
+import { kajillionManualChunks } from '../build/vite-manual-chunks'
 
 // eslint-disable-next-line import/no-default-export
 export default defineConfig({
@@ -35,4 +36,14 @@ export default defineConfig({
     captureJsonPlugin('/record-replay', 'replays', MAX_REPLAY_BYTES, 'kajillion-demo-replay-capture'),
     captureBakePlugin(),
   ],
+  build: {
+    // Three is isolated to the cosmic intro vendor chunk and lands just above
+    // Vite's 500 kB default; keep warnings focused on accidental app growth.
+    chunkSizeWarningLimit: 525,
+    rollupOptions: {
+      output: {
+        manualChunks: kajillionManualChunks,
+      },
+    },
+  },
 })

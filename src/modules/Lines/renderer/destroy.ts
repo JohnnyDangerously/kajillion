@@ -1,12 +1,12 @@
-import type { Lines } from '@/graph/modules/Lines/renderer/lines'
 import { resetLinkStatusBindingsCache } from '@/graph/modules/Lines/passes/shared/link-status-bindings'
 import { resetHoveredLineIndexBindingsCache } from '@/graph/modules/Lines/passes/hover/hovered-line-index-pass'
+import type { LinesRendererContext } from './contracts'
 
 /**
  * Destruction order matters
  * Models -> Framebuffers -> Textures -> UniformStores -> Buffers
  */
-export function destroyLinesRenderer (lines: Lines): void {
+export function destroyLinesRenderer (lines: LinesRendererContext): void {
   // 1. Destroy Models FIRST (they destroy _gpuGeometry if exists, and _uniformStore)
   lines.drawCurveCommand?.destroy()
   lines.drawCurveInstancedCommand?.destroy()

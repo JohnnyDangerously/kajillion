@@ -10,7 +10,7 @@ export function ensureVisibleLineBuffers (
   device: Device,
   state: VisibleLineBufferState,
   linkCount: number,
-  vertexCount: number,
+  vertexCount: number
 ): VisibleLineBufferState {
   if (
     state.visibleLineIndexBuffer &&

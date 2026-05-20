@@ -6,7 +6,7 @@ export function runVisibleLineComputePass (
   device: Device,
   timer: GpuTimerLike | undefined,
   label: string,
-  execute: (pass: ReturnType<Device['beginComputePass']>) => void,
+  execute: (pass: ReturnType<Device['beginComputePass']>) => void
 ): void {
   timer?.begin(label)
   const pass = device.beginComputePass({ id: label })

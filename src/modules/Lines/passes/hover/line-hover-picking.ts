@@ -1,4 +1,3 @@
-import type { Lines } from '@/graph/modules/Lines/renderer/lines'
 import {
   getEffectiveLineSegments,
   getHoverPickScissorRect,
@@ -6,8 +5,9 @@ import {
 import { bindDrawCurveIndexCommandIfNeeded } from '@/graph/modules/Lines/passes/draw/draw-command-bindings'
 import { setDrawLineUniforms } from '@/graph/modules/Lines/passes/draw/draw-command-uniforms'
 import { renderHoveredLineIndexPass } from '@/graph/modules/Lines/passes/hover/hovered-line-index-pass'
+import type { LinesRendererContext } from '@/graph/modules/Lines/renderer/contracts'
 
-export function findHoveredLine (lines: Lines): void {
+export function findHoveredLine (lines: LinesRendererContext): void {
   const { config, points, store } = lines
   if (!points) return
   if (!points.currentPositionTexture || points.currentPositionTexture.destroyed) return

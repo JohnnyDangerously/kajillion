@@ -1,47 +1,17 @@
-import { UniformStore, type Buffer, type ComputePipeline, type Device, type Shader } from '@luma.gl/core'
+import { UniformStore, type Device } from '@luma.gl/core'
 import { ensureVec2 } from '@/graph/modules/Shared/uniform-utils'
 import { DEFAULT_POINT_LOD_ZOOM_RANGE } from '@/graph/modules/Points/passes/shared/constants'
-import type { Mat4Array } from '@/graph/modules/Store'
-import type { CullVisiblePointsUniforms } from './contracts'
+import type {
+  VisiblePointCullPipelineOptions,
+  VisiblePointCullPipelineState,
+} from './pipelineTypes'
 import {
   ensureVisiblePointCullComputePipelines,
   ensureVisiblePointPrefixPipelines,
   ensureVisiblePointTileBudgetPipeline,
 } from './pipelineSetup'
 
-export type VisiblePointCullPipelineState = {
-  uniformStore: UniformStore<CullVisiblePointsUniforms> | undefined;
-  uniformBuffer: Buffer | undefined;
-  cullPipeline: ComputePipeline | undefined;
-  prefixGroupsPipeline: ComputePipeline | undefined;
-  prefixBlocksPipeline: ComputePipeline | undefined;
-  addBlockOffsetsPipeline: ComputePipeline | undefined;
-  clearTileBudgetPipeline: ComputePipeline | undefined;
-  selectTileBudgetPipeline: ComputePipeline | undefined;
-  scatterPipeline: ComputePipeline | undefined;
-  cullShader: Shader | undefined;
-  prefixShader: Shader | undefined;
-  clearTileBudgetShader: Shader | undefined;
-}
-
-export type VisiblePointCullPipelineOptions = {
-  ratio: number;
-  transformationMatrix: Mat4Array;
-  pointCount: number;
-  spaceSize: number;
-  screenSize: [number, number] | undefined;
-  sizeScale: number;
-  scalePointsOnZoom: boolean;
-  maxPointSize: number;
-  pointMinPixelSize: number;
-  pointLodStrength: number;
-  pointLodZoomRange: number[] | undefined;
-  pointLodMinSampleRate: number;
-  pointLodSizeCompensation: number;
-  renderPositionMix: number;
-  hasActiveFilter: boolean;
-  tileBudgetSize: number;
-}
+export type { VisiblePointCullPipelineOptions, VisiblePointCullPipelineState } from './pipelineTypes'
 
 export function ensureVisiblePointCullPipelines (
   device: Device,

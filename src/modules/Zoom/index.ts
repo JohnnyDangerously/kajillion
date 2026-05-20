@@ -1,5 +1,5 @@
 import { Store } from '@/graph/modules/Store'
-import { type GraphConfigInterface } from '@/graph/config'
+import { type GraphConfigInterface } from '@/graph/config/schema'
 import { type EasingFunction } from './animation'
 import {
   convertScreenToSpacePosition,

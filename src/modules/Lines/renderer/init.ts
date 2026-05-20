@@ -18,9 +18,9 @@ import {
   ensureLineDrawPrograms,
 } from '@/graph/modules/Lines/passes/draw/program-lifecycle'
 
-import type { Lines } from './lines'
+import type { LinesRendererContext } from './contracts'
 
-export function initializeLinesRenderer (lines: Lines): void {
+export function initializeLinesRenderer (lines: LinesRendererContext): void {
   const { device, config, store, data } = lines
 
   lines.updateLinkIndexFbo()

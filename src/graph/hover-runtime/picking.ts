@@ -11,7 +11,7 @@ import {
   type HoverChange,
   type HoverDetectionResult,
 } from '@/graph/graph/hover-picking'
-import type { HoverRuntimeContext } from '@/graph/graph/hover-runtime'
+import type { HoverRuntimeContext } from '@/graph/graph/hover-runtime/contracts'
 
 export function findHoveredItemOnCpu (context: HoverRuntimeContext): HoverDetectionResult {
   const point = findHoveredPoint(context)

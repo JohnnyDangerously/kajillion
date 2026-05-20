@@ -1,4 +1,3 @@
-import type { Lines } from '@/graph/modules/Lines/renderer/lines'
 import {
   createSampledLinksUniforms,
   ensureSampledLinksFramebuffer,
@@ -6,8 +5,9 @@ import {
   renderSampledLinksGrid as renderSampledLinksGridPass,
 } from '@/graph/modules/Lines/passes/sampling/sampled-links-renderer'
 import { getEffectiveLineSegments } from '@/graph/modules/Lines/features/draw-lifecycle/lifecycle'
+import type { LinesRendererContext } from '@/graph/modules/Lines/renderer/contracts'
 
-export function updateSampledLinksGridFramebuffer (lines: Lines): void {
+export function updateSampledLinksGridFramebuffer (lines: LinesRendererContext): void {
   const { store: { screenSize }, config: { linkSamplingDistance }, device } = lines
   lines.sampledLinksFbo = ensureSampledLinksFramebuffer({
     device,
@@ -17,7 +17,9 @@ export function updateSampledLinksGridFramebuffer (lines: Lines): void {
   })
 }
 
-export function getSampledLinkPositionsMap (lines: Lines): Map<number, [number, number, number]> {
+export function getSampledLinkPositionsMap (
+  lines: LinesRendererContext
+): Map<number, [number, number, number]> {
   const positions = new Map<number, [number, number, number]>()
   if (!lines.sampledLinksFbo || lines.sampledLinksFbo.destroyed) return positions
   const points = lines.points
@@ -31,7 +33,9 @@ export function getSampledLinkPositionsMap (lines: Lines): Map<number, [number, 
   return positions
 }
 
-export function getSampledLinks (lines: Lines): { indices: number[]; positions: number[]; angles: number[] } {
+export function getSampledLinks (
+  lines: LinesRendererContext
+): { indices: number[]; positions: number[]; angles: number[] } {
   const indices: number[] = []
   const positions: number[] = []
   const angles: number[] = []
@@ -49,7 +53,7 @@ export function getSampledLinks (lines: Lines): { indices: number[]; positions: 
   return { indices, positions, angles }
 }
 
-function renderSampledLinksGrid (lines: Lines): void {
+function renderSampledLinksGrid (lines: LinesRendererContext): void {
   if (!lines.sampledLinksFbo || lines.sampledLinksFbo.destroyed) return
   const points = lines.points
   if (!points?.currentPositionTexture || points.currentPositionTexture.destroyed) return

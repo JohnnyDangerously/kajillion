@@ -1,8 +1,8 @@
 import type { Buffer, ComputePipeline, Device, Shader, UniformStore } from '@luma.gl/core'
 import type { Model } from '@luma.gl/engine'
-import type { GraphConfigInterface } from '@/graph/config'
+import type { GraphConfigInterface } from '@/graph/config/schema'
+import type { CorePointsRef } from '@/graph/modules/core-module'
 import type { GraphData } from '@/graph/modules/GraphData'
-import type { Points } from '@/graph/modules/Points'
 import type { Store } from '@/graph/modules/Store'
 
 import { createForceComputeResources } from './compute'
@@ -29,7 +29,7 @@ export type InitForceManyBodyProgramsOptions = {
   config: GraphConfigInterface;
   store: Store;
   data: GraphData;
-  points: Points | undefined;
+  points: CorePointsRef | undefined;
   levels: number;
   pointIndices: Buffer | undefined;
   calculateLevelsCommand: Model | undefined;

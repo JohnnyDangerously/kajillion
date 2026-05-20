@@ -1,4 +1,4 @@
-import { defaultConfigValues } from '@/graph/variables'
+import { defaultConfigValues } from '@/graph/config/defaults'
 
 /**
  * Applies WebGL texture limits to configured graph space size while preserving

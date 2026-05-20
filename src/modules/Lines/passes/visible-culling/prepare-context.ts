@@ -1,7 +1,7 @@
 import type { Buffer, Device } from '@luma.gl/core'
-import type { GraphConfigInterface } from '@/graph/config'
+import type { GraphConfigInterface } from '@/graph/config/schema'
+import type { CorePointsRef } from '@/graph/modules/core-module'
 import type { GraphData } from '@/graph/modules/GraphData'
-import type { Points } from '@/graph/modules/Points'
 import type { Store } from '@/graph/modules/Store'
 import { getEffectiveLinkLodStrength } from '@/graph/modules/Lines/features/draw-lifecycle/lifecycle'
 import { DEFAULT_LINK_LOD_ZOOM_RANGE } from '@/graph/modules/Lines/passes/shared/constants'
@@ -11,11 +11,11 @@ export interface VisibleLinePrepareHost {
   readonly device: Device;
   readonly config: GraphConfigInterface;
   readonly data: GraphData;
-  readonly points: Points | undefined;
+  readonly points: CorePointsRef | undefined;
   readonly store: Store;
 }
 
-export type PreparedVisibleLinePoints = Points & {
+export type PreparedVisibleLinePoints = CorePointsRef & {
   positionStorageBuffer: Buffer;
   previousRenderPositionStorageBuffer: Buffer;
 }
@@ -32,7 +32,7 @@ export function getVisibleLinePrepareContext (
   forcePolicy: boolean,
   pointABuffer: Buffer,
   pointBBuffer: Buffer,
-  vertexCount: number,
+  vertexCount: number
 ): VisibleLinePrepareContext | undefined {
   const { config, data, device, points, store } = host
   if (device.info?.type !== 'webgpu') return undefined

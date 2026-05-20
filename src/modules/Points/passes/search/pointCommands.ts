@@ -5,7 +5,7 @@ import findHoveredPointWgsl from '@/graph/modules/Points/find-hovered-point.wgsl
 import fillGridWithSampledPointsFrag from '@/graph/modules/Points/fill-sampled-points.frag?raw'
 import fillGridWithSampledPointsVert from '@/graph/modules/Points/fill-sampled-points.vert?raw'
 import fillGridWithSampledPointsWgsl from '@/graph/modules/Points/fill-sampled-points.wgsl?raw'
-import type { PointSearchSetupOptions, PointSearchSetupState } from './setup'
+import type { PointSearchSetupOptions, PointSearchSetupState } from './contracts'
 import {
   createFillSampledPointsUniformStore,
   createFindHoveredPointUniformStore,

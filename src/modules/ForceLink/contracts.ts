@@ -1,8 +1,8 @@
 import type { Buffer, ComputePipeline, Device, Shader, Texture, UniformStore } from '@luma.gl/core'
 import type { Model } from '@luma.gl/engine'
-import type { GraphConfigInterface } from '@/graph/config'
+import type { GraphConfigInterface } from '@/graph/config/schema'
+import type { CorePointsRef } from '@/graph/modules/core-module'
 import type { GraphData } from '@/graph/modules/GraphData'
-import type { Points } from '@/graph/modules/Points'
 import type { Store } from '@/graph/modules/Store'
 
 export enum LinkDirection {
@@ -49,12 +49,12 @@ export type ForceLinkCreateContext = {
 export type ForceLinkSetupContext = {
   device: Device;
   store: Store;
-  points: Points | undefined;
+  points: CorePointsRef | undefined;
 }
 
 export type ForceLinkRunContext = {
   device: Device;
   config: GraphConfigInterface;
   store: Store;
-  points: Points | undefined;
+  points: CorePointsRef | undefined;
 }

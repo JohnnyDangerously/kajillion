@@ -1,4 +1,3 @@
-import type { Lines } from '@/graph/modules/Lines/renderer/lines'
 import {
   createLinkArrowAttributeData,
   createLinkEndpointAttributeData,
@@ -9,8 +8,9 @@ import {
   createSampledLinksAttributes,
 } from '@/graph/modules/Lines/passes/sampling/sampled-links-renderer'
 import { getLineAttributeBufferUsage } from '@/graph/modules/Lines/passes/draw/program-lifecycle'
+import type { LinesRendererContext } from '@/graph/modules/Lines/renderer/contracts'
 
-export function updateLineEndpointAttributes (lines: Lines): void {
+export function updateLineEndpointAttributes (lines: LinesRendererContext): void {
   const { device, data, store } = lines
   if (data.linksNumber === undefined || data.links === undefined) return
   if (!store.pointsTextureSize) return // Guard against 0/undefined
@@ -85,7 +85,7 @@ export function updateLineEndpointAttributes (lines: Lines): void {
   if (lines.config.highlightedLinkIndices !== undefined) lines.updateLinkStatus()
 }
 
-export function updateLineColorAttribute (lines: Lines): void {
+export function updateLineColorAttribute (lines: LinesRendererContext): void {
   const { device, data } = lines
   const linksNumber = data.linksNumber ?? 0
   const colorData = data.linkColors ?? new Float32Array(linksNumber * 4).fill(0)
@@ -108,7 +108,7 @@ export function updateLineColorAttribute (lines: Lines): void {
   })
 }
 
-export function updateLineWidthAttribute (lines: Lines): void {
+export function updateLineWidthAttribute (lines: LinesRendererContext): void {
   const { device, data } = lines
   const linksNumber = data.linksNumber ?? 0
   const widthData = data.linkWidths ?? new Float32Array(linksNumber).fill(0)
@@ -131,7 +131,7 @@ export function updateLineWidthAttribute (lines: Lines): void {
   })
 }
 
-export function updateLineArrowAttribute (lines: Lines): void {
+export function updateLineArrowAttribute (lines: LinesRendererContext): void {
   const { device, data } = lines
   // linkArrows is number[] not Float32Array, so we need to convert it
   // Ensure we have the right size even if linkArrows is undefined

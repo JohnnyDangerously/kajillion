@@ -1,15 +1,17 @@
 import { scaleLinear } from 'd3-scale'
 import { mat3 } from 'gl-matrix'
 import { Random } from 'random'
+import { focusedPointRingOpacity, hoveredPointRingOpacity, defaultConfigValues } from '@/graph/config/defaults'
+import type { GraphConfigInterface } from '@/graph/config/schema'
 import { rgbToBrightness } from '@/graph/helper'
 import { MAX_POINT_SIZE } from '@/graph/modules/Shared/point-constants'
-import { hoveredPointRingOpacity, focusedPointRingOpacity, defaultConfigValues } from '@/graph/variables'
-import type { GraphConfigInterface } from '@/graph/config'
 import { resetUnsetRgba, setRgbFromColor, setRgbaFromColor, type RgbaColor } from './color'
+import { type Hovered } from './hovered'
 import { toStd140TransformMatrix, type Mat4Array } from './matrix'
 import { getAdjustedSpaceSize } from './space-size'
 
 export const ALPHA_MIN = 0.001
+export type { Hovered } from './hovered'
 export type { Mat4Array } from './matrix'
 
 /**
@@ -25,7 +27,6 @@ export const MAX_HOVER_DETECTION_DELAY = 4
  */
 export const MIN_MOUSE_MOVEMENT_THRESHOLD = 2
 
-export type Hovered = { index: number; position: [ number, number ] }
 type Focused = { index: number }
 
 export class Store {

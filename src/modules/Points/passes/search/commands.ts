@@ -6,7 +6,7 @@ import findPointsInRectWgsl from '@/graph/modules/Points/find-points-in-rect.wgs
 import updateVert from '@/graph/modules/Shared/quad.vert?raw'
 import { createFullscreenQuadBuffer } from '@/graph/modules/Points/passes/resources/lifecycle'
 
-import type { PointSearchSetupOptions, PointSearchSetupState } from './setup'
+import type { PointSearchSetupOptions, PointSearchSetupState } from './contracts'
 import {
   createFillSampledPointsUniformStore,
   createFindHoveredPointUniformStore,

@@ -1,4 +1,4 @@
-import { type GraphConfigInterface } from '@/graph/config'
+import { type GraphConfigInterface } from '@/graph/config/schema'
 import { clamp } from '@/graph/helper'
 import { NativeZoomTransform } from './native'
 

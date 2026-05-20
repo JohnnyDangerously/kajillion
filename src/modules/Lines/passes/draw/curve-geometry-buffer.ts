@@ -1,9 +1,9 @@
 import { Buffer } from '@luma.gl/core'
-import type { Lines } from '@/graph/modules/Lines/renderer/lines'
 import { getCurveLineGeometry } from '@/graph/modules/Lines/geometry'
 import { getEffectiveLineSegments } from '@/graph/modules/Lines/features/draw-lifecycle/lifecycle'
+import type { LinesRendererContext } from '@/graph/modules/Lines/renderer/contracts'
 
-export function updateCurveLineGeometryBuffer (lines: Lines): void {
+export function updateCurveLineGeometryBuffer (lines: LinesRendererContext): void {
   const { device } = lines
   lines.curveLineGeometry = getCurveLineGeometry(getEffectiveLineSegments(lines.config))
 

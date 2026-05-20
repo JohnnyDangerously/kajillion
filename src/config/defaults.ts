@@ -1,4 +1,4 @@
-import { PointShape } from '@/graph/modules/GraphData'
+import { PointShape } from '@/graph/modules/GraphData/point-shape'
 import { renderLodDepthDefaultConfigValues } from './render-lod-depth'
 import { simulationDefaultConfigValues } from './simulation'
 import { type GraphConfigInterface } from './schema'

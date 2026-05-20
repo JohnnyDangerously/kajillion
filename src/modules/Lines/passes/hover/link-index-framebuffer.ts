@@ -1,8 +1,8 @@
 import { Texture } from '@luma.gl/core'
-import type { Lines } from '@/graph/modules/Lines/renderer/lines'
 import { getBytesPerRow } from '@/graph/modules/Shared/texture-utils'
+import type { LinesRendererContext } from '@/graph/modules/Lines/renderer/contracts'
 
-export function updateLinkIndexFramebuffer (lines: Lines): void {
+export function updateLinkIndexFramebuffer (lines: LinesRendererContext): void {
   const { device, store } = lines
 
   if (device.info?.type === 'webgpu') return

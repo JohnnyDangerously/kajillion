@@ -1,8 +1,6 @@
 import type { GpuTimerLike } from '@/graph/modules/Points/passes/shared/contracts'
-import {
-  prepareVisiblePointCullDraw,
-  type VisiblePointCullState,
-} from '@/graph/modules/Points/passes/visible-culling/prepare'
+import { prepareVisiblePointCullDraw } from '@/graph/modules/Points/passes/visible-culling/prepare'
+import type { VisiblePointCullState } from '@/graph/modules/Points/passes/visible-culling/prepareTypes'
 import {
   updateActivePointMask as updateActivePointMaskState,
 } from '@/graph/modules/Points/passes/visible-culling/activeMask'

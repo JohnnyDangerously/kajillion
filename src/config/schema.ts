@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { D3DragEvent } from 'd3-drag'
-import { type Hovered } from '@/graph/modules/Store'
-import { type NativeZoomEvent } from '@/graph/modules/Zoom'
-import { PointShape } from '@/graph/modules/GraphData'
+import { type Hovered } from '@/graph/modules/Store/hovered'
+import { type NativeZoomEvent } from '@/graph/modules/Zoom/native'
+import { PointShape } from '@/graph/modules/GraphData/point-shape'
 import { type RenderLodDepthConfig } from './render-lod-depth'
 import { type SimulationConfig } from './simulation'
 

@@ -8,7 +8,7 @@ import type {
   FindPointsInRectUniforms,
 } from '@/graph/modules/Points/passes/draw/contracts'
 
-import type { PointSearchSetupOptions } from './setup'
+import type { PointSearchSetupOptions } from './contracts'
 
 export function createFindPointsInRectUniformStore (
   options: PointSearchSetupOptions,

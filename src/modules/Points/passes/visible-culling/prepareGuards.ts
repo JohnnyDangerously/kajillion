@@ -3,7 +3,7 @@ import type { CullVisiblePointsUniforms } from '@/graph/modules/Points/passes/vi
 import type {
   PrepareVisiblePointCullOptions,
   VisiblePointCullState,
-} from '@/graph/modules/Points/passes/visible-culling/prepare'
+} from '@/graph/modules/Points/passes/visible-culling/prepareTypes'
 
 export function canAttemptVisiblePointCull (options: PrepareVisiblePointCullOptions): boolean {
   if (options.device.info?.type !== 'webgpu') return false

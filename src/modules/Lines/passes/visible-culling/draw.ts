@@ -1,12 +1,12 @@
 import type { Buffer, Device, RenderPass, Texture, UniformStore } from '@luma.gl/core'
 import type { Model } from '@luma.gl/engine'
-import type { Points } from '@/graph/modules/Points'
+import type { CorePointsRef } from '@/graph/modules/core-module'
 import type { LineDrawUniformStoreShape } from '@/graph/modules/Lines/passes/draw/contracts'
 import { drawModelIndirect } from '@/graph/modules/Lines/passes/visible-culling/indirect-draw'
 
 export interface VisibleLineDrawHost {
   readonly device: Device;
-  readonly points: Points | undefined;
+  readonly points: CorePointsRef | undefined;
 }
 
 export interface VisibleLineDrawInput {

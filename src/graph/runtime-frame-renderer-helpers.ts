@@ -1,7 +1,7 @@
 import { renderCanvasScene } from '@/graph/render/render-canvas-scene'
 import type { MsaaTarget } from '@/graph/render/msaa-target'
+import type { RuntimeFrameRendererContext } from '@/graph/graph/runtime-frame-renderer-contracts'
 
-import type { RuntimeFrameRendererContext } from './runtime-frame-renderer'
 import {
   getForceThrottleAlpha,
   shouldCaptureRenderPositions,

@@ -5,7 +5,7 @@ import type {
   FindPointsInPolygonOptions,
   FindPointsInRectOptions,
   SampledPointFillOptions,
-} from './selection'
+} from './contracts'
 
 export function runFindPointsInRect (options: FindPointsInRectOptions): boolean {
   const {

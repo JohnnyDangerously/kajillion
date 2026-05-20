@@ -2,7 +2,7 @@ import { ensureVisiblePointCullPipelines } from '@/graph/modules/Points/passes/v
 import type {
   PrepareVisiblePointCullOptions,
   VisiblePointCullState,
-} from '@/graph/modules/Points/passes/visible-culling/prepare'
+} from '@/graph/modules/Points/passes/visible-culling/prepareTypes'
 
 export type EnsureVisiblePointCullPipelineStateOptions = {
   state: VisiblePointCullState;

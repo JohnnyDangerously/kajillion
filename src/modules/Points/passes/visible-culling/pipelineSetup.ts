@@ -2,7 +2,7 @@ import type { Device } from '@luma.gl/core'
 import { cullVisiblePointsComputeWgsl } from '@/graph/modules/Points/cull-visible-points.compute.wgsl'
 import { prefixVisiblePointsComputeWgsl } from '@/graph/modules/Points/prefix-visible-points.compute.wgsl'
 import { clearVisiblePointTileBudgetComputeWgsl } from '@/graph/modules/Points/clear-visible-point-tile-budget.compute.wgsl'
-import type { VisiblePointCullPipelineState } from './pipelines'
+import type { VisiblePointCullPipelineState } from './pipelineTypes'
 
 export function ensureVisiblePointCullComputePipelines (
   device: Device,

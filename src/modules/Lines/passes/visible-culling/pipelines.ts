@@ -1,8 +1,8 @@
 import { UniformStore, type Buffer, type ComputePipeline, type Device, type Shader } from '@luma.gl/core'
 
-import type { GraphConfigInterface } from '@/graph/config'
+import type { GraphConfigInterface } from '@/graph/config/schema'
+import type { CorePointsRef } from '@/graph/modules/core-module'
 import type { GraphData } from '@/graph/modules/GraphData'
-import type { Points } from '@/graph/modules/Points'
 import type { Store } from '@/graph/modules/Store'
 import { clearVisibleLinesComputeWgsl } from '@/graph/modules/Lines/clear-visible-lines.compute.wgsl'
 import { cullVisibleLinesComputeWgsl } from '@/graph/modules/Lines/cull-visible-lines.compute.wgsl'
@@ -34,7 +34,7 @@ export interface VisibleLinePipelineInput {
   device: Device;
   config: GraphConfigInterface;
   data: GraphData;
-  points: Points | undefined;
+  points: CorePointsRef | undefined;
   store: Store;
   vertexCount: number;
   state: VisibleLinePipelineState;

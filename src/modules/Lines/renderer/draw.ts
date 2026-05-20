@@ -16,12 +16,12 @@ import {
 } from '@/graph/modules/Lines/features/draw-lifecycle/lifecycle'
 import type { GpuTimerLike } from '@/graph/modules/Lines/passes/shared/contracts'
 
-import type { Lines } from './lines'
+import type { LinesRendererContext } from './contracts'
 
 export function drawLinesRenderer (
-  lines: Lines,
+  lines: LinesRendererContext,
   renderPass: RenderPass,
-  usePreparedCulledDraw = false,
+  usePreparedCulledDraw = false
 ): void {
   const { config, points } = lines
   if (!points) return
@@ -96,9 +96,9 @@ export function drawLinesRenderer (
 }
 
 export function prepareGpuCulledLineDraw (
-  lines: Lines,
+  lines: LinesRendererContext,
   timer?: GpuTimerLike,
-  forcePolicy = false,
+  forcePolicy = false
 ): boolean {
   lines.visibleLineCullingPass.resetPrepared()
   if (lines.device.info?.type !== 'webgpu') return false

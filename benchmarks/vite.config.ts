@@ -3,6 +3,8 @@ import { writeFileSync, renameSync, mkdirSync, unlinkSync } from 'fs'
 import { resolve } from 'path'
 import { defineConfig, type Plugin } from 'vite'
 
+import { kajillionManualChunks } from '../build/vite-manual-chunks'
+
 const MAX_RESULT_BYTES = 5 * 1024 * 1024 // 5 MB
 
 function captureResultsPlugin (): Plugin {
@@ -85,4 +87,11 @@ export default defineConfig({
     },
   },
   plugins: [captureResultsPlugin()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: kajillionManualChunks,
+      },
+    },
+  },
 })

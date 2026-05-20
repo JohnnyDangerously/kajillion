@@ -1,8 +1,8 @@
 import { Buffer, UniformStore, type ComputePipeline, type Device, type RenderPass, type Shader } from '@luma.gl/core'
 import type { Model } from '@luma.gl/engine'
-import type { GraphConfigInterface } from '@/graph/config'
+import type { GraphConfigInterface } from '@/graph/config/schema'
+import type { CorePointsRef } from '@/graph/modules/core-module'
 import type { GraphData } from '@/graph/modules/GraphData'
-import type { Points } from '@/graph/modules/Points'
 import { precomputeLineInstancesWgsl } from '@/graph/modules/Lines/precompute-line-instances.compute.wgsl'
 import { LINE_INSTANCE_BYTE_LENGTH } from '@/graph/modules/Lines/passes/shared/constants'
 import type { LineDrawUniformStoreShape } from '@/graph/modules/Lines/passes/draw/contracts'
@@ -16,7 +16,7 @@ export interface LineInstancePrecomputeHost {
   readonly device: Device;
   readonly config: GraphConfigInterface;
   readonly data: GraphData;
-  readonly points: Points | undefined;
+  readonly points: CorePointsRef | undefined;
 }
 
 export class LineInstancePrecomputePass {
