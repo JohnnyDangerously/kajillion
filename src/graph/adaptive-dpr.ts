@@ -31,7 +31,7 @@ export const sanitizePixelRatio = (ratio: number): number =>
 
 export const hasAdaptiveDprCameraMotion = (
   current: AdaptiveDprTransform,
-  previous: AdaptiveDprTransform,
+  previous: AdaptiveDprTransform
 ): boolean => {
   const hasPreviousTransform = Number.isFinite(previous.x) &&
     Number.isFinite(previous.y) &&
@@ -44,7 +44,7 @@ export const hasAdaptiveDprCameraMotion = (
 }
 
 export const resolveAdaptiveDprDecision = (
-  input: AdaptiveDprDecisionInput,
+  input: AdaptiveDprDecisionInput
 ): AdaptiveDprDecision => {
   const interactionDpr = sanitizePixelRatio(typeof input.setting === 'number' ? input.setting : 1.0)
   const fullDpr = sanitizePixelRatio(input.configuredPixelRatio)

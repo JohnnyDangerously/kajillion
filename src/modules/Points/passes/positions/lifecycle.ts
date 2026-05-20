@@ -13,7 +13,7 @@ export type PositionStorageBufferState = {
 export function createInitialPositionState (
   pointPositions: Float32Array | number[],
   pointsNumber: number,
-  pointsTextureSize: number,
+  pointsTextureSize: number
 ): Float32Array {
   const textureDataSize = pointsTextureSize * pointsTextureSize * 4
   const initialState = new Float32Array(textureDataSize)
@@ -44,7 +44,7 @@ export function ensurePositionTarget (
   state: PositionTargetState,
   pointsTextureSize: number,
   data: Float32Array,
-  usage: number,
+  usage: number
 ): PositionTargetState {
   return ensureRgba32FloatTarget(device, state, pointsTextureSize, data, usage)
 }
@@ -52,7 +52,7 @@ export function ensurePositionTarget (
 export function ensureVelocityTarget (
   device: Device,
   state: PositionTargetState,
-  pointsTextureSize: number,
+  pointsTextureSize: number
 ): PositionTargetState {
   const velocityData = new Float32Array(pointsTextureSize * pointsTextureSize * 4).fill(0)
   return ensureRgba32FloatTarget(
@@ -60,7 +60,7 @@ export function ensureVelocityTarget (
     state,
     pointsTextureSize,
     velocityData,
-    Texture.SAMPLE | Texture.STORAGE | Texture.RENDER | Texture.COPY_DST,
+    Texture.SAMPLE | Texture.STORAGE | Texture.RENDER | Texture.COPY_DST
   )
 }
 
@@ -68,20 +68,20 @@ export function ensureSearchTarget (
   device: Device,
   state: PositionTargetState,
   pointsTextureSize: number,
-  data: Float32Array,
+  data: Float32Array
 ): PositionTargetState {
   return ensureRgba32FloatTarget(
     device,
     state,
     pointsTextureSize,
     data,
-    Texture.SAMPLE | Texture.RENDER | Texture.COPY_SRC | Texture.COPY_DST,
+    Texture.SAMPLE | Texture.RENDER | Texture.COPY_SRC | Texture.COPY_DST
   )
 }
 
 export function ensureHoveredTarget (
   device: Device,
-  state: PositionTargetState,
+  state: PositionTargetState
 ): PositionTargetState {
   const texture = state.texture
   if (texture && !texture.destroyed) return state
@@ -108,7 +108,7 @@ export function ensurePositionStorageBuffers (
   device: Device,
   state: PositionStorageBufferState,
   pointsTextureSize: number,
-  initialState: Float32Array,
+  initialState: Float32Array
 ): PositionStorageBufferState {
   if (
     device.info?.type !== 'webgpu' ||

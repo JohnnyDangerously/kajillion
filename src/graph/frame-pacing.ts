@@ -36,7 +36,7 @@ export const roundRefreshHz = (estimatedRefreshHz: number): number => {
 export const getTargetRenderFps = (
   frameRateLimit: number,
   frameRateHeadroomFps: number,
-  estimatedRefreshHz: number,
+  estimatedRefreshHz: number
 ): number => {
   const sanitizedFrameRateLimit = Number.isFinite(frameRateLimit) ? frameRateLimit : 0
   if (sanitizedFrameRateLimit > 0) return sanitizedFrameRateLimit
@@ -51,7 +51,7 @@ export const getTargetRenderFps = (
 
 export const createFramePacingStats = (
   counters: FramePacingCounters,
-  targetFps: number,
+  targetFps: number
 ): FramePacingStats => {
   const total = counters.renderedFrameCount + counters.skippedFrameCount
   return {
@@ -68,7 +68,7 @@ export const createFramePacingStats = (
 export const updateRefreshEstimate = (
   state: FramePacingEstimateState,
   now: number,
-  isDocumentVisible: boolean,
+  isDocumentVisible: boolean
 ): FramePacingEstimateState => {
   if (!isDocumentVisible) {
     return { ...state, lastRafFrameMs: now }
@@ -98,7 +98,7 @@ export const updateRefreshEstimate = (
 export const shouldRenderOnRaf = (
   now: number,
   targetFps: number,
-  nextRenderEligibleMs: number,
+  nextRenderEligibleMs: number
 ): RafRenderDecision => {
   if (targetFps <= 0) return { shouldRender: true, nextRenderEligibleMs }
 

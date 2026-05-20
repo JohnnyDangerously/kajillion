@@ -171,5 +171,4 @@ export class TimerQueryPoolWebGPU {
   private startMapForFrame (frame: FrameRecord): void {
     startMapForFrame(frame, () => this.gpuDevice, this.stagingPool, this.stats)
   }
-
 }

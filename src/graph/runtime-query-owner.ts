@@ -2,11 +2,11 @@ import type { GraphData } from '@/graph/modules/GraphData'
 import type { Points } from '@/graph/modules/Points'
 
 export interface GraphRuntimeQueryOwner {
-  _isDestroyed: boolean
-  graph: GraphData
-  points: Points | undefined
-  ensureDevice: (callback: () => void) => boolean
-  trackPointPositionsByIndices: (indices: number[]) => void
+  _isDestroyed: boolean;
+  graph: GraphData;
+  points: Points | undefined;
+  ensureDevice: (callback: () => void) => boolean;
+  trackPointPositionsByIndices: (indices: number[]) => void;
 }
 
 export function getRuntimeQueryOwner (runtime: unknown): GraphRuntimeQueryOwner {

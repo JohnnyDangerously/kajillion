@@ -13,21 +13,21 @@ import { type DebugFrameTraceEvent } from './runtime-contracts'
 type GraphRuntimeEvent = NativeZoomEvent | D3DragEvent<HTMLCanvasElement, undefined, Hovered> | MouseEvent
 
 export interface TraceRuntimeDebugFrameOptions {
-  enabled: boolean
-  trace: DebugFrameTraceEvent[]
-  limit: number
-  name: string
-  data?: Record<string, unknown>
-  rafCallbackCount: number
-  renderedFrameCount: number
-  skippedFrameCount: number
-  isRenderDirty: boolean
-  renderDirtyFrameCount: number
-  currentEvent: GraphRuntimeEvent | undefined
-  store: Store
-  zoomInstance: Zoom
-  dragInstance: Drag
-  canvas: HTMLCanvasElement | undefined
+  enabled: boolean;
+  trace: DebugFrameTraceEvent[];
+  limit: number;
+  name: string;
+  data?: Record<string, unknown>;
+  rafCallbackCount: number;
+  renderedFrameCount: number;
+  skippedFrameCount: number;
+  isRenderDirty: boolean;
+  renderDirtyFrameCount: number;
+  currentEvent: GraphRuntimeEvent | undefined;
+  store: Store;
+  zoomInstance: Zoom;
+  dragInstance: Drag;
+  canvas: HTMLCanvasElement | undefined;
 }
 
 export function traceRuntimeDebugFrame ({

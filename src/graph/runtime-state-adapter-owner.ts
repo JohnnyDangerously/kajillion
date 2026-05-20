@@ -24,55 +24,55 @@ import type { ITimerQueryPool } from '@/graph/perf'
 import type { ResolvedRenderPolicy } from '@/graph/render/resolveAdaptiveRenderPolicy'
 
 export interface GraphStateAdapterOwner {
-  _isDestroyed: boolean
-  _lastAppliedDpr: number | undefined
-  canvas: HTMLCanvasElement
-  clusters: Clusters | undefined
-  config: GraphConfigInterface
-  currentEvent: NativeZoomEvent | D3DragEvent<HTMLCanvasElement, undefined, Hovered> | MouseEvent | undefined
-  debugFrameTrace: DebugFrameTraceEvent[]
-  debugFrameTraceLimit: number
-  device: Device | undefined
-  dragInstance: Drag
-  forceCenter: ForceCenter | undefined; forceGravity: ForceGravity | undefined
-  forceLinkIncoming: ForceLink | undefined; forceLinkOutgoing: ForceLink | undefined
-  forceManyBody: ForceManyBody | undefined; forceMouse: ForceMouse | undefined
-  fpsMonitor: FPSMonitor | undefined
-  frameLoop: RuntimeFrameLoopController
-  graph: GraphData
-  hoverState: HoverRuntimeState
-  isLinkArrowUpdateNeeded: boolean; isLinkColorUpdateNeeded: boolean
-  isLinkWidthUpdateNeeded: boolean; isLinksUpdateNeeded: boolean
-  isPointClusterUpdateNeeded: boolean; isPointColorUpdateNeeded: boolean
-  isPointImageIndicesUpdateNeeded: boolean; isPointImageSizesUpdateNeeded: boolean
-  isPointImpostorAutoActive: boolean
-  isPointPositionsUpdateNeeded: boolean; isPointShapeUpdateNeeded: boolean
-  isPointSizeUpdateNeeded: boolean
-  isRenderDirty: boolean
-  isRightClickMouse: boolean
-  isForceCenterUpdateNeeded: boolean; isForceLinkUpdateNeeded: boolean
-  isForceManyBodyUpdateNeeded: boolean
-  lastSimTickMs: number
-  lines: Lines | undefined
-  linkHoverPathCache: LinkHoverPathCache
-  points: Points | undefined
-  renderDirtyFrameCount: number
-  resolvedRenderPolicy: ResolvedRenderPolicy | undefined
-  simFrameCounter: number
-  store: Store
-  timerQueryPool: ITimerQueryPool | undefined
-  webGpuLinkPickerGrid: WebGpuLinkPickerGrid | undefined; webGpuPointPickerGrid: WebGpuPointPickerGrid | undefined
-  webGpuPointPositions: PointPositionReadbackCache
-  zoomInstance: Zoom
-  applyEffectivePixelRatio: (ratio: number) => boolean
-  markLinksChanged: () => void
-  markPointPositionsChanged: () => void
-  markRenderDirty: () => void
-  maybeApplyAdaptiveDpr: (nowMs: number) => boolean
-  rebuildWebGpuLinkPickerGrid: (positions: Float32Array) => void; rebuildWebGpuPointPickerGrid: (positions: Float32Array) => void
-  requestWebGpuPointPositionsSnapshot: (force?: boolean) => void
-  resizeCanvas: (forceResize?: boolean) => void
-  update: (simulationAlpha?: number) => void
-  updateZoomDragBehaviors: () => void
-  getZoomDistance: () => number
+  _isDestroyed: boolean;
+  _lastAppliedDpr: number | undefined;
+  canvas: HTMLCanvasElement;
+  clusters: Clusters | undefined;
+  config: GraphConfigInterface;
+  currentEvent: NativeZoomEvent | D3DragEvent<HTMLCanvasElement, undefined, Hovered> | MouseEvent | undefined;
+  debugFrameTrace: DebugFrameTraceEvent[];
+  debugFrameTraceLimit: number;
+  device: Device | undefined;
+  dragInstance: Drag;
+  forceCenter: ForceCenter | undefined; forceGravity: ForceGravity | undefined;
+  forceLinkIncoming: ForceLink | undefined; forceLinkOutgoing: ForceLink | undefined;
+  forceManyBody: ForceManyBody | undefined; forceMouse: ForceMouse | undefined;
+  fpsMonitor: FPSMonitor | undefined;
+  frameLoop: RuntimeFrameLoopController;
+  graph: GraphData;
+  hoverState: HoverRuntimeState;
+  isLinkArrowUpdateNeeded: boolean; isLinkColorUpdateNeeded: boolean;
+  isLinkWidthUpdateNeeded: boolean; isLinksUpdateNeeded: boolean;
+  isPointClusterUpdateNeeded: boolean; isPointColorUpdateNeeded: boolean;
+  isPointImageIndicesUpdateNeeded: boolean; isPointImageSizesUpdateNeeded: boolean;
+  isPointImpostorAutoActive: boolean;
+  isPointPositionsUpdateNeeded: boolean; isPointShapeUpdateNeeded: boolean;
+  isPointSizeUpdateNeeded: boolean;
+  isRenderDirty: boolean;
+  isRightClickMouse: boolean;
+  isForceCenterUpdateNeeded: boolean; isForceLinkUpdateNeeded: boolean;
+  isForceManyBodyUpdateNeeded: boolean;
+  lastSimTickMs: number;
+  lines: Lines | undefined;
+  linkHoverPathCache: LinkHoverPathCache;
+  points: Points | undefined;
+  renderDirtyFrameCount: number;
+  resolvedRenderPolicy: ResolvedRenderPolicy | undefined;
+  simFrameCounter: number;
+  store: Store;
+  timerQueryPool: ITimerQueryPool | undefined;
+  webGpuLinkPickerGrid: WebGpuLinkPickerGrid | undefined; webGpuPointPickerGrid: WebGpuPointPickerGrid | undefined;
+  webGpuPointPositions: PointPositionReadbackCache;
+  zoomInstance: Zoom;
+  applyEffectivePixelRatio: (ratio: number) => boolean;
+  markLinksChanged: () => void;
+  markPointPositionsChanged: () => void;
+  markRenderDirty: () => void;
+  maybeApplyAdaptiveDpr: (nowMs: number) => boolean;
+  rebuildWebGpuLinkPickerGrid: (positions: Float32Array) => void; rebuildWebGpuPointPickerGrid: (positions: Float32Array) => void;
+  requestWebGpuPointPositionsSnapshot: (force?: boolean) => void;
+  resizeCanvas: (forceResize?: boolean) => void;
+  update: (simulationAlpha?: number) => void;
+  updateZoomDragBehaviors: () => void;
+  getZoomDistance: () => number;
 }

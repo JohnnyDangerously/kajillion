@@ -44,7 +44,7 @@ export abstract class GraphRuntimeViewApi extends GraphRuntimeInspectionApi {
       scale,
       canZoomOut,
       enableSimulation,
-      () => this.zoomToPointByIndex(index, duration, scale, canZoomOut, enableSimulation),
+      () => this.zoomToPointByIndex(index, duration, scale, canZoomOut, enableSimulation)
     )
   }
 
@@ -124,7 +124,7 @@ export abstract class GraphRuntimeViewApi extends GraphRuntimeInspectionApi {
       duration,
       padding,
       enableSimulation,
-      () => this.fitViewByPointIndices(indices, duration, padding, enableSimulation),
+      () => this.fitViewByPointIndices(indices, duration, padding, enableSimulation)
     )
   }
 
@@ -142,7 +142,7 @@ export abstract class GraphRuntimeViewApi extends GraphRuntimeInspectionApi {
       duration,
       padding,
       enableSimulation,
-      () => this.fitViewByPointPositions(positions, duration, padding, enableSimulation),
+      () => this.fitViewByPointPositions(positions, duration, padding, enableSimulation)
     )
   }
 
@@ -163,7 +163,7 @@ export abstract class GraphRuntimeViewApi extends GraphRuntimeInspectionApi {
       scale,
       padding,
       enableSimulation,
-      () => this.setZoomTransformByPointPositions(positions, duration, scale, padding, enableSimulation),
+      () => this.setZoomTransformByPointPositions(positions, duration, scale, padding, enableSimulation)
     )
   }
 

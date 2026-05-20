@@ -12,11 +12,11 @@ import {
 } from '@/graph/graph/readback/point-position-readback-cache'
 
 export interface ReadPointPositionsContext {
-  device: Device
-  graph: GraphData
-  points: Points
-  pointPositionCache: PointPositionReadbackCache
-  requestWebGpuPointPositionsSnapshot: () => void
+  device: Device;
+  graph: GraphData;
+  points: Points;
+  pointPositionCache: PointPositionReadbackCache;
+  requestWebGpuPointPositionsSnapshot: () => void;
 }
 
 export function readPointPositionsSync ({
@@ -52,15 +52,15 @@ export function readPointPositionsSync ({
 }
 
 export interface ReadbackViewContext {
-  isDestroyed: () => boolean
-  readbackPointPositions: () => Promise<Float32Array>
+  isDestroyed: () => boolean;
+  readbackPointPositions: () => Promise<Float32Array>;
   setZoomTransformByPointPositions: (
     positions: Float32Array,
     duration?: number,
     scale?: number,
     padding?: number,
     enableSimulation?: boolean
-  ) => void
+  ) => void;
 }
 
 export async function fitViewFromReadback (
@@ -100,10 +100,10 @@ export async function fitViewByPointIndicesFromReadback (
 }
 
 export interface ZoomToPointReadbackContext extends ReadbackViewContext {
-  hasCanvasSelection: () => boolean
-  getZoomLevel: () => number
-  store: Store
-  zoomInstance: Zoom
+  hasCanvasSelection: () => boolean;
+  getZoomLevel: () => number;
+  store: Store;
+  zoomInstance: Zoom;
 }
 
 export async function zoomToPointByIndexFromReadback (

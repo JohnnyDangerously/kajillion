@@ -6,11 +6,11 @@ import { cloneDebugFrameTrace } from './debug-frame-trace'
 import { type DebugFrameTraceEvent, type FramePacingStats } from './runtime-contracts'
 
 export interface RuntimeFramePacingSnapshotInput {
-  estimatedRefreshHz: number
-  rafCallbackCount: number
-  renderedFrameCount: number
-  skippedFrameCount: number
-  targetFps: number
+  estimatedRefreshHz: number;
+  rafCallbackCount: number;
+  renderedFrameCount: number;
+  skippedFrameCount: number;
+  targetFps: number;
 }
 
 export function getRuntimeGpuTimings (

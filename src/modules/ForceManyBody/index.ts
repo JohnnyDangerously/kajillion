@@ -154,5 +154,4 @@ export class ForceManyBody extends CoreModule {
       forceVertexCoordBuffer: this.forceVertexCoordBuffer,
     }))
   }
-
 }

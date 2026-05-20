@@ -26,53 +26,53 @@ import type { RuntimeEvent } from '@/graph/graph/runtime-context-owner'
 import type { RuntimeFrameLoopController } from '@/graph/graph/runtime-frame-loop-controller'
 
 export interface GraphLifecycleOwner {
-  _fitViewOnInitTimeoutID: number | undefined
-  _isDestroyed: boolean
-  attributionDivElement: HTMLElement | undefined
-  canvas: HTMLCanvasElement
-  canvasD3Selection: Selection<HTMLCanvasElement, undefined, null, undefined> | undefined
-  clusters: Clusters | undefined
-  config: GraphConfigInterface
-  currentEvent: RuntimeEvent
-  device: Device | undefined
-  dragInstance: Drag
-  forceCenter: ForceCenter | undefined
-  forceGravity: ForceGravity | undefined
-  forceLinkIncoming: ForceLink | undefined
-  forceLinkOutgoing: ForceLink | undefined
-  forceManyBody: ForceManyBody | undefined
-  forceMouse: ForceMouse | undefined
-  fpsMonitor: FPSMonitor | undefined
-  graph: GraphData
-  hoverState: HoverRuntimeState
-  isReady: boolean
-  isRightClickMouse: boolean
-  lines: Lines | undefined
-  msaaTarget: MsaaTarget | undefined
-  points: Points | undefined
-  shouldDestroyDevice: boolean
-  store: Store
-  timerQueryPool: ITimerQueryPool | undefined
-  zoomInstance: Zoom
-  applyEffectivePixelRatio: (ratio: number) => boolean
-  frameLoop: RuntimeFrameLoopController
-  markRenderDirty: () => void
-  setZoomLevel: (value: number) => void
-  traceDebugFrame: (name: string, data?: Record<string, unknown>) => void
-  updateZoomDragBehaviors: () => void
+  _fitViewOnInitTimeoutID: number | undefined;
+  _isDestroyed: boolean;
+  attributionDivElement: HTMLElement | undefined;
+  canvas: HTMLCanvasElement;
+  canvasD3Selection: Selection<HTMLCanvasElement, undefined, null, undefined> | undefined;
+  clusters: Clusters | undefined;
+  config: GraphConfigInterface;
+  currentEvent: RuntimeEvent;
+  device: Device | undefined;
+  dragInstance: Drag;
+  forceCenter: ForceCenter | undefined;
+  forceGravity: ForceGravity | undefined;
+  forceLinkIncoming: ForceLink | undefined;
+  forceLinkOutgoing: ForceLink | undefined;
+  forceManyBody: ForceManyBody | undefined;
+  forceMouse: ForceMouse | undefined;
+  fpsMonitor: FPSMonitor | undefined;
+  graph: GraphData;
+  hoverState: HoverRuntimeState;
+  isReady: boolean;
+  isRightClickMouse: boolean;
+  lines: Lines | undefined;
+  msaaTarget: MsaaTarget | undefined;
+  points: Points | undefined;
+  shouldDestroyDevice: boolean;
+  store: Store;
+  timerQueryPool: ITimerQueryPool | undefined;
+  zoomInstance: Zoom;
+  applyEffectivePixelRatio: (ratio: number) => boolean;
+  frameLoop: RuntimeFrameLoopController;
+  markRenderDirty: () => void;
+  setZoomLevel: (value: number) => void;
+  traceDebugFrame: (name: string, data?: Record<string, unknown>) => void;
+  updateZoomDragBehaviors: () => void;
 }
 
 export interface GraphLifecycleState {
-  deviceInitPromise: Promise<Device>
-  ready: Promise<void>
-  shouldDestroyDevice: boolean
+  deviceInitPromise: Promise<Device>;
+  ready: Promise<void>;
+  shouldDestroyDevice: boolean;
 }
 
 export function createGraphLifecycle (
   owner: GraphLifecycleOwner,
   div: HTMLDivElement,
   config: GraphConfig | undefined,
-  devicePromise: Promise<Device> | undefined,
+  devicePromise: Promise<Device> | undefined
 ): GraphLifecycleState {
   if (config) applyConfig(owner.config, config)
   owner.zoomInstance.updateScaleExtent()
@@ -81,7 +81,7 @@ export function createGraphLifecycle (
   const deviceInitPromise = devicePromise ?? createGraphDevice(
     document.createElement('canvas'),
     owner.config,
-    sanitizePixelRatio,
+    sanitizePixelRatio
   )
 
   const setupPromise = deviceInitPromise.then(device => {

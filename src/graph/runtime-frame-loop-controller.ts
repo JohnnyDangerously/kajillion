@@ -11,18 +11,18 @@ import { getRuntimeFramePacingStats } from './runtime-public-api'
 import { resolveAlphaStopThreshold } from './runtime-render-loop'
 
 export interface RuntimeFrameLoopControllerContext {
-  isDestroyed: () => boolean
-  config: GraphConfigInterface
-  store: Store
-  renderFrame: (now: number) => void
-  endSimulation: () => void
-  traceDebugFrame: (name: string, data?: Record<string, unknown>) => void
+  isDestroyed: () => boolean;
+  config: GraphConfigInterface;
+  store: Store;
+  renderFrame: (now: number) => void;
+  endSimulation: () => void;
+  traceDebugFrame: (name: string, data?: Record<string, unknown>) => void;
 }
 
 export interface RuntimeFrameLoopCounters {
-  rafCallbackCount: number
-  renderedFrameCount: number
-  skippedFrameCount: number
+  rafCallbackCount: number;
+  renderedFrameCount: number;
+  skippedFrameCount: number;
 }
 
 export class RuntimeFrameLoopController {
@@ -111,7 +111,7 @@ export class RuntimeFrameLoopController {
     return getTargetRenderFps(
       this.context.config.frameRateLimit,
       this.context.config.frameRateHeadroomFps,
-      this.estimatedRefreshHz,
+      this.estimatedRefreshHz
     )
   }
 

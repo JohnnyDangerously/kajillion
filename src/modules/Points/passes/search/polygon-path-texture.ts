@@ -11,7 +11,7 @@ export type PolygonPathTextureState = {
 export function updatePolygonPathTexture (
   device: Device,
   polygonPath: [number, number][],
-  texture: Texture | undefined,
+  texture: Texture | undefined
 ): PolygonPathTextureState {
   if (polygonPath.length === 0) {
     if (texture && !texture.destroyed) texture.destroy()

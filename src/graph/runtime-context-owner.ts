@@ -28,68 +28,68 @@ import type { MsaaTarget } from '@/graph/render/msaa-target'
 export type RuntimeEvent = NativeZoomEvent | D3DragEvent<HTMLCanvasElement, undefined, Hovered> | MouseEvent | undefined
 
 export interface GraphRuntimeContextOwner {
-  _isDestroyed: boolean
-  _isFirstRenderAfterInit: boolean
-  _fitViewOnInitTimeoutID: number | undefined
-  _lastAppliedDpr: number | undefined
-  _lastInteractionMs: number
-  _lastAdaptiveTransformX: number
-  _lastAdaptiveTransformY: number
-  _lastAdaptiveTransformK: number
-  canvas: HTMLCanvasElement
-  canvasD3Selection: Selection<HTMLCanvasElement, undefined, null, undefined> | undefined
-  config: GraphConfigInterface
-  graph: GraphData
-  store: Store
-  device: Device | undefined
-  points: Points | undefined
-  lines: Lines | undefined
-  forceGravity: ForceGravity | undefined
-  forceCenter: ForceCenter | undefined
-  forceManyBody: ForceManyBody | undefined
-  forceLinkIncoming: ForceLink | undefined
-  forceLinkOutgoing: ForceLink | undefined
-  forceMouse: ForceMouse | undefined
-  clusters: Clusters | undefined
-  zoomInstance: Zoom
-  dragInstance: Drag
-  fpsMonitor: FPSMonitor | undefined
-  timerQueryPool: ITimerQueryPool | undefined
-  msaaTarget: MsaaTarget | undefined
-  isRenderDirty: boolean
-  renderDirtyFrameCount: number
-  currentEvent: RuntimeEvent
-  lastPhysicsTickMs: number
-  lastSimTickMs: number
-  webGpuPointPositions: PointPositionReadbackCache
-  webGpuPointPickerGrid: WebGpuPointPickerGrid | undefined
-  webGpuLinkPickerGrid: WebGpuLinkPickerGrid | undefined
-  linkHoverPathCache: LinkHoverPathCache
-  hoverState: HoverRuntimeState
-  frameLoop: RuntimeFrameLoopController
-  ready: Promise<void>
-  isReady: boolean
-  ensureDevice: (callback: () => void) => boolean
-  flatten: (pointPositions: [number, number][]) => number[]
-  fitView: (duration?: number, padding?: number, enableSimulation?: boolean) => void
-  fitViewByPointIndices: (indices: number[], duration?: number, padding?: number, enableSimulation?: boolean) => void
-  setZoomTransformByPointPositions: (positions: Float32Array, duration?: number, scale?: number, padding?: number, enableSimulation?: boolean) => void
-  update: (simulationAlpha?: number) => void
-  resizeCanvas: (forceResize?: boolean) => void
-  applyConfigUpdate: (prevConfig: GraphConfigInterface) => void
-  markPointPositionsChanged: (invalidateKnownPickerData?: boolean) => void
-  markLinksChanged: () => void
-  traceDebugFrame: (name: string, data?: Record<string, unknown>) => void
-  maybeApplyAdaptiveDpr: (nowMs: number) => boolean
-  runSimulationStep: (forceExecution?: boolean) => void
-  resolveRenderPolicy: RuntimeFrameRendererContext['resolveRenderPolicy']
-  readbackPointPositions: () => Promise<Float32Array>
-  getPointPositions: () => number[]
-  requestWebGpuPointPositionsSnapshot: (force?: boolean) => void
-  getBestKnownWebGpuPointPositions: () => Float32Array | undefined
-  getZoomDistance: () => number
-  markRenderDirty: (frames?: number) => void
-  applyEffectivePixelRatio: (ratio: number) => boolean
-  updateZoomDragBehaviors: () => void
-  findHoveredItem: () => void
+  _isDestroyed: boolean;
+  _isFirstRenderAfterInit: boolean;
+  _fitViewOnInitTimeoutID: number | undefined;
+  _lastAppliedDpr: number | undefined;
+  _lastInteractionMs: number;
+  _lastAdaptiveTransformX: number;
+  _lastAdaptiveTransformY: number;
+  _lastAdaptiveTransformK: number;
+  canvas: HTMLCanvasElement;
+  canvasD3Selection: Selection<HTMLCanvasElement, undefined, null, undefined> | undefined;
+  config: GraphConfigInterface;
+  graph: GraphData;
+  store: Store;
+  device: Device | undefined;
+  points: Points | undefined;
+  lines: Lines | undefined;
+  forceGravity: ForceGravity | undefined;
+  forceCenter: ForceCenter | undefined;
+  forceManyBody: ForceManyBody | undefined;
+  forceLinkIncoming: ForceLink | undefined;
+  forceLinkOutgoing: ForceLink | undefined;
+  forceMouse: ForceMouse | undefined;
+  clusters: Clusters | undefined;
+  zoomInstance: Zoom;
+  dragInstance: Drag;
+  fpsMonitor: FPSMonitor | undefined;
+  timerQueryPool: ITimerQueryPool | undefined;
+  msaaTarget: MsaaTarget | undefined;
+  isRenderDirty: boolean;
+  renderDirtyFrameCount: number;
+  currentEvent: RuntimeEvent;
+  lastPhysicsTickMs: number;
+  lastSimTickMs: number;
+  webGpuPointPositions: PointPositionReadbackCache;
+  webGpuPointPickerGrid: WebGpuPointPickerGrid | undefined;
+  webGpuLinkPickerGrid: WebGpuLinkPickerGrid | undefined;
+  linkHoverPathCache: LinkHoverPathCache;
+  hoverState: HoverRuntimeState;
+  frameLoop: RuntimeFrameLoopController;
+  ready: Promise<void>;
+  isReady: boolean;
+  ensureDevice: (callback: () => void) => boolean;
+  flatten: (pointPositions: [number, number][]) => number[];
+  fitView: (duration?: number, padding?: number, enableSimulation?: boolean) => void;
+  fitViewByPointIndices: (indices: number[], duration?: number, padding?: number, enableSimulation?: boolean) => void;
+  setZoomTransformByPointPositions: (positions: Float32Array, duration?: number, scale?: number, padding?: number, enableSimulation?: boolean) => void;
+  update: (simulationAlpha?: number) => void;
+  resizeCanvas: (forceResize?: boolean) => void;
+  applyConfigUpdate: (prevConfig: GraphConfigInterface) => void;
+  markPointPositionsChanged: (invalidateKnownPickerData?: boolean) => void;
+  markLinksChanged: () => void;
+  traceDebugFrame: (name: string, data?: Record<string, unknown>) => void;
+  maybeApplyAdaptiveDpr: (nowMs: number) => boolean;
+  runSimulationStep: (forceExecution?: boolean) => void;
+  resolveRenderPolicy: RuntimeFrameRendererContext['resolveRenderPolicy'];
+  readbackPointPositions: () => Promise<Float32Array>;
+  getPointPositions: () => number[];
+  requestWebGpuPointPositionsSnapshot: (force?: boolean) => void;
+  getBestKnownWebGpuPointPositions: () => Float32Array | undefined;
+  getZoomDistance: () => number;
+  markRenderDirty: (frames?: number) => void;
+  applyEffectivePixelRatio: (ratio: number) => boolean;
+  updateZoomDragBehaviors: () => void;
+  findHoveredItem: () => void;
 }

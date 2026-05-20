@@ -36,40 +36,40 @@ import {
 } from '@/graph/graph/runtime-event-actions'
 
 export interface RuntimeInitializationInput {
-  device: Device
-  div: HTMLDivElement
-  hasExternalDevice: boolean
-  config: GraphConfigInterface
-  store: Store
-  graph: GraphData
-  zoomInstance: Zoom
-  dragInstance: Drag
-  hoverState: HoverRuntimeState
-  applyEffectivePixelRatio: (ratio: number) => void
-  sanitizePixelRatio: (ratio: number) => number
-  updateZoomDragBehaviors: () => void
-  setZoomLevel: (value: number) => void
-  markRenderDirty: () => void
-  traceDebugFrame: (name: string, data?: Record<string, unknown>) => void
-  setCurrentEvent: (event: NativeZoomEvent | D3DragEvent<HTMLCanvasElement, undefined, Hovered> | MouseEvent | undefined) => void
-  setRightClickMouse: (value: boolean) => void
+  device: Device;
+  div: HTMLDivElement;
+  hasExternalDevice: boolean;
+  config: GraphConfigInterface;
+  store: Store;
+  graph: GraphData;
+  zoomInstance: Zoom;
+  dragInstance: Drag;
+  hoverState: HoverRuntimeState;
+  applyEffectivePixelRatio: (ratio: number) => void;
+  sanitizePixelRatio: (ratio: number) => number;
+  updateZoomDragBehaviors: () => void;
+  setZoomLevel: (value: number) => void;
+  markRenderDirty: () => void;
+  traceDebugFrame: (name: string, data?: Record<string, unknown>) => void;
+  setCurrentEvent: (event: NativeZoomEvent | D3DragEvent<HTMLCanvasElement, undefined, Hovered> | MouseEvent | undefined) => void;
+  setRightClickMouse: (value: boolean) => void;
 }
 
 export interface RuntimeInitializationState {
-  canvas: HTMLCanvasElement
-  attributionDivElement: HTMLElement | undefined
-  canvasD3Selection: Selection<HTMLCanvasElement, undefined, null, undefined>
-  points: Points
-  lines: Lines
-  forceGravity: ForceGravity | undefined
-  forceCenter: ForceCenter | undefined
-  forceManyBody: ForceManyBody | undefined
-  forceLinkIncoming: ForceLink | undefined
-  forceLinkOutgoing: ForceLink | undefined
-  forceMouse: ForceMouse | undefined
-  clusters: Clusters
-  fpsMonitor: FPSMonitor | undefined
-  timerQueryPool: ITimerQueryPool | undefined
+  canvas: HTMLCanvasElement;
+  attributionDivElement: HTMLElement | undefined;
+  canvasD3Selection: Selection<HTMLCanvasElement, undefined, null, undefined>;
+  points: Points;
+  lines: Lines;
+  forceGravity: ForceGravity | undefined;
+  forceCenter: ForceCenter | undefined;
+  forceManyBody: ForceManyBody | undefined;
+  forceLinkIncoming: ForceLink | undefined;
+  forceLinkOutgoing: ForceLink | undefined;
+  forceMouse: ForceMouse | undefined;
+  clusters: Clusters;
+  fpsMonitor: FPSMonitor | undefined;
+  timerQueryPool: ITimerQueryPool | undefined;
 }
 
 export function initializeGraphRuntime (input: RuntimeInitializationInput): RuntimeInitializationState {

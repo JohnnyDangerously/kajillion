@@ -68,7 +68,7 @@ export function applyGraphPendingUpdates (owner: GraphStateAdapterOwner): void {
 export function traceGraphDebugFrame (
   owner: GraphStateAdapterOwner,
   name: string,
-  data?: Record<string, unknown>,
+  data?: Record<string, unknown>
 ): void {
   const counters = owner.frameLoop.getCounters()
   traceRuntimeDebugFrame({

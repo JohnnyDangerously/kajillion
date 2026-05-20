@@ -43,7 +43,7 @@ export type UpdatePointPositionResourceOptions = {
 }
 
 export function updatePointPositionResources (
-  options: UpdatePointPositionResourceOptions,
+  options: UpdatePointPositionResourceOptions
 ): PointPositionResourceState {
   const {
     device,

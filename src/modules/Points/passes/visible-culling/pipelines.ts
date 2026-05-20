@@ -16,7 +16,7 @@ export type { VisiblePointCullPipelineOptions, VisiblePointCullPipelineState } f
 export function ensureVisiblePointCullPipelines (
   device: Device,
   state: VisiblePointCullPipelineState,
-  options: VisiblePointCullPipelineOptions,
+  options: VisiblePointCullPipelineOptions
 ): VisiblePointCullPipelineState {
   if (device.info?.type !== 'webgpu') return state
   const nextState = { ...state }

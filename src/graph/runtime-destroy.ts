@@ -9,22 +9,22 @@ import { type ITimerQueryPool } from '@/graph/perf'
 import { type MsaaTarget } from '@/graph/render/msaa-target'
 
 interface Destroyable {
-  destroy: () => void
+  destroy: () => void;
 }
 
 export interface DestroyGraphRuntimeOptions {
-  canvasD3Selection: Selection<HTMLCanvasElement, undefined, null, undefined> | undefined
-  zoomInstance: Zoom
-  dragInstance: Drag
-  fpsMonitor: FPSMonitor | undefined
-  timerQueryPool: ITimerQueryPool | undefined
-  modules: Array<Destroyable | undefined>
-  msaaTarget: MsaaTarget | undefined
-  device: Device | undefined
-  shouldDestroyDevice: boolean
-  store: Store
-  canvas: HTMLCanvasElement | undefined
-  attributionDivElement: HTMLElement | undefined
+  canvasD3Selection: Selection<HTMLCanvasElement, undefined, null, undefined> | undefined;
+  zoomInstance: Zoom;
+  dragInstance: Drag;
+  fpsMonitor: FPSMonitor | undefined;
+  timerQueryPool: ITimerQueryPool | undefined;
+  modules: Array<Destroyable | undefined>;
+  msaaTarget: MsaaTarget | undefined;
+  device: Device | undefined;
+  shouldDestroyDevice: boolean;
+  store: Store;
+  canvas: HTMLCanvasElement | undefined;
+  attributionDivElement: HTMLElement | undefined;
 }
 
 export function destroyGraphRuntime ({

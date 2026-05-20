@@ -1,6 +1,6 @@
 export function createTrackedPositionsMap (
   pixels: Float32Array,
-  trackedIndices: readonly number[],
+  trackedIndices: readonly number[]
 ): Map<number, [number, number]> {
   const tracked = new Map<number, [number, number]>()
   for (let i = 0; i < pixels.length / 4; i += 1) {
@@ -16,7 +16,7 @@ export function createTrackedPositionsMap (
 
 export function createTrackedPositionsArray (
   pixels: Float32Array,
-  trackedIndices: readonly number[],
+  trackedIndices: readonly number[]
 ): number[] {
   const positions: number[] = []
   positions.length = trackedIndices.length * 2

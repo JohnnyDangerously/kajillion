@@ -15,24 +15,24 @@ import { type Store } from '@/graph/modules/Store'
 import { type Zoom } from '@/graph/modules/Zoom'
 
 export interface GraphRuntimeModules {
-  points: Points
-  lines: Lines
-  clusters: Clusters
-  forceGravity: ForceGravity | undefined
-  forceCenter: ForceCenter | undefined
-  forceManyBody: ForceManyBody | undefined
-  forceLinkIncoming: ForceLink | undefined
-  forceLinkOutgoing: ForceLink | undefined
-  forceMouse: ForceMouse | undefined
+  points: Points;
+  lines: Lines;
+  clusters: Clusters;
+  forceGravity: ForceGravity | undefined;
+  forceCenter: ForceCenter | undefined;
+  forceManyBody: ForceManyBody | undefined;
+  forceLinkIncoming: ForceLink | undefined;
+  forceLinkOutgoing: ForceLink | undefined;
+  forceMouse: ForceMouse | undefined;
 }
 
 export interface InitializeCanvasStateOptions {
-  device: Device
-  canvas: HTMLCanvasElement
-  div: HTMLDivElement
-  config: GraphConfigInterface
-  store: Store
-  zoomInstance: Zoom
+  device: Device;
+  canvas: HTMLCanvasElement;
+  div: HTMLDivElement;
+  config: GraphConfigInterface;
+  store: Store;
+  zoomInstance: Zoom;
 }
 
 export function initializeCanvasState ({

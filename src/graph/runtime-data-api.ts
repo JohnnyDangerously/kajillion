@@ -23,8 +23,8 @@ import {
 import { GraphRuntimeContexts } from '@/graph/graph/runtime-contexts'
 
 interface GraphRuntimeDataApiOwner {
-  _isDestroyed: boolean
-  graph: GraphData
+  _isDestroyed: boolean;
+  graph: GraphData;
 }
 
 export abstract class GraphRuntimeDataApi extends GraphRuntimeContexts {

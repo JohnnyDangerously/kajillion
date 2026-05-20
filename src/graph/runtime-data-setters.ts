@@ -13,7 +13,7 @@ export type {
 export function setRuntimeConfig (
   context: RuntimeDataUpdateContext,
   config: GraphConfig,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   applyConfigUpdate(context, config)
@@ -22,7 +22,7 @@ export function setRuntimeConfig (
 export function setRuntimeConfigPartial (
   context: RuntimeDataUpdateContext,
   config: GraphConfig,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   applyConfigUpdate(context, config, true)
@@ -32,7 +32,7 @@ export function setRuntimePointPositions (
   context: RuntimeDataUpdateContext,
   pointPositions: Float32Array,
   dontRescale: boolean | undefined,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   applyPointPositionsUpdate(context, pointPositions, dontRescale)
@@ -41,7 +41,7 @@ export function setRuntimePointPositions (
 export function setRuntimePointColors (
   context: RuntimeDataUpdateContext,
   pointColors: Float32Array,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.inputPointColors = pointColors
@@ -51,7 +51,7 @@ export function setRuntimePointColors (
 export function setRuntimePointSizes (
   context: RuntimeDataUpdateContext,
   pointSizes: Float32Array,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.inputPointSizes = pointSizes
@@ -61,7 +61,7 @@ export function setRuntimePointSizes (
 export function setRuntimePointShapes (
   context: RuntimeDataUpdateContext,
   pointShapes: Float32Array,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.inputPointShapes = pointShapes
@@ -71,7 +71,7 @@ export function setRuntimePointShapes (
 export function setRuntimeImageData (
   context: RuntimeDataUpdateContext,
   imageDataArray: ImageData[],
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.inputImageData = imageDataArray
@@ -81,7 +81,7 @@ export function setRuntimeImageData (
 export function setRuntimePointImageIndices (
   context: RuntimeDataUpdateContext,
   imageIndices: Float32Array,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.inputPointImageIndices = imageIndices
@@ -91,7 +91,7 @@ export function setRuntimePointImageIndices (
 export function setRuntimePointImageSizes (
   context: RuntimeDataUpdateContext,
   imageSizes: Float32Array,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.inputPointImageSizes = imageSizes
@@ -101,7 +101,7 @@ export function setRuntimePointImageSizes (
 export function setRuntimeLinks (
   context: RuntimeDataUpdateContext,
   links: Float32Array,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   applyLinksUpdate(context, links)
@@ -110,7 +110,7 @@ export function setRuntimeLinks (
 export function setRuntimeLinkColors (
   context: RuntimeDataUpdateContext,
   linkColors: Float32Array,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.inputLinkColors = linkColors
@@ -120,7 +120,7 @@ export function setRuntimeLinkColors (
 export function setRuntimeLinkWidths (
   context: RuntimeDataUpdateContext,
   linkWidths: Float32Array,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.inputLinkWidths = linkWidths
@@ -130,7 +130,7 @@ export function setRuntimeLinkWidths (
 export function setRuntimeLinkArrows (
   context: RuntimeDataUpdateContext,
   linkArrows: boolean[],
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.linkArrowsBoolean = linkArrows
@@ -140,7 +140,7 @@ export function setRuntimeLinkArrows (
 export function setRuntimeLinkStrength (
   context: RuntimeDataUpdateContext,
   linkStrength: Float32Array,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.inputLinkStrength = linkStrength
@@ -150,7 +150,7 @@ export function setRuntimeLinkStrength (
 export function setRuntimePointClusters (
   context: RuntimeDataUpdateContext,
   pointClusters: (number | undefined)[],
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.inputPointClusters = pointClusters
@@ -160,7 +160,7 @@ export function setRuntimePointClusters (
 export function setRuntimeClusterPositions (
   context: RuntimeDataUpdateContext,
   clusterPositions: (number | undefined)[],
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.inputClusterPositions = clusterPositions
@@ -170,7 +170,7 @@ export function setRuntimeClusterPositions (
 export function setRuntimePointClusterStrength (
   context: RuntimeDataUpdateContext,
   clusterStrength: Float32Array,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.inputClusterStrength = clusterStrength
@@ -180,7 +180,7 @@ export function setRuntimePointClusterStrength (
 export function setRuntimePinnedPoints (
   context: RuntimeDataUpdateContext,
   pinnedIndices: number[] | null,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (shouldSkipRuntimeDataUpdate(context, requeue)) return
   context.graph.inputPinnedPoints = pinnedIndices && pinnedIndices.length > 0 ? pinnedIndices : undefined

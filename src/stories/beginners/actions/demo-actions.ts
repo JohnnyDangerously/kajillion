@@ -1,13 +1,13 @@
 import { type Graph, type GraphConfig } from '@kajillion/graph'
 
 interface DemoActionsOptions {
-  actionsDiv: HTMLDivElement
-  config: GraphConfig
-  defaultLinkColor: string
-  div: HTMLDivElement
-  graph: Graph
-  highlightLinkColor: string
-  pointPositions: { length: number }
+  actionsDiv: HTMLDivElement;
+  config: GraphConfig;
+  defaultLinkColor: string;
+  div: HTMLDivElement;
+  graph: Graph;
+  highlightLinkColor: string;
+  pointPositions: { length: number };
 }
 
 export function attachDemoActions ({

@@ -11,7 +11,7 @@ import type {
 import type { PointSearchSetupOptions } from './contracts'
 
 export function createFindPointsInRectUniformStore (
-  options: PointSearchSetupOptions,
+  options: PointSearchSetupOptions
 ): UniformStore<FindPointsInRectUniforms> {
   return new UniformStore({
     findPointsInRectUniforms: {
@@ -42,7 +42,7 @@ export function createFindPointsInRectUniformStore (
 }
 
 export function createFindPointsInPolygonUniformStore (
-  options: PointSearchSetupOptions,
+  options: PointSearchSetupOptions
 ): UniformStore<FindPointsInPolygonUniforms> {
   return new UniformStore({
     findPointsInPolygonUniforms: {
@@ -63,7 +63,7 @@ export function createFindPointsInPolygonUniformStore (
 }
 
 export function createFindHoveredPointUniformStore (
-  options: PointSearchSetupOptions,
+  options: PointSearchSetupOptions
 ): UniformStore<FindHoveredPointUniforms> {
   return new UniformStore({
     findHoveredPointUniforms: {
@@ -98,7 +98,7 @@ export function createFindHoveredPointUniformStore (
 }
 
 export function createFillSampledPointsUniformStore (
-  options: PointSearchSetupOptions,
+  options: PointSearchSetupOptions
 ): UniformStore<FillSampledPointsUniforms> {
   return new UniformStore({
     fillSampledPointsUniforms: {

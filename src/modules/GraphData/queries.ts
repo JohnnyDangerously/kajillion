@@ -1,11 +1,11 @@
 import { type LinkAdjacencyList } from './types'
 
 interface GraphQueryData {
-  pointsNumber: number | undefined
-  linksNumber: number | undefined
-  links: Float32Array | undefined
-  sourceIndexToTargetIndices: LinkAdjacencyList | undefined
-  targetIndexToSourceIndices: LinkAdjacencyList | undefined
+  pointsNumber: number | undefined;
+  linksNumber: number | undefined;
+  links: Float32Array | undefined;
+  sourceIndexToTargetIndices: LinkAdjacencyList | undefined;
+  targetIndexToSourceIndices: LinkAdjacencyList | undefined;
 }
 
 export function getNeighboringPointIndices (

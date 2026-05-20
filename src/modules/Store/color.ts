@@ -4,7 +4,7 @@ export type RgbaColor = [number, number, number, number]
 
 export function setRgbFromColor (
   target: number[],
-  color: string | RgbaColor,
+  color: string | RgbaColor
 ): void {
   const convertedRgba = getRgbaColor(color)
   target[0] = convertedRgba[0]
@@ -14,7 +14,7 @@ export function setRgbFromColor (
 
 export function setRgbaFromColor (
   target: number[],
-  color: string | RgbaColor,
+  color: string | RgbaColor
 ): void {
   const convertedRgba = getRgbaColor(color)
   target[0] = convertedRgba[0]

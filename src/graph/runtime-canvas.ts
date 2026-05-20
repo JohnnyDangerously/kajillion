@@ -11,31 +11,31 @@ import type { Zoom } from '@/graph/modules/Zoom'
 import { resolveAdaptiveDprDecision, sanitizePixelRatio } from '@/graph/graph/adaptive-dpr'
 
 export interface RuntimeCanvasContext {
-  isDestroyed: () => boolean
-  config: GraphConfigInterface
-  store: Store
-  canvas: HTMLCanvasElement
-  device: Device | undefined
-  points: Points | undefined
-  lines: Lines | undefined
-  zoomInstance: Zoom
-  dragInstance: Drag
-  canvasD3Selection: Selection<HTMLCanvasElement, undefined, null, undefined> | undefined
-  lastAppliedDpr: number | undefined
-  lastInteractionMs: number
-  lastAdaptiveTransformX: number
-  lastAdaptiveTransformY: number
-  lastAdaptiveTransformK: number
-  setAdaptiveState: (state: Partial<RuntimeCanvasAdaptiveState>) => void
-  traceDebugFrame: (name: string, data?: Record<string, unknown>) => void
+  isDestroyed: () => boolean;
+  config: GraphConfigInterface;
+  store: Store;
+  canvas: HTMLCanvasElement;
+  device: Device | undefined;
+  points: Points | undefined;
+  lines: Lines | undefined;
+  zoomInstance: Zoom;
+  dragInstance: Drag;
+  canvasD3Selection: Selection<HTMLCanvasElement, undefined, null, undefined> | undefined;
+  lastAppliedDpr: number | undefined;
+  lastInteractionMs: number;
+  lastAdaptiveTransformX: number;
+  lastAdaptiveTransformY: number;
+  lastAdaptiveTransformK: number;
+  setAdaptiveState: (state: Partial<RuntimeCanvasAdaptiveState>) => void;
+  traceDebugFrame: (name: string, data?: Record<string, unknown>) => void;
 }
 
 export interface RuntimeCanvasAdaptiveState {
-  lastAppliedDpr: number | undefined
-  lastInteractionMs: number
-  lastAdaptiveTransformX: number
-  lastAdaptiveTransformY: number
-  lastAdaptiveTransformK: number
+  lastAppliedDpr: number | undefined;
+  lastInteractionMs: number;
+  lastAdaptiveTransformX: number;
+  lastAdaptiveTransformY: number;
+  lastAdaptiveTransformK: number;
 }
 
 export function applyRuntimeEffectivePixelRatio (context: RuntimeCanvasContext, ratio: number): boolean {

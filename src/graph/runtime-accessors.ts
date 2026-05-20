@@ -4,11 +4,11 @@ import { type Points } from '@/graph/modules/Points'
 import { type Zoom } from '@/graph/modules/Zoom'
 
 export interface GraphAccessorContext {
-  isDestroyed: boolean
-  graph: GraphData
-  points: Points | undefined
-  lines: Lines | undefined
-  zoomInstance: Zoom
+  isDestroyed: boolean;
+  graph: GraphData;
+  points: Points | undefined;
+  lines: Lines | undefined;
+  zoomInstance: Zoom;
 }
 
 export function spaceToScreenPosition (

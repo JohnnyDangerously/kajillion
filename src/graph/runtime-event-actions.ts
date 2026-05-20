@@ -7,8 +7,8 @@ import { type Zoom } from '@/graph/modules/Zoom'
 import { shouldCheckHoverForMousePosition } from './hover-picking'
 
 export interface GraphEventActionContext {
-  config: GraphConfigInterface
-  store: Store
+  config: GraphConfigInterface;
+  store: Store;
 }
 
 export function handleGraphClick (

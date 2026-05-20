@@ -6,31 +6,31 @@ import { type Lines } from '@/graph/modules/Lines'
 import { type Points } from '@/graph/modules/Points'
 
 export interface PendingGraphUpdateFlags {
-  isPointPositionsUpdateNeeded: boolean
-  isPointColorUpdateNeeded: boolean
-  isPointSizeUpdateNeeded: boolean
-  isPointShapeUpdateNeeded: boolean
-  isPointImageIndicesUpdateNeeded: boolean
-  isLinksUpdateNeeded: boolean
-  isLinkColorUpdateNeeded: boolean
-  isLinkWidthUpdateNeeded: boolean
-  isLinkArrowUpdateNeeded: boolean
-  isPointClusterUpdateNeeded: boolean
-  isForceManyBodyUpdateNeeded: boolean
-  isForceLinkUpdateNeeded: boolean
-  isForceCenterUpdateNeeded: boolean
-  isPointImageSizesUpdateNeeded: boolean
+  isPointPositionsUpdateNeeded: boolean;
+  isPointColorUpdateNeeded: boolean;
+  isPointSizeUpdateNeeded: boolean;
+  isPointShapeUpdateNeeded: boolean;
+  isPointImageIndicesUpdateNeeded: boolean;
+  isLinksUpdateNeeded: boolean;
+  isLinkColorUpdateNeeded: boolean;
+  isLinkWidthUpdateNeeded: boolean;
+  isLinkArrowUpdateNeeded: boolean;
+  isPointClusterUpdateNeeded: boolean;
+  isForceManyBodyUpdateNeeded: boolean;
+  isForceLinkUpdateNeeded: boolean;
+  isForceCenterUpdateNeeded: boolean;
+  isPointImageSizesUpdateNeeded: boolean;
 }
 
 export interface ApplyPendingGraphUpdatesOptions {
-  flags: PendingGraphUpdateFlags
-  points: Points | undefined
-  lines: Lines | undefined
-  forceManyBody: ForceManyBody | undefined
-  forceLinkIncoming: ForceLink | undefined
-  forceLinkOutgoing: ForceLink | undefined
-  forceCenter: ForceCenter | undefined
-  clusters: Clusters | undefined
+  flags: PendingGraphUpdateFlags;
+  points: Points | undefined;
+  lines: Lines | undefined;
+  forceManyBody: ForceManyBody | undefined;
+  forceLinkIncoming: ForceLink | undefined;
+  forceLinkOutgoing: ForceLink | undefined;
+  forceCenter: ForceCenter | undefined;
+  clusters: Clusters | undefined;
 }
 
 export function createClearedPendingGraphUpdateFlags (): PendingGraphUpdateFlags {

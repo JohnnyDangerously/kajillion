@@ -12,7 +12,7 @@ export function ensureRgba32FloatTarget (
   state: PositionTargetState,
   pointsTextureSize: number,
   data: Float32Array,
-  usage: number,
+  usage: number
 ): PositionTargetState {
   const copyPayload = {
     data,

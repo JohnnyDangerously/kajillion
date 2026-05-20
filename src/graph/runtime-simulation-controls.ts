@@ -3,22 +3,22 @@ import type { GraphData } from '@/graph/modules/GraphData'
 import type { Store } from '@/graph/modules/Store'
 
 export interface RuntimeSimulationControlContext {
-  isDestroyed: () => boolean
-  ensureDevice: (callback: () => void) => boolean
-  config: GraphConfigInterface
-  graph: GraphData
-  store: Store
-  hasPointsTexture: () => boolean
-  resetSimulationTicks: () => void
-  runSimulationStep: (forceExecution?: boolean) => void
-  requestWebGpuPointPositionsSnapshot: (force?: boolean) => void
-  forceHoverDetection: () => void
+  isDestroyed: () => boolean;
+  ensureDevice: (callback: () => void) => boolean;
+  config: GraphConfigInterface;
+  graph: GraphData;
+  store: Store;
+  hasPointsTexture: () => boolean;
+  resetSimulationTicks: () => void;
+  runSimulationStep: (forceExecution?: boolean) => void;
+  requestWebGpuPointPositionsSnapshot: (force?: boolean) => void;
+  forceHoverDetection: () => void;
 }
 
 export function startRuntimeSimulation (
   context: RuntimeSimulationControlContext,
   alpha = 1,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (context.isDestroyed()) return
   if (context.ensureDevice(requeue)) return
@@ -41,7 +41,7 @@ export function stopRuntimeSimulation (context: RuntimeSimulationControlContext)
 
 export function pauseRuntimeSimulation (
   context: RuntimeSimulationControlContext,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (context.isDestroyed()) return
   if (context.ensureDevice(requeue)) return
@@ -52,7 +52,7 @@ export function pauseRuntimeSimulation (
 
 export function unpauseRuntimeSimulation (
   context: RuntimeSimulationControlContext,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (context.isDestroyed()) return
   if (context.ensureDevice(requeue)) return
@@ -62,7 +62,7 @@ export function unpauseRuntimeSimulation (
 
 export function stepRuntimeSimulation (
   context: RuntimeSimulationControlContext,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (context.isDestroyed()) return
   if (context.ensureDevice(requeue)) return

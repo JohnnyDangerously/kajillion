@@ -43,7 +43,7 @@ export interface GraphSimulationStepContext extends GraphSimulationStepState {
 
 export function runGraphSimulationStep (
   context: GraphSimulationStepContext,
-  forceExecution = false,
+  forceExecution = false
 ): GraphSimulationStepState {
   const {
     config,

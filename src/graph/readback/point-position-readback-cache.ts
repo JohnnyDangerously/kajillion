@@ -25,7 +25,7 @@ export class PointPositionReadbackCache {
 
   public constructor (options: PointPositionReadbackCacheOptions = {}) {
     this.minSnapshotIntervalMs = options.minSnapshotIntervalMs ?? 250
-    this.now = options.now ?? (() => performance.now())
+    this.now = options.now ?? ((): number => performance.now())
   }
 
   public get epoch (): number {

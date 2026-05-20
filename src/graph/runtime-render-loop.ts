@@ -7,27 +7,27 @@ import {
 } from './runtime-contracts'
 
 export interface IdleFrameSkipInput {
-  disableIdleFrameSkip: boolean
-  isSimulationRunning: boolean
-  currentEvent: unknown
-  isZoomRunning: boolean
-  isDragActive: boolean
-  isRenderDirty: boolean
-  dprChanged: boolean
+  disableIdleFrameSkip: boolean;
+  isSimulationRunning: boolean;
+  currentEvent: unknown;
+  isZoomRunning: boolean;
+  isDragActive: boolean;
+  isRenderDirty: boolean;
+  dprChanged: boolean;
 }
 
 export interface RenderDirtyState {
-  isRenderDirty: boolean
-  renderDirtyFrameCount: number
+  isRenderDirty: boolean;
+  renderDirtyFrameCount: number;
 }
 
 export interface CaptureRenderPositionsInput {
-  isWebGPU: boolean
-  isSimulationRunning: boolean
-  alpha: number
-  pointCount: number
-  hasPositionStorageBuffer: boolean
-  hasPreviousRenderPositionStorageBuffer: boolean
+  isWebGPU: boolean;
+  isSimulationRunning: boolean;
+  alpha: number;
+  pointCount: number;
+  hasPositionStorageBuffer: boolean;
+  hasPreviousRenderPositionStorageBuffer: boolean;
 }
 
 export function resolveAlphaStopThreshold (rawThreshold: number): number {

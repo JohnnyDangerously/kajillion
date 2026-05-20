@@ -6,30 +6,30 @@ import type { GraphData } from '@/graph/modules/GraphData'
 import type { Store } from '@/graph/modules/Store'
 
 export interface RuntimeRenderEntryContext {
-  isDestroyed: () => boolean
-  ensureDevice: (callback: () => void) => boolean
-  config: GraphConfigInterface
-  graph: GraphData
-  store: Store
-  getCanvas: () => HTMLCanvasElement
-  getDevice: () => Device | undefined
-  isFirstRenderAfterInit: () => boolean
-  setFitViewOnInitTimeoutId: (id: number) => void
-  setFirstRenderAfterInit: (value: boolean) => void
-  flatten: (pointPositions: [number, number][]) => number[]
-  fitView: (duration?: number, padding?: number) => void
-  fitViewByPointIndices: (indices: number[], duration?: number, padding?: number) => void
-  setZoomTransformByPointPositions: (positions: Float32Array, duration?: number, scale?: number, padding?: number) => void
-  update: (simulationAlpha?: number) => void
-  stopFrames: () => void
-  startFrames: () => void
-  forceHoverDetection: () => void
+  isDestroyed: () => boolean;
+  ensureDevice: (callback: () => void) => boolean;
+  config: GraphConfigInterface;
+  graph: GraphData;
+  store: Store;
+  getCanvas: () => HTMLCanvasElement;
+  getDevice: () => Device | undefined;
+  isFirstRenderAfterInit: () => boolean;
+  setFitViewOnInitTimeoutId: (id: number) => void;
+  setFirstRenderAfterInit: (value: boolean) => void;
+  flatten: (pointPositions: [number, number][]) => number[];
+  fitView: (duration?: number, padding?: number) => void;
+  fitViewByPointIndices: (indices: number[], duration?: number, padding?: number) => void;
+  setZoomTransformByPointPositions: (positions: Float32Array, duration?: number, scale?: number, padding?: number) => void;
+  update: (simulationAlpha?: number) => void;
+  stopFrames: () => void;
+  startFrames: () => void;
+  forceHoverDetection: () => void;
 }
 
 export function renderGraphRuntime (
   context: RuntimeRenderEntryContext,
   simulationAlpha: number | undefined,
-  requeue: () => void,
+  requeue: () => void
 ): void {
   if (context.isDestroyed()) return
   if (context.ensureDevice(requeue)) return

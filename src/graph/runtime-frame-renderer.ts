@@ -23,7 +23,7 @@ export type {
 
 export function renderRuntimeFrame (
   context: RuntimeFrameRendererContext,
-  now?: number,
+  now?: number
 ): RuntimeFrameRendererState {
   const {
     config,
@@ -85,7 +85,7 @@ export function renderRuntimeFrame (
     context,
     interpolationState.shouldCaptureRenderPositionsNow,
     simulationState.simulationAdvanced,
-    interpolationState.forceThrottleAlpha,
+    interpolationState.forceThrottleAlpha
   )
   syncPositionStorageBuffer(context)
   msaaTarget = renderRuntimeCanvasScene(context, msaaTarget)

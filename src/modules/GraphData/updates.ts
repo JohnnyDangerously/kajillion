@@ -1,11 +1,11 @@
 interface ClusterData {
-  pointsNumber: number | undefined
-  inputPointClusters: (number | undefined)[] | undefined
-  inputClusterPositions: (number | undefined)[] | undefined
-  inputClusterStrength: Float32Array | undefined
-  pointClusters: (number | undefined)[] | undefined
-  clusterPositions: (number | undefined)[] | undefined
-  clusterStrength: Float32Array | undefined
+  pointsNumber: number | undefined;
+  inputPointClusters: (number | undefined)[] | undefined;
+  inputClusterPositions: (number | undefined)[] | undefined;
+  inputClusterStrength: Float32Array | undefined;
+  pointClusters: (number | undefined)[] | undefined;
+  clusterPositions: (number | undefined)[] | undefined;
+  clusterStrength: Float32Array | undefined;
 }
 
 export function resolveLinkStrength (

@@ -1,16 +1,16 @@
 interface GraphDataLifecycle {
-  updatePoints: () => void
-  updatePointColor: () => void
-  updatePointSize: () => void
-  updatePointShape: () => void
-  updatePointImageIndices: () => void
-  updatePointImageSizes: () => void
-  updateLinks: () => void
-  updateLinkColor: () => void
-  updateLinkWidth: () => void
-  updateArrows: () => void
-  updateLinkStrength: () => void
-  updateClusters: () => void
+  updatePoints: () => void;
+  updatePointColor: () => void;
+  updatePointSize: () => void;
+  updatePointShape: () => void;
+  updatePointImageIndices: () => void;
+  updatePointImageSizes: () => void;
+  updateLinks: () => void;
+  updateLinkColor: () => void;
+  updateLinkWidth: () => void;
+  updateArrows: () => void;
+  updateLinkStrength: () => void;
+  updateClusters: () => void;
 }
 
 export function updateGraphData (graphData: GraphDataLifecycle): void {
