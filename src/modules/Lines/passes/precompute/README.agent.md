@@ -12,6 +12,9 @@ Invariants:
 - `LINE_INSTANCE_BYTE_LENGTH` must match the WGSL `LineInstance` layout.
 - Binding names and locations must mirror `PRECOMPUTE_LINE_INSTANCES_BINDINGS`.
 - The pass reuses caller-owned attribute buffers; it must not create CPU-side per-frame copies.
+- Keep this pass off unless curved/bundled line rendering actually needs it.
+- Do not add debug/readback or CPU materialization to this pass without an
+  explicit performance gate and timing evidence.
 - The render model stays owned by `src/modules/Lines/index.ts`.
 
 Verify:

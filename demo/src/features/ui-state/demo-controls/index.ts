@@ -77,7 +77,6 @@ export function installDemoControls (
       if (!button.dataset.n) return
       ctlEl.n.value = button.dataset.n
       if (button.dataset.mode === 'work') ctlEl.data.value = 'work'
-      else if (ctlEl.data.value === 'work') ctlEl.data.value = 'cosmo'
       syncNodeButtons()
       runControlChange()
     })

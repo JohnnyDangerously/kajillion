@@ -18,6 +18,8 @@ Boundaries:
 - Runtime code may use thin wrappers here while implementation remains in existing lifecycle/focus modules.
 - Do not add per-frame DOM or React loops for graph primitives.
 - Do not add broad dependencies or object-heavy hot paths.
+- UI controls must be truthful: node-count buttons should not silently switch
+  data mode, and labels/readouts should describe the active render policy.
 - Filtering sidebars, force-layout choices, node hopping, and A-to-B camera animations should grow under this feature before touching galaxy code.
 
 Verify:

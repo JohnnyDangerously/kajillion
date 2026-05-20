@@ -6,7 +6,7 @@ header {
 }
 header h1 { margin: 0; font-size: 13px; font-weight: 650; letter-spacing: 0; color: var(--text); }
 header .meta { color: var(--muted); font-size: 12px; }
-#graph-host { position: absolute; inset: 0 318px 0 0; background: transparent; overflow: hidden; perspective: 1600px; }
+#graph-host { position: absolute; inset: 0 288px 0 0; background: transparent; overflow: hidden; perspective: 1600px; }
 #graph { position: absolute; inset: 0; z-index: 1; width: auto; height: auto; transform-origin: 50% 58%; }
 #cosmic-intro-renderer {
   position: absolute; inset: 0; z-index: 3;

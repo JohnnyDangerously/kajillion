@@ -11,6 +11,7 @@
   backdrop-filter: blur(8px);
 }
 :root[data-graph-mode="work"] #focus-panel { display: block; }
+:root[data-graph-mode="work"] #overlay { top: 272px; }
 #focus-panel .focus-title {
   color: var(--text);
   font: 700 12px/1.25 ui-monospace, SFMono-Regular, monospace;

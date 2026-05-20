@@ -1,6 +1,6 @@
 #sidebar {
-  position: absolute; top: 12px; right: 12px; z-index: 3;
-  width: 282px; max-height: calc(100vh - 24px); padding: 0 2px 0 0; overflow: auto;
+  position: absolute; top: 10px; right: 10px; z-index: 3;
+  width: 260px; max-height: calc(100vh - 20px); padding: 0 2px 0 0; overflow: auto;
   display: flex; flex-direction: column; gap: 10px;
   scrollbar-width: thin;
 }
@@ -64,7 +64,7 @@
 	      background: color-mix(in srgb, var(--control-bg) 76%, transparent);
 	      color: var(--muted); font: 11px/1.35 ui-monospace, SFMono-Regular, monospace;
 	    }
-	    .button-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+	    .button-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
 .button-row button.active,
 .toggle-row button.active { background: var(--button-active-bg); border-color: var(--button-active-border); color: var(--text); }
-.toggle-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+.toggle-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }

@@ -131,11 +131,11 @@
   letter-spacing: 0;
 }
 
-:root[data-palette="subnet"][data-theme="light"] #focus-panel {
+:root[data-palette="subnet"][data-theme="light"]:not([data-graph-mode="work"]) #focus-panel {
   display: none;
 }
 
-:root[data-palette="subnet"][data-theme="light"] #overlay {
+:root[data-palette="subnet"][data-theme="light"]:not([data-graph-mode="work"]) #overlay {
   top: 16px;
 }
 
@@ -158,6 +158,6 @@
   box-shadow: 0 16px 52px rgba(27, 45, 74, 0.12);
 }
 
-:root[data-palette="analyst"][data-theme="light"] #overlay {
+:root[data-palette="analyst"][data-theme="light"]:not([data-graph-mode="work"]) #overlay {
   top: 16px;
 }
