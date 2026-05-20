@@ -9,7 +9,8 @@ Current inventory:
 - Work graph data and metadata live in `features/demo-lifecycle/work-graph-*`.
 - Local focus, preview, fit, and node-hopping behavior currently lives in `features/work-focus`.
 - Work panel text projection lives in `features/ui-state/work-focus-panel`.
-- Demo `GraphConfig` policy lives in `features/graph-config`; keep hot render loops in `src/graph` and `src/modules`.
+- Work Mode `GraphConfig` overlay policy lives here; generic demo config delegates Work Mode interaction/render knobs into this feature.
+- Keep hot render loops in `src/graph` and `src/modules`.
 - Use this feature's `index.ts` as the public Work Mode surface for policy, data helpers, controller access, and work graph types.
 
 Boundaries:

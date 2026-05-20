@@ -1,6 +1,7 @@
 import type { Graph, GpuTimingSnapshot } from '@kajillion/graph'
 import type { DemoConfig } from './types'
 import type { OverlayElements } from './dom'
+import { isWorkMode, resolveWorkModeZoomStage } from '../work-mode'
 import {
   estimateGpuFrameMs,
   fmtMs,
@@ -114,7 +115,11 @@ export function paintOverlay (options: {
     : currentConfig.frameRateHeadroomFps > 0
       ? `display -${currentConfig.frameRateHeadroomFps.toFixed(0)}`
       : 'native'
-  overlayEl.zoomDistance.textContent = `${g.getZoomDistance().toFixed(1)}`
+  const zoomDistance = g.getZoomDistance()
+  const zoomStage = isWorkMode(currentConfig) ? resolveWorkModeZoomStage(zoomDistance) : null
+  overlayEl.zoomDistance.textContent = zoomStage
+    ? `${zoomDistance.toFixed(1)} (${zoomStage.id})`
+    : `${zoomDistance.toFixed(1)}`
   const policy = g.getResolvedRenderPolicy?.()
   overlayEl.renderPolicy.textContent = policy ? `${policy.state}/${policy.zoomBucket}/${policy.pointMode}` : '—'
   overlayEl.policyDensity.textContent = policy

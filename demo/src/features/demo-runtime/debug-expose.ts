@@ -8,6 +8,14 @@ interface DemoDebugWindow {
   __demoSnapshot?: GraphSnapshot | null;
   __demoFrame?: GraphFrame | null;
   __demoViewSpec?: ViewSpec | null;
+  __kajillionWorkMode?: {
+    getZoomStage: DemoRuntimeContext['workFocusController']['getZoomStage'];
+    goToZoomStage: DemoRuntimeContext['workFocusController']['goToZoomStage'];
+    goToGalaxyOverview: DemoRuntimeContext['workFocusController']['goToGalaxyOverview'];
+    goToClusterDiscovery: DemoRuntimeContext['workFocusController']['goToClusterDiscovery'];
+    goToSingleCluster: DemoRuntimeContext['workFocusController']['goToSingleCluster'];
+    goToWorkMode: DemoRuntimeContext['workFocusController']['goToWorkMode'];
+  };
   __kajillionLab?: VisualLabControlPlane | null;
   __dumpKajillionTrace: () => unknown;
   __markKajillionFlash: (label?: string) => void;
@@ -22,6 +30,14 @@ export function exposeDemoDebugGraph (runtime: DemoRuntimeContext, graph: Graph)
   debugWindow.__demoSnapshot = state.currentSnapshot
   debugWindow.__demoFrame = state.currentFrame
   debugWindow.__demoViewSpec = state.currentViewSpec
+  debugWindow.__kajillionWorkMode = {
+    getZoomStage: runtime.workFocusController.getZoomStage,
+    goToZoomStage: runtime.workFocusController.goToZoomStage,
+    goToGalaxyOverview: runtime.workFocusController.goToGalaxyOverview,
+    goToClusterDiscovery: runtime.workFocusController.goToClusterDiscovery,
+    goToSingleCluster: runtime.workFocusController.goToSingleCluster,
+    goToWorkMode: runtime.workFocusController.goToWorkMode,
+  }
   state.visualLabControlPlane ||= createVisualLabControlPlane({
     getSnapshot: () => state.currentSnapshot,
     getFrame: () => state.currentFrame,

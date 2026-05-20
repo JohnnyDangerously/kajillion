@@ -1,4 +1,11 @@
 export {
+  applyWorkModeGraphConfigOverlay,
+  resolveWorkModeGraphConfigPolicy,
+  type WorkModeGraphConfigHooks,
+  type WorkModeGraphConfigPaletteFlags,
+  type WorkModeGraphConfigPolicy,
+} from './config'
+export {
   createWorkModeController,
   type WorkModeController,
   type WorkModeControllerOptions,
@@ -18,6 +25,15 @@ export {
   type WorkModeConfigShape,
   type WorkModeInteractionProfile,
 } from './profile'
+export {
+  clampWorkModeZoomDistance,
+  resolveWorkModeZoomStage,
+  WORK_MODE_ZOOM_STAGE_DURATIONS,
+  WORK_MODE_ZOOM_STAGE_ORDER,
+  WORK_MODE_ZOOM_STAGES,
+  type WorkModeZoomStage,
+  type WorkModeZoomStageId,
+} from './zoom-stages'
 export type {
   WorkGraphData,
   WorkGraphMetadata,
