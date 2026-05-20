@@ -15,7 +15,7 @@ import {
   type VisualControlsController,
 } from './features/ui-state/visual-controls'
 import type { VisualAttributes } from './features/ui-state/visual-attributes'
-import type { WorkFocusController } from './features/work-focus'
+import type { WorkModeController } from './features/work-mode'
 import type { GeneratedGraph } from './generate-graph'
 import type { RenderableGraphData } from './graph-contract'
 
@@ -23,7 +23,7 @@ interface RuntimeVisualControllersOptions {
   state: DemoRuntimeState;
   ctlEl: ControlElements;
   labelOverlay: LabelOverlayController;
-  workFocusController: WorkFocusController;
+  workFocusController: WorkModeController;
   buildGraphConfig: (cfg: DemoConfig) => GraphConfig;
   applyTheme: (theme: DemoConfig['theme']) => void;
   syncToggleButtons: () => void;

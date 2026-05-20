@@ -1,0 +1,27 @@
+{
+  "feature": "work-mode",
+  "purpose": "Own Work Mode product contracts and policy for local graph workflows separate from galaxy rendering.",
+  "owned_paths": [
+    "demo/src/features/work-mode/**"
+  ],
+  "entrypoints": [
+    "demo/src/features/work-mode/index.ts",
+    "demo/src/features/work-mode/controller.ts",
+    "demo/src/features/work-mode/data.ts",
+    "demo/src/features/work-mode/profile.ts",
+    "demo/src/features/work-mode/types.ts",
+    "demo/src/features/work-mode/README.agent.md"
+  ],
+  "verification": [
+    "npm run verify:fast"
+  ],
+  "invariants": [
+    "No per-frame React or DOM loops for graph primitives.",
+    "No broad dependency additions.",
+    "Keep renderer hot paths in src/graph and src/modules out of this feature."
+  ],
+  "next": [
+    "Move Work Focus controller contracts here when the visual redesign starts.",
+    "Add filtering and animation policy here before wiring runtime behavior."
+  ]
+}

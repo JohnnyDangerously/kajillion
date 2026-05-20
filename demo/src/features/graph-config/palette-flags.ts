@@ -1,4 +1,4 @@
-import { isWorkMode } from '../control-plane/controls'
+import { isWorkMode } from '../work-mode'
 import type { DemoConfig } from '../control-plane/types'
 import { isGalleryPalette } from '../../gallery-presets'
 

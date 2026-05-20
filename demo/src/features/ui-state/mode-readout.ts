@@ -1,5 +1,5 @@
 import type { ControlElements } from '../control-plane/dom'
-import { isWorkMode } from '../control-plane/controls'
+import { isWorkMode } from '../work-mode'
 import type { DemoConfig } from '../control-plane/types'
 
 export function syncToggleButtonLabels (

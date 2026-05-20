@@ -3,6 +3,7 @@
 Purpose:
 - Own demo-only control parsing, DOM element lookup, and live perf overlay helpers.
 - Keep `demo/src/main.ts` focused on graph lifecycle and data wiring.
+- Work Mode product policy lives in `features/work-mode`; this feature only reads and writes controls.
 
 Important files:
 - `types.ts`: public demo control-plane config contracts.

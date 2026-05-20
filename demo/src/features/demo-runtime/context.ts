@@ -27,7 +27,7 @@ import type {
 import type { LabelOverlayController } from '../ui-state/label-overlay/label-overlay'
 import type { AnalystZoomVisualRefreshScheduler } from '../ui-state/visual-controls'
 import type { VisualAttributes } from '../ui-state/visual-attributes'
-import type { WorkFocusController } from '../work-focus'
+import type { WorkModeController } from '../work-mode'
 
 export interface DemoRuntimeState {
   currentGraph: Graph | null;
@@ -67,7 +67,7 @@ export interface DemoRuntimeContext {
   graphHost: HTMLDivElement;
   labelOverlay: LabelOverlayController;
   cosmicIntroPresentation: CosmicIntroPresentationController;
-  workFocusController: WorkFocusController;
+  workFocusController: WorkModeController;
   frameVisualsController: FrameVisualsController;
   analystZoomVisualRefreshScheduler: AnalystZoomVisualRefreshScheduler;
   demoControls: DemoControlController;

@@ -1,4 +1,4 @@
-import { isWorkMode } from '../../control-plane/controls'
+import { isWorkMode } from '../../work-mode'
 import { DEMO_SPACE_SIZE } from '../../demo-lifecycle/demo-space'
 import type { WorkGraphData } from '../../demo-lifecycle/work-graph-types'
 import type { RenderableGraphData } from '../../../graph-contract'

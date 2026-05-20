@@ -1,12 +1,12 @@
 import {
   applyDepthPresetToControls,
-  isWorkMode,
   readControls,
   syncTuningLabels,
 } from '../../control-plane/controls'
 import type { ControlElements, FocusElements } from '../../control-plane/dom'
 import type { DepthPreset } from '../../control-plane/types'
 import { isGalleryPalette, parsePaletteParam } from '../../../gallery-presets'
+import { isWorkMode } from '../../work-mode'
 import { syncToggleButtonLabels } from '../mode-readout'
 import {
   applyGalleryPreset,

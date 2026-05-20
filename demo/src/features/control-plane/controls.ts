@@ -1,6 +1,7 @@
-import { parsePaletteParam, type GalleryPalette } from '../../gallery-presets'
+import { parsePaletteParam } from '../../gallery-presets'
 import type { ControlElements } from './dom'
 import type { DemoConfig, DepthPreset } from './types'
+export { isWorkMode } from '../work-mode'
 
 const DEPTH_PRESETS: Record<Exclude<DepthPreset, 'custom'>, {
   strength: number;
@@ -63,10 +64,6 @@ export function syncTuningLabels (ctlEl: ControlElements): void {
   ctlEl.tileBudgetValue.textContent = `${Math.round(readRange(ctlEl.tileBudget, 0))}/tile`
   ctlEl.tileSizeValue.textContent = `${Math.round(readRange(ctlEl.tileSize, 20))}px`
   ctlEl.tileMaxScaleValue.textContent = readRange(ctlEl.tileMaxScale, 0).toFixed(2)
-}
-
-export function isWorkMode (cfg: Pick<DemoConfig, 'dataMode' | 'n'> & { palette?: GalleryPalette }): boolean {
-  return cfg.dataMode === 'work' || (cfg.n <= 1000 && (!cfg.palette || cfg.palette === 'category'))
 }
 
 export function hydrateControlsFromUrl (ctlEl: ControlElements): void {

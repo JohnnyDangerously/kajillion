@@ -1,4 +1,4 @@
-import { isWorkMode } from '../control-plane/controls'
+import { isWorkMode } from '../work-mode/profile'
 import type { WorkGraphData } from '../demo-lifecycle/work-graph-types'
 import {
   applyWorkFocusPanel,

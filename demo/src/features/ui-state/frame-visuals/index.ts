@@ -1,5 +1,5 @@
 import { type Graph } from '@kajillion/graph'
-import { isWorkMode } from '../../control-plane/controls'
+import { isWorkMode } from '../../work-mode'
 import type { DemoConfig } from '../../control-plane/types'
 import { attachWorkMetadata, renderDataFromFrame } from '../../demo-lifecycle/render-data'
 import { DEMO_SPACE_SIZE } from '../../demo-lifecycle/demo-space'

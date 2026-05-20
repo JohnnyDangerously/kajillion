@@ -1,5 +1,4 @@
 import { Graph } from '@kajillion/graph'
-import { isWorkMode } from './features/control-plane/controls'
 import type { ControlElements, FocusElements, OverlayElements } from './features/control-plane/dom'
 import type { DemoConfig } from './features/control-plane/types'
 import type { GeneratedGraph } from './generate-graph'
@@ -19,6 +18,7 @@ import {
   type DemoRuntimeState,
 } from './features/demo-runtime'
 import { createVisualLabActions } from './features/demo-runtime/visual-lab-actions'
+import { isWorkMode } from './features/work-mode'
 import { createRuntimeStartupControllers } from './main-runtime-controllers'
 import { createRuntimeVisualControllers } from './main-runtime-visuals'
 

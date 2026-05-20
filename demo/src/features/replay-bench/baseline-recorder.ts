@@ -2,7 +2,7 @@ import { Graph, type GpuTimingSnapshot, type GraphConfig } from '@kajillion/grap
 import { galleryRenderData } from '../../gallery-presets'
 import type { GeneratedGraph } from '../../generate-graph'
 import type { RenderableGraphData } from '../../graph-contract'
-import { isWorkMode } from '../control-plane/controls'
+import { isWorkMode } from '../work-mode'
 import type { ControlElements } from '../control-plane/dom'
 import type { DemoConfig } from '../control-plane/types'
 import { aggregateGpu, delay, downloadBlob, measureWallFps, median } from './metrics'

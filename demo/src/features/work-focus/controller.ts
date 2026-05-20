@@ -1,4 +1,4 @@
-import { isWorkMode } from '../control-plane/controls'
+import { isWorkMode, WORK_MODE_CAMERA, WORK_MODE_INTERACTION } from '../work-mode/profile'
 import type { WorkFocusState } from '../ui-state/work-focus-panel'
 import {
   buildWorkLinkFocusState,
@@ -101,7 +101,7 @@ export function createWorkFocusController (options: WorkFocusControllerOptions):
       })
       const data = options.getCurrentData()
       if (data) options.applyCurrentVisualAttributes(graph, data)
-      if (fitOverview && isWorkMode(cfg)) fitPointIndices([], 420, 0.16)
+      if (fitOverview && isWorkMode(cfg)) fitPointIndices([], WORK_MODE_CAMERA.overviewFitDurationMs, WORK_MODE_CAMERA.overviewFitPadding)
       graph.render()
     },
 
@@ -124,11 +124,11 @@ export function createWorkFocusController (options: WorkFocusControllerOptions):
         highlightedLinkIndices: workFocusState.connectedLinks,
         outlinedPointIndices: undefined,
         renderLodMode: 'exact',
-        pointGreyoutOpacity: cfg.theme === 'light' ? 0.14 : 0.18,
-        linkGreyoutOpacity: cfg.theme === 'light' ? 0.06 : 0.08,
+        pointGreyoutOpacity: cfg.theme === 'light' ? WORK_MODE_INTERACTION.focusPointGreyoutLight : WORK_MODE_INTERACTION.focusPointGreyoutDark,
+        linkGreyoutOpacity: cfg.theme === 'light' ? WORK_MODE_INTERACTION.focusLinkGreyoutLight : WORK_MODE_INTERACTION.focusLinkGreyoutDark,
       })
       options.applyCurrentVisualAttributes(graph, data)
-      if (shouldZoom) fitPointIndices(sampleIndices(workFocusState.visiblePoints, 96), 460, 0.34)
+      if (shouldZoom) fitPointIndices(sampleIndices(workFocusState.visiblePoints, 96), WORK_MODE_CAMERA.focusFitDurationMs, WORK_MODE_CAMERA.focusFitPadding)
       graph.render()
     },
 
@@ -138,7 +138,7 @@ export function createWorkFocusController (options: WorkFocusControllerOptions):
       const cfg = options.getCurrentConfig()
       if (!graph || !data || !isWorkMode(cfg) || !isCloseWorkZoom(options)) return
       if (workFocusState?.type === 'link' && workFocusState.index === index) {
-        if (shouldZoom && workFocusState.endpoints.length > 0) fitPointIndices(workFocusState.endpoints, 360, 0.36)
+        if (shouldZoom && workFocusState.endpoints.length > 0) fitPointIndices(workFocusState.endpoints, WORK_MODE_CAMERA.linkFitDurationMs, WORK_MODE_CAMERA.linkFitPadding)
         return
       }
       workFocusState = buildWorkLinkFocusState(graph, index)
@@ -155,20 +155,20 @@ export function createWorkFocusController (options: WorkFocusControllerOptions):
         linkGreyoutOpacity: cfg.theme === 'light' ? 0.04 : 0.06,
       })
       options.applyCurrentVisualAttributes(graph, data)
-      if (shouldZoom && workFocusState.endpoints.length > 0) fitPointIndices(workFocusState.endpoints, 360, 0.36)
+      if (shouldZoom && workFocusState.endpoints.length > 0) fitPointIndices(workFocusState.endpoints, WORK_MODE_CAMERA.linkFitDurationMs, WORK_MODE_CAMERA.linkFitPadding)
       graph.render()
     },
 
     fitNeighborhood: () => {
       const graph = options.getCurrentGraph()
       if (!graph || workFocusState?.type !== 'point') return
-      fitPointIndices(workFocusState.neighborhood, 420, 0.26)
+      fitPointIndices(workFocusState.neighborhood, WORK_MODE_CAMERA.overviewFitDurationMs, 0.26)
     },
 
     stepIntoPoint: () => {
       const graph = options.getCurrentGraph()
       if (!graph || workFocusState?.type !== 'point') return
-      fitPointIndices(sampleIndices([workFocusState.index, ...workFocusState.neighbors], 28), 340, 0.44)
+      fitPointIndices(sampleIndices([workFocusState.index, ...workFocusState.neighbors], 28), WORK_MODE_CAMERA.stepFitDurationMs, WORK_MODE_CAMERA.stepFitPadding)
     },
   }
 

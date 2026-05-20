@@ -6,11 +6,17 @@ import {
   generatedGraphToSnapshot,
   graphFrameFromSnapshot,
 } from '../../graph-contract'
-import { isWorkMode } from '../control-plane/controls'
 import { DEMO_SPACE_SIZE } from '../demo-lifecycle/demo-space'
-import { attachWorkMetadata, renderDataFromFrame } from '../demo-lifecycle/render-data'
-import { generateWorkGraph, scaleGeneratedDataToDemoSpace } from '../demo-lifecycle/work-graph-generator'
+import { renderDataFromFrame } from '../demo-lifecycle/render-data'
+import { scaleGeneratedDataToDemoSpace } from '../demo-lifecycle/work-graph-generator'
 import { buildLabelAnchors } from '../ui-state/label-overlay/label-anchors'
+import {
+  buildWorkModeRenderData,
+  generateWorkModeSourceData,
+  isExplicitWorkDataset,
+  isWorkMode,
+  WORK_MODE_CAMERA,
+} from '../work-mode'
 import type { DemoRuntimeContext } from './context'
 
 export async function rebuildDemoGraph (runtime: DemoRuntimeContext): Promise<void> {
@@ -31,12 +37,12 @@ export async function rebuildDemoGraph (runtime: DemoRuntimeContext): Promise<vo
   const dataKey = `${cfg.dataMode}:${cfg.n}:${cfg.seed}`
   const needsRegen = !state.currentData || state.currentDataKey !== dataKey
   if (needsRegen) {
-    const generated = cfg.dataMode === 'work'
-      ? generateWorkGraph(cfg.n, cfg.seed)
+    const generated = isExplicitWorkDataset(cfg)
+      ? generateWorkModeSourceData(cfg)
       : cfg.dataMode === 'cosmo'
         ? generateCosmoLab({ count: cfg.n, seed: cfg.seed, layoutStyle: 'organic' })
         : generateBA(cfg.n, 3, cfg.seed)
-    state.currentData = cfg.dataMode === 'work' ? generated : scaleGeneratedDataToDemoSpace(generated)
+    state.currentData = isExplicitWorkDataset(cfg) ? generated : scaleGeneratedDataToDemoSpace(generated)
     state.currentDataKey = dataKey
   }
   const data = state.currentData!
@@ -55,15 +61,15 @@ export async function rebuildDemoGraph (runtime: DemoRuntimeContext): Promise<vo
     lanes: cfg.lanes,
     renderLinks: cfg.renderLinks,
   })
-  if (cfg.dataMode === 'work' && cfg.renderLinks) {
+  if (isExplicitWorkDataset(cfg) && cfg.renderLinks) {
     viewSpec.edge.visibleKinds = ['observed', 'second_degree', 'predicted']
   }
   const frame = graphFrameFromSnapshot(snapshot, viewSpec.layout)
   state.labNodeFilterMask = null
   state.labNodeFilterEdgeMode = 'inside'
   state.labInteractionState = null
-  const renderData = cfg.dataMode === 'work'
-    ? attachWorkMetadata(renderDataFromFrame(frame, viewSpec, cfg, DEMO_SPACE_SIZE), state.currentData)
+  const renderData = isExplicitWorkDataset(cfg)
+    ? buildWorkModeRenderData(frame, viewSpec, cfg, state.currentData)
     : renderDataFromFrame(frame, viewSpec, cfg, DEMO_SPACE_SIZE)
   state.currentSnapshot = snapshot
   state.currentFrame = frame
@@ -85,7 +91,13 @@ export async function rebuildDemoGraph (runtime: DemoRuntimeContext): Promise<vo
   if (isWorkMode(cfg)) {
     requestAnimationFrame(() => {
       if (state.currentGraph !== graph) return
-      graph.setZoomTransformByPointPositions(renderData.positions, 420, undefined, 0.18, false)
+      graph.setZoomTransformByPointPositions(
+        renderData.positions,
+        WORK_MODE_CAMERA.initialFitDurationMs,
+        undefined,
+        WORK_MODE_CAMERA.initialFitPadding,
+        false
+      )
     })
   }
 }

@@ -5,7 +5,7 @@ import {
   influenceLabelAnchors,
   talentLabelAnchors,
 } from '../../../gallery-presets'
-import { isWorkMode } from '../../control-plane/controls'
+import { isWorkMode } from '../../work-mode'
 import type { DemoConfig } from '../../control-plane/types'
 import { DEMO_SPACE_SIZE } from '../../demo-lifecycle/demo-space'
 import { WORK_GROUPS, type WorkGraphData } from '../../demo-lifecycle/work-graph-types'

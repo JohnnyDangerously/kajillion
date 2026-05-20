@@ -1,5 +1,5 @@
 import { type Graph } from '@kajillion/graph'
-import { isWorkMode } from '../../control-plane/controls'
+import { isWorkMode } from '../../work-mode'
 import type { DemoConfig } from '../../control-plane/types'
 import type { GeneratedGraph } from '../../../generate-graph'
 import type { VisualAttributeApplyOptions } from '../frame-visuals'

@@ -13,9 +13,9 @@ import {
   type LabelOverlayController,
 } from './features/ui-state/label-overlay/label-overlay'
 import {
-  createWorkFocusController,
-  type WorkFocusController,
-} from './features/work-focus'
+  createWorkModeController,
+  type WorkModeController,
+} from './features/work-mode'
 
 interface RuntimeStartupControllersOptions {
   state: DemoRuntimeState;
@@ -30,7 +30,7 @@ export interface RuntimeStartupControllers {
   graphHost: HTMLDivElement;
   labelOverlay: LabelOverlayController;
   cosmicIntroPresentation: CosmicIntroPresentationController;
-  workFocusController: WorkFocusController;
+  workFocusController: WorkModeController;
 }
 
 export function createRuntimeStartupControllers (
@@ -54,7 +54,7 @@ export function createRuntimeStartupControllers (
     applyTheme: options.applyTheme,
     handleError: (err) => console.error(err),
   })
-  const workFocusController = createWorkFocusController({
+  const workFocusController = createWorkModeController({
     focusEl,
     getCurrentConfig: () => state.currentConfig,
     getCurrentGraph: () => state.currentGraph,
