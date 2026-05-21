@@ -35,7 +35,7 @@ struct CullUniforms {
 @group(0) @binding(10) var<storage, read_write> tileBudgetPriorities: array<atomic<u32>>;
 
 const outlineRingScale: f32 = 1.3;
-const maxTileBudgetSlots: u32 = 16u;
+const maxTileBudgetSlots: u32 = 32u;
 const priorityTieMask: u32 = 0x001fffffu;
 const priorityScoreShift: u32 = 21u;
 var<workgroup> localKeep: array<u32, 64>;

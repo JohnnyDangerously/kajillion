@@ -1,4 +1,5 @@
 import { createWorkFocusController } from '../work-focus'
+import { createFitPointIndices } from '../work-focus/fitting'
 import type {
   WorkFocusController,
   WorkFocusControllerOptions,
@@ -25,6 +26,7 @@ export type WorkModeControllerOptions = WorkFocusControllerOptions
 
 export function createWorkModeController (options: WorkModeControllerOptions): WorkModeController {
   const focus = createWorkFocusController(options)
+  const fitPointIndices = createFitPointIndices(options)
 
   function canControlWorkMode (): boolean {
     return isWorkMode(options.getCurrentConfig()) && !!options.getCurrentGraph()
@@ -34,6 +36,11 @@ export function createWorkModeController (options: WorkModeControllerOptions): W
     if (!canControlWorkMode()) return
     const graph = options.getCurrentGraph()
     if (!graph) return
+    if (stage === 'galaxy') {
+      fitPointIndices([], duration, 0.12, WORK_MODE_ZOOM_STAGES.galaxy.distance)
+      graph.render()
+      return
+    }
     graph.setZoomDistance(WORK_MODE_ZOOM_STAGES[stage].distance, duration, false)
     graph.render()
   }

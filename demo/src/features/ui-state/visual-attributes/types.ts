@@ -47,6 +47,7 @@ export type VisualAttributeContext = {
   edgeWeightForEdge?: Float32Array;
   edgeConfidenceForEdge?: Float32Array;
   isLargeWork: boolean;
+  isAtlasWork: boolean;
   cx: number;
   cy: number;
   normalizeX: (x: number) => number;

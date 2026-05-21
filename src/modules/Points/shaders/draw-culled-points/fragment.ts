@@ -44,14 +44,13 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
 
   if (input.isOutlined <= 0.0) {
     let bgLuma = dot(drawFragment.backgroundColor.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
-    if (bgLuma > 0.78) {
-      let rim = smoothstep(0.66, 0.98, length(input.pointCoord)) * shapeOpacity;
-      let rimOpacity = rim * 0.34 * finalPointAlpha;
-      fragColor = vec4<f32>(
-        mix(fragColor.rgb, vec3<f32>(0.06, 0.08, 0.11), rimOpacity),
-        fragColor.a,
-      );
-    }
+    let rim = smoothstep(0.62, 0.98, length(input.pointCoord)) * shapeOpacity;
+    let rimColor = select(vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(0.055, 0.070, 0.095), bgLuma > 0.78);
+    let rimOpacity = rim * (0.24 + select(0.0, 0.12, bgLuma > 0.78)) * finalPointAlpha;
+    fragColor = vec4<f32>(
+      mix(fragColor.rgb, rimColor, rimOpacity),
+      fragColor.a,
+    );
   }
 
   if (drawFragment.hasOutlinedPoints > 0.0 && input.isOutlined > 0.0) {

@@ -15,6 +15,7 @@ import {
   resolveWorkNodeOverlaps,
   seededUnit,
 } from './work-graph-layout'
+import { atlasRelayoutWorkNodes } from './work-graph-atlas'
 import { addWorkGraphMeshLinks } from './work-graph-mesh'
 import {
   WORK_GROUPS,
@@ -155,9 +156,13 @@ export function generateWorkGraph (count: number, seed: number): GeneratedGraph 
     rand,
   })
 
-  organicRelayoutWorkNodes(positions, nodeKind, nodeScore, groupForNode, seed)
-  compactWorkNodesIntoSharedField(positions, nodeKind, nodeScore, groupForNode, seed)
-  resolveWorkNodeOverlaps(positions, nodeKind, nodeScore)
+  if (nodeCount >= 50000) {
+    atlasRelayoutWorkNodes(positions, nodeKind, nodeScore, groupForNode, nodeCompany, seed)
+  } else {
+    organicRelayoutWorkNodes(positions, nodeKind, nodeScore, groupForNode, seed)
+    compactWorkNodesIntoSharedField(positions, nodeKind, nodeScore, groupForNode, seed)
+    resolveWorkNodeOverlaps(positions, nodeKind, nodeScore)
+  }
 
   return buildGeneratedWorkGraph(builder)
 }

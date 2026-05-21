@@ -37,10 +37,10 @@ export function analystTierSize (
   const isVip = kind === WORK_NODE_GROUP || kind === WORK_NODE_COMPANY || degree >= 18 || score > 0.74
   const isFirstDegree = kind === WORK_NODE_COMPANY || degree >= 8 || score > 0.44
   const overviewSize = isVip
-    ? 7.10 + hash * 0.50
+    ? 6.25 + hash * 2.15 + Math.min(2.1, Math.sqrt(degree) * 0.18)
     : isFirstDegree
-      ? 5.70 + hash * 0.38
-      : 4.65 + hash * 0.30
+      ? 3.90 + hash * 1.10 + Math.min(1.15, Math.sqrt(degree) * 0.12)
+      : 2.30 + hash * 0.92 + score * 0.62
   return overviewSize * (1 - equalize) + ANALYST_CLOSE_NODE_SIZE * equalize
 }
 

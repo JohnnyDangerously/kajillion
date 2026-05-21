@@ -36,6 +36,7 @@ export function buildVisualAttributeContext (
   const edgeWeightForEdge = (data as RenderableGraphData).edgeWeight
   const edgeConfidenceForEdge = (data as RenderableGraphData).edgeConfidence
   const isLargeWork = isWork && data.nodeCount >= 2000
+  const isAtlasWork = isWork && data.nodeCount >= 50000
   const cx = spaceSize / 2
   const cy = spaceSize / 2
   let minX = Infinity
@@ -82,6 +83,7 @@ export function buildVisualAttributeContext (
     edgeWeightForEdge,
     edgeConfidenceForEdge,
     isLargeWork,
+    isAtlasWork,
     cx,
     cy,
     normalizeX,

@@ -40,7 +40,7 @@ export function resolveWorkModeGraphConfigPolicy (
     flags.useAnalystPalette &&
     cfg.density &&
     cfg.lod &&
-    cfg.n >= 50000
+    cfg.n >= 500000
 
   return {
     useAnalystMacroImpostors,
@@ -62,6 +62,7 @@ export function applyWorkModeGraphConfigOverlay (
     useSubnetPalette,
     useTokyoPalette,
   } = flags
+  const useLargeAtlas = cfg.n >= 50000 && !policy.useAnalystMacroImpostors
 
   return {
     ...config,
@@ -70,24 +71,27 @@ export function applyWorkModeGraphConfigOverlay (
       : config.backgroundColor === '#06090d'
         ? '#05070b'
         : config.backgroundColor,
-    pointDefaultSize: useAnalystPalette ? 11.5 : 10.25,
-    pointSizeScale: useAnalystPalette ? 1.0 : 1.14,
+    pointDefaultSize: useLargeAtlas ? 4.8 : useAnalystPalette ? 11.5 : 10.25,
+    pointSizeScale: useLargeAtlas ? 0.86 : useAnalystPalette ? 1.0 : 1.14,
     pointOpacity: 1,
-    linkDefaultWidth: useAnalystPalette ? 0.86 : useSubnetPalette ? 1.65 : 2.05,
-    linkWidthScale: useAnalystPalette ? 0.78 : 1.06,
+    linkDefaultWidth: useLargeAtlas ? 0.52 : useAnalystPalette ? 0.86 : useSubnetPalette ? 1.65 : 2.05,
+    linkWidthScale: useLargeAtlas ? 0.50 : useAnalystPalette ? 0.78 : 1.06,
     linkOpacity: cfg.renderLinks
-      ? useAnalystPalette ? 0.92 : useSubnetPalette ? 0.82 : (isLight ? 0.82 : 0.80)
+      ? useLargeAtlas ? (isLight ? 0.24 : 0.36) : useAnalystPalette ? 0.92 : useSubnetPalette ? 0.82 : (isLight ? 0.82 : 0.80)
       : 0,
-    curvedLinkSegments: cfg.lanes ? 22 : 1,
-    curvedLinkWeight: 0.84,
-    curvedLinkControlPointDistance: cfg.lanes ? 0.16 : 0,
-    linkBundlingStrength: cfg.lanes ? 0.035 : 0,
+    curvedLinkSegments: useLargeAtlas ? (cfg.lanes ? 5 : 1) : cfg.lanes ? 22 : 1,
+    curvedLinkWeight: useLargeAtlas ? 0.58 : 0.84,
+    curvedLinkControlPointDistance: useLargeAtlas ? (cfg.lanes ? 0.035 : 0) : cfg.lanes ? 0.16 : 0,
+    linkBundlingStrength: useLargeAtlas ? 0 : cfg.lanes ? 0.035 : 0,
     linkBundlingCellSize: 260,
-    minZoomLevel: useAnalystPalette ? ANALYST_MIN_ZOOM_LEVEL : 0.001,
-    maxZoomLevel: useAnalystPalette ? ANALYST_MAX_ZOOM_LEVEL : 10,
+    pointTileBudget: useLargeAtlas ? Math.max(config.pointTileBudget ?? 0, 28) : config.pointTileBudget,
+    pointTileBudgetSize: useLargeAtlas ? Math.min(config.pointTileBudgetSize ?? 18, 14) : config.pointTileBudgetSize,
+    minZoomLevel: useLargeAtlas ? 0.060 : useAnalystPalette ? ANALYST_MIN_ZOOM_LEVEL : 0.001,
+    maxZoomLevel: useLargeAtlas ? 7.5 : useAnalystPalette ? ANALYST_MAX_ZOOM_LEVEL : 10,
     rescalePositions: false,
-    fitViewOnInit: false,
-    fitViewPadding: 0.16,
+    renderLodMode: useLargeAtlas && cfg.webgpu && cfg.lod ? 'phantom' : config.renderLodMode,
+    fitViewOnInit: useLargeAtlas,
+    fitViewPadding: useLargeAtlas ? 0.17 : 0.16,
     fitViewDuration: 520,
     enableSimulation: cfg.explore ? true : false,
     enableDrag: true,

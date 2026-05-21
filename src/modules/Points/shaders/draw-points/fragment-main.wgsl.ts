@@ -125,20 +125,18 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
     );
   }
 
-  // Light-theme dense graphs need a cheap figure/ground cue, but the
-  // explicit outline-ring path is too visually heavy for thousands of nodes.
-  // Add a subtle in-disc rim for plain circles on light backgrounds so nodes
-  // remain individually readable inside crowded clusters.
+  // Dense graph views need a cheap figure/ground cue, but the explicit
+  // outline-ring path is too visually heavy for thousands of nodes. Add an
+  // in-disc moat/rim for plain circles so crowded clusters keep separation.
   if (input.pointShape == CIRCLE && input.isOutlined <= 0.0 && input.imageAtlasUV.x == -1.0) {
     let bgLuma = dot(drawFragment.backgroundColor.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
-    if (bgLuma > 0.78) {
-      let rim = smoothstep(0.66, 0.98, length(shapeCoordForAA)) * shapeOpacity;
-      let rimOpacity = rim * 0.34 * finalPointAlpha;
-      fragColor = vec4<f32>(
-        mix(fragColor.rgb, vec3<f32>(0.06, 0.08, 0.11), rimOpacity),
-        fragColor.a,
-      );
-    }
+    let rim = smoothstep(0.62, 0.98, length(shapeCoordForAA)) * shapeOpacity;
+    let rimColor = select(vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(0.055, 0.070, 0.095), bgLuma > 0.78);
+    let rimOpacity = rim * (0.24 + select(0.0, 0.12, bgLuma > 0.78)) * finalPointAlpha;
+    fragColor = vec4<f32>(
+      mix(fragColor.rgb, rimColor, rimOpacity),
+      fragColor.a,
+    );
   }
 
   // Render outline ring around the point. Outer uniform gate lets the
