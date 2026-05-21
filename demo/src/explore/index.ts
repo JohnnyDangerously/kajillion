@@ -12,7 +12,7 @@
  * This module owns interaction + data orchestration only. It touches the
  * renderer exclusively through the ExploreAdapter passed to initExplore().
  */
-import type { ExploreAdapter, EgoNet, SkeletonPayload } from './types'
+import type { ExploreAdapter, ExploreOptions, EgoNet, SkeletonPayload } from './types'
 import { fetchNeighborhoodGraph } from './csr-client'
 import { radialLayout } from './layout'
 import { detectCommunities, rankCommunitiesBySize } from './communities'
@@ -27,8 +27,18 @@ const MAX_NEIGHBORS = 40_000
 const MIN_EDGE_SCORE = 20
 
 export function initExplore (adapter: ExploreAdapter, seedEntityInt: number): void {
+  initExploreWithOptions(adapter, seedEntityInt)
+}
+
+export function initExploreWithOptions (
+  adapter: ExploreAdapter,
+  seedEntityInt: number,
+  options: ExploreOptions = {}
+): void {
   const panel = new ExplorePanel()
   const traversal = new Traversal()
+  const maxNeighbors = options.maxNeighbors ?? MAX_NEIGHBORS
+  const edgeMinScore = options.edgeMinScore ?? MIN_EDGE_SCORE
 
   // State for the currently-rendered network.
   let orderedIds: number[] = []
@@ -39,7 +49,7 @@ export function initExplore (adapter: ExploreAdapter, seedEntityInt: number): vo
   async function resolveEgoNet (entityInt: number): Promise<EgoNet> {
     const cached = traversal.getCached(entityInt)
     if (cached) return cached
-    const g = await fetchNeighborhoodGraph(entityInt, MAX_NEIGHBORS, MIN_EDGE_SCORE)
+    const g = await fetchNeighborhoodGraph(entityInt, maxNeighbors, edgeMinScore)
     // Edge indices are into the neighbour block; ordered = [root, ...neighbors]
     // puts the root at 0, so neighbour index k maps to ordered index k + 1.
     const interEdges: number[] = new Array(g.edges.length * 2)
@@ -103,6 +113,7 @@ export function initExplore (adapter: ExploreAdapter, seedEntityInt: number): vo
       adapter.setColors(uniformColors(ordered.length))
       orderedIds = ordered
       scoreByIndex = [0, ...net.neighborScores]
+      adapter.setNodeMetadata?.({ entityIds: orderedIds, scores: scoreByIndex })
       panel.hide()
       panel.setBreadcrumb(traversal.history)
 
@@ -135,6 +146,10 @@ export function initExplore (adapter: ExploreAdapter, seedEntityInt: number): vo
     const entityInt = orderedIds[nodeIndex]
     if (entityInt === undefined) return
     const isFocus = nodeIndex === 0
+    if (options.autoJumpOnNodeClick && entityInt !== traversal.current) {
+      jumpTo(entityInt)
+      return
+    }
     panel.show({
       entityInt,
       isFocus,

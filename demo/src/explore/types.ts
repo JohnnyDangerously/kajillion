@@ -30,8 +30,21 @@ export interface ExploreAdapter {
   setPositions: (positions: number[]) => void
   /** Override every node's colour (flat [r,g,b,a,...]). */
   setColors: (colors: number[]) => void
+  /** Attach product metadata for the current ordered entity set. */
+  setNodeMetadata?: (metadata: ExploreNodeMetadata) => void
   /** Register a callback fired when the user clicks a node (by index). */
   registerNodeClick: (cb: (nodeIndex: number) => void) => void
+}
+
+export interface ExploreNodeMetadata {
+  entityIds: number[]
+  scores: number[]
+}
+
+export interface ExploreOptions {
+  maxNeighbors?: number
+  edgeMinScore?: number
+  autoJumpOnNodeClick?: boolean
 }
 
 /** A resolved 1-hop ego-network from one /neighborhood_graph_raw call. */

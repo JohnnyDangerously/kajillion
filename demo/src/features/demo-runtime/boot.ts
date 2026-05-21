@@ -1,10 +1,15 @@
-import { initExplore } from '../../explore'
+import { initExploreWithOptions } from '../../explore'
 import type { ExploreAdapter } from '../../explore/types'
 import { initNodeTreatmentLab } from '../../node-treatment-lab'
 import { startAgentCommandLoop } from '../agent-bridge'
 import { DEMO_SPACE_SIZE } from '../demo-lifecycle/demo-space'
 import type { RuntimeActions } from '../runtime-actions'
 import { readControls } from '../control-plane/controls'
+import {
+  applyWorkNetworkNodeMetadata,
+  isExplicitWorkDataset,
+  WORK_MODE_NETWORK_EXPLORER,
+} from '../work-mode'
 import { startDemoOverlayLoop } from './overlay-loop'
 import type { DemoRuntimeContext } from './context'
 
@@ -21,7 +26,9 @@ export async function bootDemo (
   runtime.labelOverlay.start()
   startAgentCommandLoop(runtimeActions.applyAgentCommand)
   initNodeTreatmentLab()
-  if (new URLSearchParams(window.location.search).get('explore') === '1') {
+  const params = new URLSearchParams(window.location.search)
+  const useWorkExplorer = isExplicitWorkDataset(state.currentConfig)
+  if (useWorkExplorer || params.get('explore') === '1') {
     const exploreAdapter: ExploreAdapter = {
       spaceSize: DEMO_SPACE_SIZE,
       loadSkeleton: async (p) => {
@@ -42,8 +49,19 @@ export async function bootDemo (
         state.currentGraph?.setPointColors(new Float32Array(colors))
         state.currentGraph?.render()
       },
+      setNodeMetadata: (metadata) => {
+        applyWorkNetworkNodeMetadata(state.currentData, metadata)
+        applyWorkNetworkNodeMetadata(state.currentRenderData, metadata)
+        runtime.workFocusController.updatePanel()
+      },
       registerNodeClick: (cb) => { state.exploreNodeClickHook = cb },
     }
-    initExplore(exploreAdapter, 51197947)
+    initExploreWithOptions(exploreAdapter, WORK_MODE_NETWORK_EXPLORER.seedEntityInt, {
+      maxNeighbors: useWorkExplorer ? WORK_MODE_NETWORK_EXPLORER.maxNeighbors : undefined,
+      edgeMinScore: useWorkExplorer ? WORK_MODE_NETWORK_EXPLORER.edgeMinScore : undefined,
+      autoJumpOnNodeClick: useWorkExplorer
+        ? WORK_MODE_NETWORK_EXPLORER.autoJumpOnNodeClick
+        : undefined,
+    })
   }
 }

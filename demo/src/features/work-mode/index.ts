@@ -26,6 +26,14 @@ export {
   type WorkModeInteractionProfile,
 } from './profile'
 export {
+  applyWorkNetworkNodeMetadata,
+  type WorkNetworkNodeMetadata,
+} from './network-metadata'
+export {
+  WORK_MODE_NETWORK_EXPLORER,
+  type WorkModeNetworkExplorerPolicy,
+} from './network-policy'
+export {
   clampWorkModeZoomDistance,
   resolveWorkModeZoomStage,
   WORK_MODE_ZOOM_STAGE_DURATIONS,
