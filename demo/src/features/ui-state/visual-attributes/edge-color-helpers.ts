@@ -73,7 +73,7 @@ export function edgeResolvedColor (
     targetParticle?: EdgeColor;
   }
 ): EdgeColor {
-  const { config, isLight, useGalleryPalette } = context
+  const { config, isAtlasWork, isLight, useGalleryPalette } = context
   const { group, normalizedSourceY, normalizedTargetY, predictedEdge, projectedEdge, sourceParticle, targetParticle } = options
   return predictedEdge
     ? [1.0, 0.43, 0.10]
@@ -87,7 +87,9 @@ export function edgeResolvedColor (
           sourceParticle,
           targetParticle
         )
-        : displayPaletteColor(group, isLight)
+        : isAtlasWork
+          ? [0.26, 0.34, 0.40]
+          : displayPaletteColor(group, isLight)
 }
 
 export function edgeColorScalesForContext (context: VisualAttributeContext): EdgeColor {

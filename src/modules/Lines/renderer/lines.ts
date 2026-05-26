@@ -43,7 +43,11 @@ import {
 } from '@/graph/modules/Lines/passes/visible-culling/visible-line-culling-pass'
 import { destroyLinesRenderer } from '@/graph/modules/Lines/renderer/destroy'
 import { initializeLinesRenderer } from '@/graph/modules/Lines/renderer/init'
-import { drawLinesRenderer, prepareGpuCulledLineDraw } from '@/graph/modules/Lines/renderer/draw'
+import {
+  drawLinesRenderer,
+  prepareDirectLineDraw,
+  prepareGpuCulledLineDraw,
+} from '@/graph/modules/Lines/renderer/draw'
 
 export class Lines extends CoreModule {
   public linkIndexFbo: Framebuffer | undefined
@@ -100,6 +104,10 @@ export class Lines extends CoreModule {
 
   public prepareGpuCulledDraw (timer?: GpuTimerLike, forcePolicy = false): boolean {
     return prepareGpuCulledLineDraw(this, timer, forcePolicy)
+  }
+
+  public prepareDirectDraw (): boolean {
+    return prepareDirectLineDraw(this)
   }
 
   public updateLinkIndexFbo (): void {

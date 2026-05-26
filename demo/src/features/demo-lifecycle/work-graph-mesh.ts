@@ -7,6 +7,7 @@ export function addWorkGraphMeshLinks (options: {
   companyIndicesByGroup: number[][];
   groupForNode: Int32Array;
   hubIndices: number[];
+  includeHubs?: boolean;
   nodeCount: number;
   peopleByGroup: number[][];
   rand: () => number;
@@ -18,6 +19,7 @@ export function addWorkGraphMeshLinks (options: {
     companyIndicesByGroup,
     groupForNode,
     hubIndices,
+    includeHubs = true,
     nodeCount,
     peopleByGroup,
     rand,
@@ -25,7 +27,7 @@ export function addWorkGraphMeshLinks (options: {
   for (let group = 0; group < WORK_GROUPS.length; group += 1) {
     const hub = hubIndices[group] ?? 0
     const nextHub = hubIndices[(group + 1) % hubIndices.length] ?? 0
-    addLink(hub, nextHub, 0, 1.65, 0.72)
+    if (includeHubs) addLink(hub, nextHub, 0, 1.65, 0.72)
     const companies = companyIndicesByGroup[group] ?? []
     const nextCompanies = companyIndicesByGroup[(group + 1) % WORK_GROUPS.length] ?? []
     const companyCrossCount = Math.min(8, companies.length, nextCompanies.length)

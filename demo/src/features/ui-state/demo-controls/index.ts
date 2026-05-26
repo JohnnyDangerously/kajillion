@@ -1,8 +1,5 @@
-import {
-  applyDepthPresetToControls,
-  readControls,
-  syncTuningLabels,
-} from '../../control-plane/controls'
+import { readControls } from '../../control-plane/controls'
+import { applyDepthPresetToControls, syncTuningLabels } from '../../control-plane/depth-presets'
 import type { ControlElements, FocusElements } from '../../control-plane/dom'
 import type { DepthPreset } from '../../control-plane/types'
 import { isGalleryPalette, parsePaletteParam } from '../../../gallery-presets'
@@ -100,6 +97,10 @@ export function installDemoControls (
 
   ctlEl.theme.addEventListener('click', () => {
     ctlEl.theme.classList.toggle('active')
+    actions.applyVisualControls()
+  })
+
+  ctlEl.borderTreatment.addEventListener('change', () => {
     actions.applyVisualControls()
   })
 

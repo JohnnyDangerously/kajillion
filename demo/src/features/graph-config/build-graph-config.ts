@@ -2,6 +2,7 @@ import type { GraphConfig } from '@kajillion/graph'
 import { boolParam } from '../control-plane/controls'
 import type { DemoConfig } from '../control-plane/types'
 import { DEMO_SPACE_SIZE } from '../demo-lifecycle/demo-space'
+import { resolveRepresentationFromUrl } from '../representations'
 import {
   applyWorkModeGraphConfigOverlay,
   isWorkMode,
@@ -12,6 +13,14 @@ import { buildDemoGraphLodConfig } from './lod-config'
 import { resolveDemoGraphPaletteFlags } from './palette-flags'
 
 export interface DemoGraphConfigHooks extends WorkModeGraphConfigHooks {}
+
+function pointBorderTreatmentValue (mode: DemoConfig['pointBorderTreatment']): number {
+  if (mode === 'off') return 0
+  if (mode === 'darker') return 2
+  if (mode === 'shadow') return 3
+  if (mode === 'both') return 4
+  return 1
+}
 
 export function buildDemoGraphConfig (cfg: DemoConfig, hooks: DemoGraphConfigHooks): GraphConfig {
   const {
@@ -129,6 +138,7 @@ export function buildDemoGraphConfig (cfg: DemoConfig, hooks: DemoGraphConfigHoo
     pointDepthCueHighlight: cfg.pointDepthCueHighlight,
     pointDepthCueShadow: cfg.pointDepthCueShadow,
     pointDepthCueSaturation: cfg.pointDepthCueSaturation,
+    pointBorderTreatment: pointBorderTreatmentValue(cfg.pointBorderTreatment),
     useWebGPU: cfg.webgpu,
     pixelRatio: window.devicePixelRatio || 1,
     adaptivePixelRatio: cfg.adaptiveDpr && !isLight && !useCosmicPalette ? 1 : false,
@@ -138,7 +148,7 @@ export function buildDemoGraphConfig (cfg: DemoConfig, hooks: DemoGraphConfigHoo
     debugFrameTrace: cfg.debugFrameTrace,
   }
 
-  return isWorkMode(cfg)
+  const baseConfig = isWorkMode(cfg)
     ? applyWorkModeGraphConfigOverlay(
       commonConfig,
       cfg,
@@ -153,4 +163,8 @@ export function buildDemoGraphConfig (cfg: DemoConfig, hooks: DemoGraphConfigHoo
       workPolicy
     )
     : commonConfig
+  const representation = resolveRepresentationFromUrl()
+  return representation?.applyGraphConfig
+    ? representation.applyGraphConfig(baseConfig, cfg)
+    : baseConfig
 }

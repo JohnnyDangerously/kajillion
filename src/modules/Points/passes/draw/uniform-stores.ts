@@ -59,6 +59,7 @@ export function createPointDrawUniformStore (
         pointDepthCueHighlight: 'f32',
         pointDepthCueShadow: 'f32',
         pointDepthCueSaturation: 'f32',
+        pointBorderTreatment: 'f32',
       },
       defaultUniforms: {
         ratio: options.effectivePixelRatio,
@@ -92,6 +93,7 @@ export function createPointDrawUniformStore (
         pointDepthCueHighlight: config.pointDepthCueHighlight,
         pointDepthCueShadow: config.pointDepthCueShadow,
         pointDepthCueSaturation: config.pointDepthCueSaturation,
+        pointBorderTreatment: config.pointBorderTreatment,
       },
     },
     drawFragmentUniforms: {

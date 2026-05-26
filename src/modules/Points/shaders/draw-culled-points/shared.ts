@@ -31,6 +31,7 @@ struct DrawVertexUniforms {
   pointDepthCueHighlight: f32,
   pointDepthCueShadow: f32,
   pointDepthCueSaturation: f32,
+  pointBorderTreatment: f32,
 };
 
 struct DrawFragmentUniforms {
@@ -66,6 +67,8 @@ struct VertexOutput {
   @location(3) isOutlined: f32,
   @location(4) lodAlpha: f32,
   @location(5) visualDepth: f32,
+  @location(6) shapeSize: f32,
+  @location(7) overallSize: f32,
 };
 
 const outlineRingScale: f32 = 1.3;

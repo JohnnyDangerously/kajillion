@@ -32,6 +32,7 @@ export type PointDrawVertexUniforms = {
   pointDepthCueHighlight: number;
   pointDepthCueShadow: number;
   pointDepthCueSaturation: number;
+  pointBorderTreatment: number;
 }
 
 export type PointDrawFragmentUniforms = {

@@ -6,6 +6,7 @@ import {
 import {
   drawCulledLinesIndirect,
   drawPrecomputedLines,
+  preparePrecomputedLines,
 } from '@/graph/modules/Lines/passes/draw/draw-command-execution'
 import {
   setDrawLineUniforms,
@@ -24,38 +25,21 @@ export function drawLinesRenderer (
   usePreparedCulledDraw = false
 ): void {
   const { config, points } = lines
+  if (!prepareLineDrawState(lines)) return
   if (!points) return
-  if (!points.currentPositionTexture || points.currentPositionTexture.destroyed) return
-  if (!lines.pointABuffer || !lines.pointBBuffer) lines.updatePointsBuffer()
-  if (!lines.colorBuffer) lines.updateColor()
-  if (!lines.widthBuffer) lines.updateWidth()
-  if (!lines.arrowBuffer) lines.updateArrow()
-  if (!lines.curveLineGeometry) lines.updateCurveLineGeometry()
-  if (!lines.drawCurveCommand || !lines.drawLineUniformStore || !lines.linkStatusTexture) return
-
+  const drawCurveCommand = lines.drawCurveCommand
+  const linkStatusTexture = lines.linkStatusTexture
+  const currentPositionTexture = points.currentPositionTexture
+  if (!drawCurveCommand || !linkStatusTexture || !currentPositionTexture) return
   const hasHighlighting = config.highlightedLinkIndices !== undefined
-
-  setDrawLineUniforms({
-    uniformStore: lines.drawLineUniformStore,
-    runtime: lines.drawLineUniformRuntime,
-    config: lines.config,
-    store: lines.store,
-    renderMode: 0,
-    linkLodStrength: getEffectiveLinkLodStrength(config),
-    hasHighlighting,
-    linkStatusTextureSize: lines.linkStatusTextureSize,
-    effectiveLineSegments: getEffectiveLineSegments(config),
-    isWebGpu: lines.device.info?.type === 'webgpu',
-    renderPositionMix: points.renderPositionMix ?? 1,
-    hasArrowedLinks: lines.hasArrowedLinks,
-  })
+  setPreparedLineUniforms(lines, hasHighlighting)
 
   if (usePreparedCulledDraw && lines.visibleLineCullingPass.isPrepared && drawCulledLinesIndirect({
     pass: lines.visibleLineCullingPass,
     renderPass,
     command: lines.drawCulledCurveCommand,
     uniformStore: lines.drawLineUniformStore,
-    linkStatusTexture: lines.linkStatusTexture,
+    linkStatusTexture,
     pointABuffer: lines.pointABuffer,
     pointBBuffer: lines.pointBBuffer,
     colorBuffer: lines.colorBuffer,
@@ -69,14 +53,6 @@ export function drawLinesRenderer (
     pass: lines.lineInstancePrecomputePass,
     renderPass,
     command: lines.drawCurveInstancedCommand,
-    uniformStore: lines.drawLineUniformStore,
-    hasHighlighting,
-    pointABuffer: lines.pointABuffer,
-    pointBBuffer: lines.pointBBuffer,
-    colorBuffer: lines.colorBuffer,
-    widthBuffer: lines.widthBuffer,
-    arrowBuffer: lines.arrowBuffer,
-    linkIndexBuffer: lines.linkIndexBuffer,
   })) {
     return
   }
@@ -85,14 +61,35 @@ export function drawLinesRenderer (
     device: lines.device,
     model: lines.drawCurveCommand,
     cache: lines.drawCurveBindingsCache,
-    currentPositionTexture: points.currentPositionTexture,
+    currentPositionTexture,
     positionStorageBuffer: points.positionStorageBuffer,
     previousPositionStorageBuffer: points.previousRenderPositionStorageBuffer,
-    linkStatusTexture: lines.linkStatusTexture,
+    linkStatusTexture,
   })) return
 
-  lines.drawCurveCommand.setInstanceCount(lines.data.linksNumber ?? 0)
-  lines.drawCurveCommand.draw(renderPass)
+  drawCurveCommand.setInstanceCount(lines.data.linksNumber ?? 0)
+  drawCurveCommand.draw(renderPass)
+}
+
+export function prepareDirectLineDraw (
+  lines: LinesRendererContext
+): boolean {
+  lines.lineInstancePrecomputePass.resetPrepared()
+  if (!prepareLineDrawState(lines)) return false
+  const hasHighlighting = lines.config.highlightedLinkIndices !== undefined
+  setPreparedLineUniforms(lines, hasHighlighting)
+  return preparePrecomputedLines({
+    pass: lines.lineInstancePrecomputePass,
+    command: lines.drawCurveInstancedCommand,
+    uniformStore: lines.drawLineUniformStore,
+    hasHighlighting,
+    pointABuffer: lines.pointABuffer,
+    pointBBuffer: lines.pointBBuffer,
+    colorBuffer: lines.colorBuffer,
+    widthBuffer: lines.widthBuffer,
+    arrowBuffer: lines.arrowBuffer,
+    linkIndexBuffer: lines.linkIndexBuffer,
+  })
 }
 
 export function prepareGpuCulledLineDraw (
@@ -116,4 +113,35 @@ export function prepareGpuCulledLineDraw (
     lines.pointBBuffer,
     vertexCount
   )
+}
+
+function prepareLineDrawState (lines: LinesRendererContext): boolean {
+  const { points } = lines
+  if (!points) return false
+  if (!points.currentPositionTexture || points.currentPositionTexture.destroyed) return false
+  if (!lines.pointABuffer || !lines.pointBBuffer) lines.updatePointsBuffer()
+  if (!lines.colorBuffer) lines.updateColor()
+  if (!lines.widthBuffer) lines.updateWidth()
+  if (!lines.arrowBuffer) lines.updateArrow()
+  if (!lines.curveLineGeometry) lines.updateCurveLineGeometry()
+  return Boolean(lines.drawCurveCommand && lines.drawLineUniformStore && lines.linkStatusTexture)
+}
+
+function setPreparedLineUniforms (lines: LinesRendererContext, hasHighlighting: boolean): void {
+  const points = lines.points
+  if (!points || !lines.drawLineUniformStore) return
+  setDrawLineUniforms({
+    uniformStore: lines.drawLineUniformStore,
+    runtime: lines.drawLineUniformRuntime,
+    config: lines.config,
+    store: lines.store,
+    renderMode: 0,
+    linkLodStrength: getEffectiveLinkLodStrength(lines.config),
+    hasHighlighting,
+    linkStatusTextureSize: lines.linkStatusTextureSize,
+    effectiveLineSegments: getEffectiveLineSegments(lines.config),
+    isWebGpu: lines.device.info?.type === 'webgpu',
+    renderPositionMix: points.renderPositionMix ?? 1,
+    hasArrowedLinks: lines.hasArrowedLinks,
+  })
 }

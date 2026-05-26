@@ -41,6 +41,7 @@ export type VisualAttributeContext = {
   degrees: Uint32Array;
   workData: WorkGraphData;
   groupForNode?: Int32Array;
+  nodeCompanyForNode?: Int32Array;
   nodeKindForNode?: Uint8Array;
   nodeScoreForNode?: Float32Array;
   edgeKindForEdge?: Uint8Array;
@@ -54,4 +55,5 @@ export type VisualAttributeContext = {
   normalizeY: (y: number) => number;
   analystEqualize: number;
   analystOverview: number;
+  atlasEqualize: number;
 }

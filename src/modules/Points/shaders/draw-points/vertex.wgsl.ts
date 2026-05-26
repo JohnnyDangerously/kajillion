@@ -107,6 +107,11 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> 
     return output;
   }
 
+  if (drawVertex.pointBorderTreatment > 0.5 && output.isOutlined <= 0.0 && input.imageIndex < 0.0 && input.shape == CIRCLE && shapeSizeValue > 0.0) {
+    let ringPad = clamp(shapeSizeValue * 0.18, 1.05 * drawVertex.ratio, 2.35 * drawVertex.ratio);
+    overallSizeValue = max(overallSizeValue, shapeSizeValue + ringPad);
+  }
+
   // Expand the instance into a screen-aligned quad. quadCorner is [-1,1]^2;
   // half-extent in clip space is sizePx / framebufferSize, and framebufferSize
   // = screenSize * ratio (screenSize is CSS pixels, sizes are device pixels).

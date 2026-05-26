@@ -57,6 +57,7 @@ export function fillPointDrawUniforms (
   drawVertexUniforms.pointDepthCueHighlight = config.pointDepthCueHighlight
   drawVertexUniforms.pointDepthCueShadow = config.pointDepthCueShadow
   drawVertexUniforms.pointDepthCueSaturation = config.pointDepthCueSaturation
+  drawVertexUniforms.pointBorderTreatment = config.pointBorderTreatment
 
   drawFragmentUniforms.greyoutOpacity = config.pointGreyoutOpacity ?? -1
   drawFragmentUniforms.pointOpacity = config.pointOpacity

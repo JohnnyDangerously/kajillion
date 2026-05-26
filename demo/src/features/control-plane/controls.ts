@@ -1,23 +1,8 @@
 import { parsePaletteParam } from '../../gallery-presets'
 import type { ControlElements } from './dom'
-import type { DemoConfig, DepthPreset } from './types'
+import { applyDepthPresetToControls, syncTuningLabels } from './depth-presets'
+import type { DemoConfig, PointBorderTreatment } from './types'
 export { isWorkMode } from '../work-mode'
-
-const DEPTH_PRESETS: Record<Exclude<DepthPreset, 'custom'>, {
-  strength: number;
-  size: number;
-  brightness: number;
-  opacity: number;
-  moat: number;
-  highlight: number;
-  shadow: number;
-  saturation: number;
-}> = {
-  off: { strength: 0, size: 0, brightness: 0, opacity: 0, moat: 0, highlight: 0, shadow: 0, saturation: 0 },
-  subtle: { strength: 0.18, size: 0.045, brightness: 0.08, opacity: 0.08, moat: 0.10, highlight: 0.12, shadow: 0.10, saturation: 0.08 },
-  standard: { strength: 0.34, size: 0.075, brightness: 0.13, opacity: 0.12, moat: 0.20, highlight: 0.18, shadow: 0.18, saturation: 0.12 },
-  vivid: { strength: 0.55, size: 0.12, brightness: 0.22, opacity: 0.18, moat: 0.30, highlight: 0.28, shadow: 0.26, saturation: 0.20 },
-}
 
 export function boolParam (value: string | null, fallback: boolean): boolean {
   if (value === null || value === '') return fallback
@@ -35,41 +20,44 @@ export function readRange (input: HTMLInputElement, fallback: number): number {
   return numberParam(input.value, fallback, Number.parseFloat(input.min), Number.parseFloat(input.max))
 }
 
-function writeRange (input: HTMLInputElement, value: number): void {
+function readBorderTreatment (value: string | null): PointBorderTreatment {
+  return value === 'off' || value === 'darker' || value === 'shadow' || value === 'both'
+    ? value
+    : 'black'
+}
+
+export function writeRange (input: HTMLInputElement, value: number): void {
   input.value = String(value)
 }
 
-export function applyDepthPresetToControls (ctlEl: ControlElements, preset: DepthPreset): void {
-  if (preset === 'custom') return
-  const values = DEPTH_PRESETS[preset]
-  writeRange(ctlEl.depthStrength, values.strength)
-  writeRange(ctlEl.depthSize, values.size)
-  writeRange(ctlEl.depthBrightness, values.brightness)
-  writeRange(ctlEl.depthOpacity, values.opacity)
-  writeRange(ctlEl.depthMoat, values.moat)
-  writeRange(ctlEl.depthHighlight, values.highlight)
-  writeRange(ctlEl.depthShadow, values.shadow)
-  writeRange(ctlEl.depthSaturation, values.saturation)
+function ensureNodeCountOption (select: HTMLSelectElement, value: string): void {
+  if ([...select.options].some(o => o.value === value)) return
+  select.add(new Option(Number.parseInt(value, 10).toLocaleString(), value))
 }
 
-export function syncTuningLabels (ctlEl: ControlElements): void {
-  ctlEl.depthStrengthValue.textContent = readRange(ctlEl.depthStrength, 0).toFixed(2)
-  ctlEl.depthSizeValue.textContent = readRange(ctlEl.depthSize, 0).toFixed(3)
-  ctlEl.depthBrightnessValue.textContent = readRange(ctlEl.depthBrightness, 0).toFixed(2)
-  ctlEl.depthOpacityValue.textContent = readRange(ctlEl.depthOpacity, 0).toFixed(2)
-  ctlEl.depthMoatValue.textContent = readRange(ctlEl.depthMoat, 0).toFixed(2)
-  ctlEl.depthHighlightValue.textContent = readRange(ctlEl.depthHighlight, 0).toFixed(2)
-  ctlEl.depthShadowValue.textContent = readRange(ctlEl.depthShadow, 0).toFixed(2)
-  ctlEl.depthSaturationValue.textContent = readRange(ctlEl.depthSaturation, 0).toFixed(2)
-  ctlEl.tileBudgetValue.textContent = `${Math.round(readRange(ctlEl.tileBudget, 0))}/tile`
-  ctlEl.tileSizeValue.textContent = `${Math.round(readRange(ctlEl.tileSize, 20))}px`
-  ctlEl.tileMaxScaleValue.textContent = readRange(ctlEl.tileMaxScale, 0).toFixed(2)
+// Some representations bring their own positions and require a specific
+// node count to render correctly. Until the preset interface gains an
+// `ownsData` mechanism, defaulting `n` here is the smallest fix that lets
+// `?rep=<id>` URLs Just Work without the user having to also pass `&n=...`.
+const REP_NODE_COUNT_DEFAULT: Record<string, string> = {
+  // 5,157 bin nodes + up to ~13,000 starfield stars: ~2,000 halo dots
+  // at the disc's exact 100×100 cadence (rings 0–2 indistinguishable
+  // from disc rings, then fading out across rings 3–11) + a wide
+  // 1/r ambient field with bright giants. The exact star count is
+  // determined by ring geometry in starfield.ts; this constant just
+  // needs to be ≥ that total.
+  'neon-network': '19500',
 }
 
 export function hydrateControlsFromUrl (ctlEl: ControlElements): void {
   const params = new URLSearchParams(window.location.search)
-  const n = params.get('n')
-  if (n && [...ctlEl.n.options].some(o => o.value === n)) ctlEl.n.value = n
+  const explicitN = params.get('n')
+  const rep = params.get('rep')
+  const n = explicitN ?? (rep ? REP_NODE_COUNT_DEFAULT[rep] ?? null : null)
+  if (n && Number.isFinite(Number.parseInt(n, 10))) {
+    ensureNodeCountOption(ctlEl.n, n)
+    ctlEl.n.value = n
+  }
   const data = params.get('data')
   if (data === 'ba' || data === 'cosmo' || data === 'work') ctlEl.data.value = data
   if (data === 'work' && !n) ctlEl.n.value = '4000'
@@ -113,6 +101,7 @@ export function hydrateControlsFromUrl (ctlEl: ControlElements): void {
   writeRange(ctlEl.depthHighlight, numberParam(params.get('depthHighlight') ?? params.get('pointDepthCueHighlight'), readRange(ctlEl.depthHighlight, 0), 0, 0.75))
   writeRange(ctlEl.depthShadow, numberParam(params.get('depthShadow') ?? params.get('pointDepthCueShadow'), readRange(ctlEl.depthShadow, 0), 0, 0.75))
   writeRange(ctlEl.depthSaturation, numberParam(params.get('depthSaturation') ?? params.get('pointDepthCueSaturation'), readRange(ctlEl.depthSaturation, 0), 0, 0.5))
+  ctlEl.borderTreatment.value = readBorderTreatment(params.get('border') ?? params.get('pointBorderTreatment'))
   writeRange(ctlEl.tileBudget, numberParam(params.get('tileBudget') ?? params.get('pointTileBudget'), readRange(ctlEl.tileBudget, 0), 0, 16))
   writeRange(ctlEl.tileSize, numberParam(params.get('tileSize') ?? params.get('pointTileBudgetSize'), readRange(ctlEl.tileSize, 20), 8, 48))
   writeRange(ctlEl.tileMaxScale, numberParam(params.get('tileMaxScale') ?? params.get('pointTileBudgetMaxScale'), readRange(ctlEl.tileMaxScale, 0), 0, 2.5))
@@ -155,6 +144,7 @@ export function readControls (ctlEl: ControlElements): DemoConfig {
     pointDepthCueHighlight: readRange(ctlEl.depthHighlight, 0.18),
     pointDepthCueShadow: readRange(ctlEl.depthShadow, 0.18),
     pointDepthCueSaturation: readRange(ctlEl.depthSaturation, 0.12),
+    pointBorderTreatment: readBorderTreatment(ctlEl.borderTreatment.value),
     pointTileBudget: Math.round(readRange(ctlEl.tileBudget, 5)),
     pointTileBudgetSize: Math.round(readRange(ctlEl.tileSize, 20)),
     pointTileBudgetMaxScale: readRange(ctlEl.tileMaxScale, 0.72),

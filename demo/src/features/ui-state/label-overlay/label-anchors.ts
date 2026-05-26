@@ -8,7 +8,7 @@ import {
 import { isWorkMode } from '../../work-mode'
 import type { DemoConfig } from '../../control-plane/types'
 import { DEMO_SPACE_SIZE } from '../../demo-lifecycle/demo-space'
-import { WORK_GROUPS, type WorkGraphData } from '../../demo-lifecycle/work-graph-types'
+import { WORK_GROUPS, WORK_NODE_ROOT, type WorkGraphData } from '../../demo-lifecycle/work-graph-types'
 
 export interface LabelAnchor {
   label: string;
@@ -42,8 +42,9 @@ export function buildLabelAnchors (data: GeneratedGraph, config: DemoConfig): La
   }
   if (isWorkMode(config)) {
     const center = DEMO_SPACE_SIZE / 2
+    const workData = data as WorkGraphData
+    const isAtlasWork = data.nodeCount >= 10000 && workData.nodeKind?.[0] === WORK_NODE_ROOT
     if (config.palette === 'analyst' && config.theme === 'light') {
-      const workData = data as WorkGraphData
       const groupForNode = workData.groupForNode
       if (groupForNode) {
         const sums = WORK_GROUPS.map(group => ({ label: group.label, x: 0, y: 0, count: 0 }))
@@ -67,14 +68,7 @@ export function buildLabelAnchors (data: GeneratedGraph, config: DemoConfig): La
       x: center + Math.cos(group.angle) * group.radius * 0.35,
       y: center - Math.sin(group.angle) * group.radius * 0.35,
     }))
-    return [
-      {
-        label: 'CRM Graph',
-        x: center,
-        y: center,
-      },
-      ...groupLabels,
-    ]
+    return isAtlasWork ? [] : [{ label: 'CRM Graph', x: center, y: center }, ...groupLabels]
   }
   let minX = Infinity
   let maxX = -Infinity

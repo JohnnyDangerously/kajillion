@@ -20,6 +20,12 @@ export interface PublicGraphConfigTypes {
   pointDefaultShape: PointShape | `${PointShape}`;
   pointOpacity: number;
   pointSizeScale: number;
+  /**
+   * Override the engine's auto-derived per-point max size (device px). Lets
+   * representations that need oversized points (e.g. photo walls) opt out
+   * of the artistic 64-px cap. Leave undefined for default behaviour.
+   */
+  maxPointSizeOverride?: number;
   hoveredPointCursor: string;
   hoveredLinkCursor: string;
   renderHoveredPointRing: boolean;

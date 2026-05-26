@@ -38,6 +38,7 @@
     "demo:dev": "vite --config demo/vite.config.ts",
     "demo:build": "vite build --config demo/vite.config.ts",
     "demo:preview": "vite preview --config demo/vite.config.ts --port 4174 --strictPort",
+    "visual:capture": "node scripts/visual-review-capture.mjs",
     "agent:map": "node scripts/agent-map.mjs map",
     "agent:symbols": "node scripts/agent-map.mjs symbols",
     "agent:range": "node scripts/agent-map.mjs range",

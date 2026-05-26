@@ -9,6 +9,7 @@ import {
 import { DEMO_SPACE_SIZE } from '../demo-lifecycle/demo-space'
 import { renderDataFromFrame } from '../demo-lifecycle/render-data'
 import { scaleGeneratedDataToDemoSpace } from '../demo-lifecycle/work-graph-generator'
+import { resolveRepresentationFromUrl } from '../representations'
 import { buildLabelAnchors } from '../ui-state/label-overlay/label-anchors'
 import {
   buildWorkModeRenderData,
@@ -19,6 +20,8 @@ import {
 } from '../work-mode'
 import type { DemoRuntimeContext } from './context'
 
+let currentRepresentationTeardown: (() => void) | null = null
+
 export async function rebuildDemoGraph (runtime: DemoRuntimeContext): Promise<void> {
   const { state } = runtime
   const cfg = state.currentConfig
@@ -28,6 +31,10 @@ export async function rebuildDemoGraph (runtime: DemoRuntimeContext): Promise<vo
   state.lastRenderSampleTs = performance.now()
   state.renderFps = undefined
   runtime.analystZoomVisualRefreshScheduler.reset()
+  if (currentRepresentationTeardown) {
+    try { currentRepresentationTeardown() } catch { /* ignore */ }
+    currentRepresentationTeardown = null
+  }
   if (state.currentGraph) {
     try { state.currentGraph.destroy() } catch { /* ignore */ }
     state.currentGraph = null
@@ -71,6 +78,11 @@ export async function rebuildDemoGraph (runtime: DemoRuntimeContext): Promise<vo
   const renderData = isExplicitWorkDataset(cfg)
     ? buildWorkModeRenderData(frame, viewSpec, cfg, state.currentData)
     : renderDataFromFrame(frame, viewSpec, cfg, DEMO_SPACE_SIZE)
+  const representation = resolveRepresentationFromUrl()
+  if (representation?.transformPositions) {
+    const replacement = representation.transformPositions(renderData, cfg)
+    if (replacement) renderData.positions = replacement
+  }
   state.currentSnapshot = snapshot
   state.currentFrame = frame
   state.currentViewSpec = viewSpec
@@ -80,6 +92,10 @@ export async function rebuildDemoGraph (runtime: DemoRuntimeContext): Promise<vo
   runtime.workFocusController.updatePanel()
 
   const graph = new Graph(runtime.graphHost, runtime.buildGraphConfig(cfg))
+  if (representation?.install && representation.ownsCamera) {
+    const teardown = representation.install({ graph, host: runtime.graphHost, data: renderData, config: cfg })
+    if (typeof teardown === 'function') currentRepresentationTeardown = teardown
+  }
   await graph.ready
   graph.setPointPositions(renderData.positions, isWorkMode(cfg) || renderData !== data)
   graph.setLinks(renderData.links)
@@ -88,7 +104,16 @@ export async function rebuildDemoGraph (runtime: DemoRuntimeContext): Promise<vo
   runtime.exposeDebugGraph(graph)
   runtime.workFocusController.updatePanel()
   graph.render()
-  if (isWorkMode(cfg)) {
+  if (representation?.install && !representation.ownsCamera) {
+    const teardown = representation.install({
+      graph,
+      host: runtime.graphHost,
+      data: renderData,
+      config: cfg,
+    })
+    if (typeof teardown === 'function') currentRepresentationTeardown = teardown
+  }
+  if (isWorkMode(cfg) && !representation?.ownsCamera) {
     requestAnimationFrame(() => {
       if (state.currentGraph !== graph) return
       graph.setZoomTransformByPointPositions(

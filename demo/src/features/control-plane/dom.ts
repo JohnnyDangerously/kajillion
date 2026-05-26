@@ -71,6 +71,7 @@ export function createControlElements () {
     depthShadowValue: document.getElementById('v-depth-shadow') as HTMLElement,
     depthSaturation: document.getElementById('c-depth-saturation') as HTMLInputElement,
     depthSaturationValue: document.getElementById('v-depth-saturation') as HTMLElement,
+    borderTreatment: document.getElementById('c-border-treatment') as HTMLSelectElement,
     tileBudget: document.getElementById('c-tile-budget') as HTMLInputElement,
     tileBudgetValue: document.getElementById('v-tile-budget') as HTMLElement,
     tileSize: document.getElementById('c-tile-size') as HTMLInputElement,

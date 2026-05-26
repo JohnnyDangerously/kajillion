@@ -35,7 +35,10 @@ export function createAnalystZoomVisualRefreshScheduler (
       const data = options.getCurrentRenderData()
       const currentConfig = options.getCurrentConfig()
       if (!graph || !data) return
-      if (currentConfig.palette !== 'analyst' || currentConfig.theme !== 'light' || !isWorkMode(currentConfig)) return
+      const isZoomSizedWork = isWorkMode(currentConfig) &&
+        ((currentConfig.palette === 'analyst' && currentConfig.theme === 'light') ||
+          (data.nodeCount >= 10000 && currentConfig.palette !== 'analyst'))
+      if (!isZoomSizedWork) return
       lastAnalystZoomSizeBucket = Math.round(graph.getZoomDistance() / 4)
       options.applyCurrentVisualAttributes(graph, data, { updatePoints: true, updateLinks: false, pointSizesOnly: true })
       graph.render()

@@ -62,7 +62,8 @@ export function applyWorkModeGraphConfigOverlay (
     useSubnetPalette,
     useTokyoPalette,
   } = flags
-  const useLargeAtlas = cfg.n >= 50000 && !policy.useAnalystMacroImpostors
+  const useLargeAtlas = cfg.n >= 10000 && !policy.useAnalystMacroImpostors
+  const useAtlasBudget = useLargeAtlas && cfg.webgpu
 
   return {
     ...config,
@@ -71,28 +72,38 @@ export function applyWorkModeGraphConfigOverlay (
       : config.backgroundColor === '#06090d'
         ? '#05070b'
         : config.backgroundColor,
-    pointDefaultSize: useLargeAtlas ? 4.8 : useAnalystPalette ? 11.5 : 10.25,
-    pointSizeScale: useLargeAtlas ? 0.86 : useAnalystPalette ? 1.0 : 1.14,
+    pixelRatio: useLargeAtlas ? 1.5 : config.pixelRatio,
+    adaptivePixelRatio: useLargeAtlas ? false : config.adaptivePixelRatio,
+    pointDefaultSize: useLargeAtlas ? 4.1 : useAnalystPalette ? 11.5 : 10.25,
+    pointSizeScale: useLargeAtlas ? 1.04 : useAnalystPalette ? 1.0 : 1.14,
     pointOpacity: 1,
-    linkDefaultWidth: useLargeAtlas ? 0.52 : useAnalystPalette ? 0.86 : useSubnetPalette ? 1.65 : 2.05,
-    linkWidthScale: useLargeAtlas ? 0.50 : useAnalystPalette ? 0.78 : 1.06,
+    linkDefaultWidth: useLargeAtlas ? 0.58 : useAnalystPalette ? 0.86 : useSubnetPalette ? 1.65 : 2.05,
+    linkWidthScale: useLargeAtlas ? 0.44 : useAnalystPalette ? 0.78 : 1.06,
+    renderLinks: useLargeAtlas ? cfg.renderLinks : config.renderLinks,
     linkOpacity: cfg.renderLinks
-      ? useLargeAtlas ? (isLight ? 0.24 : 0.36) : useAnalystPalette ? 0.92 : useSubnetPalette ? 0.82 : (isLight ? 0.82 : 0.80)
+      ? useLargeAtlas ? 0.70 : useAnalystPalette ? 0.92 : useSubnetPalette ? 0.82 : (isLight ? 0.82 : 0.80)
       : 0,
     curvedLinkSegments: useLargeAtlas ? (cfg.lanes ? 5 : 1) : cfg.lanes ? 22 : 1,
     curvedLinkWeight: useLargeAtlas ? 0.58 : 0.84,
     curvedLinkControlPointDistance: useLargeAtlas ? (cfg.lanes ? 0.035 : 0) : cfg.lanes ? 0.16 : 0,
     linkBundlingStrength: useLargeAtlas ? 0 : cfg.lanes ? 0.035 : 0,
     linkBundlingCellSize: 260,
-    pointTileBudget: useLargeAtlas ? Math.max(config.pointTileBudget ?? 0, 28) : config.pointTileBudget,
-    pointTileBudgetSize: useLargeAtlas ? Math.min(config.pointTileBudgetSize ?? 18, 14) : config.pointTileBudgetSize,
+    pointTileBudget: useAtlasBudget ? cfg.pointTileBudget : config.pointTileBudget,
+    pointTileBudgetSize: useLargeAtlas ? cfg.pointTileBudgetSize : config.pointTileBudgetSize,
+    pointTileBudgetMaxScale: useLargeAtlas ? cfg.pointTileBudgetMaxScale : config.pointTileBudgetMaxScale,
+    pointLodStrength: useLargeAtlas ? 0 : config.pointLodStrength,
+    linkLodStrength: useLargeAtlas ? 0.12 : config.linkLodStrength,
     minZoomLevel: useLargeAtlas ? 0.060 : useAnalystPalette ? ANALYST_MIN_ZOOM_LEVEL : 0.001,
     maxZoomLevel: useLargeAtlas ? 7.5 : useAnalystPalette ? ANALYST_MAX_ZOOM_LEVEL : 10,
     rescalePositions: false,
-    renderLodMode: useLargeAtlas && cfg.webgpu && cfg.lod ? 'phantom' : config.renderLodMode,
-    fitViewOnInit: useLargeAtlas,
-    fitViewPadding: useLargeAtlas ? 0.17 : 0.16,
-    fitViewDuration: 520,
+    renderLodMode: useAtlasBudget ? 'phantom' : config.renderLodMode,
+    pointDepthCueStrength: useLargeAtlas ? 0.08 : config.pointDepthCueStrength,
+    pointDepthCueMoat: useLargeAtlas ? 0 : config.pointDepthCueMoat,
+    pointDepthCueHighlight: useLargeAtlas ? 0.05 : config.pointDepthCueHighlight,
+    pointDepthCueShadow: useLargeAtlas ? 0.04 : config.pointDepthCueShadow,
+    fitViewOnInit: true,
+    fitViewPadding: useLargeAtlas ? 0.035 : 0.14,
+    fitViewDuration: useLargeAtlas ? 520 : 220,
     enableSimulation: cfg.explore ? true : false,
     enableDrag: true,
     simulationFriction: cfg.explore ? 0.85 : 0.90,
@@ -128,8 +139,8 @@ export function applyWorkModeGraphConfigOverlay (
     onPointMouseOut: () => { hooks.clearWorkPreview() },
     onLinkMouseOver: (index) => { hooks.previewWorkLink(index) },
     onLinkMouseOut: () => { hooks.clearWorkPreview() },
-    onZoom: policy.useSmallAnalystExact ? () => { hooks.scheduleAnalystZoomVisualRefresh(false) } : undefined,
-    onZoomEnd: policy.useSmallAnalystExact ? () => { hooks.scheduleAnalystZoomVisualRefresh(false) } : undefined,
+    onZoom: undefined,
+    onZoomEnd: useLargeAtlas || policy.useSmallAnalystExact ? () => { hooks.scheduleAnalystZoomVisualRefresh(true) } : undefined,
     onPointClick: (index) => {
       hooks.focusWorkPoint(index, false)
       hooks.exploreNodeClickHook?.(index)

@@ -6,7 +6,9 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
     discard;
   }
 
-  let dAA = length(input.pointCoord) - 1.0;
+  let innerRadius = clamp(input.shapeSize / max(input.overallSize, 1e-4), 0.0, 1.0);
+  let shapeCoord = input.pointCoord / max(innerRadius, 1e-4);
+  let dAA = length(shapeCoord) - 1.0;
   let aaWidth = max(fwidth(dAA), 1e-4);
   let shapeOpacity = 1.0 - smoothstep(-aaWidth, aaWidth, dAA);
 
@@ -42,14 +44,26 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
     );
   }
 
-  if (input.isOutlined <= 0.0) {
+  if (drawVertex.pointBorderTreatment > 0.5 && input.isOutlined <= 0.0) {
     let bgLuma = dot(drawFragment.backgroundColor.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
-    let rim = smoothstep(0.62, 0.98, length(input.pointCoord)) * shapeOpacity;
-    let rimColor = select(vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(0.055, 0.070, 0.095), bgLuma > 0.78);
-    let rimOpacity = rim * (0.24 + select(0.0, 0.12, bgLuma > 0.78)) * finalPointAlpha;
+    let rawRadius = length(input.pointCoord);
+    let outerRing = (1.0 - smoothstep(0.98, 1.0, rawRadius)) * smoothstep(innerRadius - 0.045, innerRadius + 0.025, rawRadius);
+    let innerRim = smoothstep(0.70, 0.80, length(shapeCoord)) * shapeOpacity;
+    let mode = drawVertex.pointBorderTreatment;
+    let darkSource = input.shapeColor.rgb * 0.42;
+    let darkNeutral = select(vec3<f32>(0.0), vec3<f32>(0.045, 0.052, 0.064), bgLuma > 0.78);
+    let isDarker = mode > 1.5 && mode < 2.5;
+    let isShadow = mode > 2.5 && mode < 3.5;
+    let isBoth = mode > 3.5;
+    let rimColor = select(darkNeutral, darkSource, isDarker || isShadow);
+    let lowerBias = smoothstep(-0.18, 0.84, input.pointCoord.y) * shapeOpacity;
+    let outerOpacity = select(outerRing * 0.95, outerRing * 0.88, isBoth) * select(1.0, 0.0, isShadow);
+    let innerOpacity = innerRim * select(0.46, 0.62, isDarker || isBoth) + lowerBias * select(0.0, 0.38, isShadow);
+    let rimOpacity = (outerOpacity + innerOpacity) * input.shapeColor.a;
+    let mixedRimColor = select(rimColor, darkSource, isBoth && innerRim > outerRing);
     fragColor = vec4<f32>(
-      mix(fragColor.rgb, rimColor, rimOpacity),
-      fragColor.a,
+      mix(fragColor.rgb, mixedRimColor, min(1.0, rimOpacity)),
+      max(fragColor.a, outerOpacity * input.shapeColor.a),
     );
   }
 

@@ -12,21 +12,31 @@ interface LineDrawAttributeBuffers {
   arrowBuffer: Buffer | undefined;
 }
 
-interface DrawPrecomputedLinesOptions extends LineDrawAttributeBuffers {
+interface DrawPrecomputedLinesOptions {
   pass: LineInstancePrecomputePass;
   renderPass: RenderPass;
+  command: Model | undefined;
+}
+
+export function drawPrecomputedLines (
+  options: DrawPrecomputedLinesOptions
+): boolean {
+  return options.pass.drawPrepared(options.renderPass, options.command)
+}
+
+interface PreparePrecomputedLinesOptions extends LineDrawAttributeBuffers {
+  pass: LineInstancePrecomputePass;
   command: Model | undefined;
   uniformStore: UniformStore<LineDrawUniformStoreShape> | undefined;
   hasHighlighting: boolean;
   linkIndexBuffer: Buffer | undefined;
 }
 
-export function drawPrecomputedLines (
-  options: DrawPrecomputedLinesOptions
+export function preparePrecomputedLines (
+  options: PreparePrecomputedLinesOptions
 ): boolean {
   const {
     pass,
-    renderPass,
     command,
     uniformStore,
     hasHighlighting,
@@ -38,8 +48,7 @@ export function drawPrecomputedLines (
     linkIndexBuffer,
   } = options
 
-  return pass.draw(
-    renderPass,
+  return pass.prepare(
     command,
     uniformStore,
     hasHighlighting,

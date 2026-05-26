@@ -37,6 +37,7 @@ struct DrawVertexUniforms {
   pointDepthCueHighlight: f32,
   pointDepthCueShadow: f32,
   pointDepthCueSaturation: f32,
+  pointBorderTreatment: f32,
 };
 
 struct DrawFragmentUniforms {

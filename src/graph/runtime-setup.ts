@@ -50,7 +50,9 @@ export function initializeCanvasState ({
   store.setWebGLMaxTextureSize(device.limits.maxTextureDimension2D)
   store.updateScreenSize(canvas.clientWidth, canvas.clientHeight)
   zoomInstance.updateTranslateExtent()
-  store.maxPointSize = getMaxPointSize(device, store.effectivePixelRatio)
+  store.maxPointSize = config.maxPointSizeOverride !== undefined
+    ? config.maxPointSizeOverride / store.effectivePixelRatio
+    : getMaxPointSize(device, store.effectivePixelRatio)
   store.isSimulationRunning = config.enableSimulation
 }
 

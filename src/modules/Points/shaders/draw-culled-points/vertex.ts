@@ -29,11 +29,13 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> 
   let centerClip = finalPosition.xy;
 
   var pointSize = calculatePointSize(sizes[pointIndex] * drawVertex.sizeScale);
+  var shapeSize = pointSize;
   let visualDepth = visualDepth01(pointIndex, centerClip, pointSize);
   output.visualDepth = visualDepth;
   let depthStrength = clamp(drawVertex.pointDepthCueStrength, 0.0, 1.0);
   if (depthStrength > 0.0) {
     pointSize = pointSize * (1.0 + (visualDepth - 0.5) * 2.0 * drawVertex.pointDepthCueSize * depthStrength);
+    shapeSize = pointSize;
   }
   if (output.isOutlined > 0.0) {
     pointSize = min(pointSize * outlineRingScale, drawVertex.maxPointSize * drawVertex.ratio);
@@ -56,7 +58,13 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> 
     let sizeComp = mix(1.0, min(1.85, sqrt(representation)), lodWeight * drawVertex.pointLodSizeCompensation);
     let alphaComp = mix(1.0, min(2.75, representation), lodWeight * drawVertex.pointLodOpacityCompensation);
     pointSize = pointSize * sizeComp;
+    shapeSize = pointSize;
     output.lodAlpha = sampleAlpha * alphaComp;
+  }
+
+  if (drawVertex.pointBorderTreatment > 0.5 && output.isOutlined <= 0.0 && pointSize > 0.0) {
+    let ringPad = clamp(pointSize * 0.18, 1.05 * drawVertex.ratio, 2.35 * drawVertex.ratio);
+    pointSize = pointSize + ringPad;
   }
 
   let halfExtentClip = vec2<f32>(
@@ -65,6 +73,8 @@ fn vertexMain(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> 
   );
   output.position = vec4<f32>(centerClip + input.quadCorner * halfExtentClip, 0.0, 1.0);
   output.pointCoord = input.quadCorner;
+  output.shapeSize = shapeSize;
+  output.overallSize = pointSize;
 
   var shapeColor = colors[pointIndex];
   if (output.isGreyedOut > 0.0) {

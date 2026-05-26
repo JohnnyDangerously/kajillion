@@ -45,6 +45,7 @@ export function createPointDrawVertexUniformScratch (): PointDrawVertexUniforms 
     pointDepthCueHighlight: 0.18,
     pointDepthCueShadow: 0.18,
     pointDepthCueSaturation: 0.12,
+    pointBorderTreatment: 1,
   }
 }
 

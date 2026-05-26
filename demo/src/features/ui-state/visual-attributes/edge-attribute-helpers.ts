@@ -113,10 +113,10 @@ export function edgeBaseAlphaForContext (
         ? touchesHub ? 0.54 : sameGroup ? 0.36 : 0.22
         : touchesHub ? 0.20 : sameGroup ? 0.105 : 0.052
       : isRankedWork && touchesHub
-      ? isAtlasWork ? (isLight ? 0.12 : 0.14) : isSubnetPalette ? 0.76 : (isLight ? 0.58 : (isLargeWork ? 0.56 : 0.82))
+      ? isAtlasWork ? (isLight ? 0.10 : 0.27) : isSubnetPalette ? 0.76 : (isLight ? 0.58 : (isLargeWork ? 0.56 : 0.82))
       : sameGroup
-        ? isAtlasWork ? (isLight ? 0.07 : 0.08) : isSubnetPalette ? 0.56 : (isLight ? 0.38 : (isLargeWork ? 0.30 : 0.64))
-        : isAtlasWork ? (isLight ? 0.04 : 0.045) : isSubnetPalette ? 0.40 : (isLight ? 0.26 : (isLargeWork ? 0.18 : 0.46))
+        ? isAtlasWork ? (isLight ? 0.06 : 0.21) : isSubnetPalette ? 0.56 : (isLight ? 0.38 : (isLargeWork ? 0.30 : 0.64))
+        : isAtlasWork ? (isLight ? 0.035 : 0.095) : isSubnetPalette ? 0.40 : (isLight ? 0.26 : (isLargeWork ? 0.18 : 0.46))
     : (useMassConservingLod ? 0.012 : isLight ? 0.045 : isCosmicPalette ? 0.18 : config.palette === 'ember' ? 0.11 : config.palette === 'ion' ? 0.14 : config.palette === 'signal' ? 0.42 : config.palette === 'tokyo' ? 0.38 : config.palette === 'insight' ? 0.50 : isFintechPalette ? 0.46 : isInfluencePalette ? 0.42 : isTalentPalette ? 0 : 0.18) * (useLanes ? 0.78 : edgeStrength)
 }
 
@@ -145,10 +145,10 @@ export function edgeRawWidthForContext (
       ? touchesCenter
         ? isAtlasWork ? 0 : isAnalystPalette ? 2.6 : isSubnetPalette ? 5.2 : (isLargeWork ? 3.4 : 4.4)
         : touchesHub
-            ? isAtlasWork ? 0.58 : isAnalystPalette ? 1.45 : isSubnetPalette ? 3.2 : (isLargeWork ? 1.95 : 3.1)
+            ? isAtlasWork ? 1.05 : isAnalystPalette ? 1.45 : isSubnetPalette ? 3.2 : (isLargeWork ? 1.95 : 3.1)
           : sameGroup
-            ? isAtlasWork ? 0.38 : isAnalystPalette ? 0.72 : isSubnetPalette ? 1.85 : (isLargeWork ? 1.10 : 1.95)
-            : isAtlasWork ? 0.28 : isAnalystPalette ? 0.46 : isSubnetPalette ? 1.18 : (isLargeWork ? 0.72 : 1.22)
+            ? isAtlasWork ? 0.76 : isAnalystPalette ? 0.72 : isSubnetPalette ? 1.85 : (isLargeWork ? 1.10 : 1.95)
+            : isAtlasWork ? 0.50 : isAnalystPalette ? 0.46 : isSubnetPalette ? 1.18 : (isLargeWork ? 0.72 : 1.22)
       : sameGroup ? (isAnalystPalette ? 0.68 : isSubnetPalette ? 1.8 : (isLargeWork ? 1.05 : 1.85)) : (isAnalystPalette ? 0.42 : isSubnetPalette ? 1.12 : (isLargeWork ? 0.70 : 1.18))
     : predictedEdge
       ? 1.4 + edgeConfidence * 1.8

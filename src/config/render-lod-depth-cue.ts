@@ -54,6 +54,13 @@ export interface RenderDepthCueConfig {
    * Default value: `0.12`
    */
   pointDepthCueSaturation: number;
+  /**
+   * Plain-circle border treatment. 0 off, 1 black, 2 darker source color,
+   * 3 shadow-only, 4 black outer plus darker inner.
+   *
+   * Default value: `1`
+   */
+  pointBorderTreatment: number;
 }
 
 export const renderDepthCueDefaultConfigValues = {
@@ -65,4 +72,5 @@ export const renderDepthCueDefaultConfigValues = {
   pointDepthCueHighlight: 0.18,
   pointDepthCueShadow: 0.18,
   pointDepthCueSaturation: 0.12,
+  pointBorderTreatment: 1,
 } satisfies RenderDepthCueConfig

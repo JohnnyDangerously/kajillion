@@ -22,6 +22,7 @@ export interface LineInstancePrecomputeHost {
 export class LineInstancePrecomputePass {
   private lineInstanceBuffer: Buffer | undefined
   private lineInstanceCapacity = 0
+  private preparedLinkCount = 0
   private shader: Shader | undefined
   private pipeline: ComputePipeline | undefined
   private uniformStore: UniformStore<PrecomputeLineInstancesUniformStoreShape> | undefined
@@ -53,8 +54,11 @@ export class LineInstancePrecomputePass {
     return this.lineInstanceBuffer
   }
 
-  public draw (
-    renderPass: RenderPass,
+  public resetPrepared (): void {
+    this.preparedLinkCount = 0
+  }
+
+  public prepare (
     model: Model | undefined,
     drawLineUniformStore: UniformStore<LineDrawUniformStoreShape> | undefined,
     hasHighlighting: boolean,
@@ -65,6 +69,7 @@ export class LineInstancePrecomputePass {
     arrowBuffer: Buffer | undefined,
     linkIndexBuffer: Buffer | undefined
   ): boolean {
+    this.resetPrepared()
     const { config, data, device, points } = this.host
     const linkCount = data.linksNumber ?? 0
     if (device.info?.type !== 'webgpu') return false
@@ -111,6 +116,13 @@ export class LineInstancePrecomputePass {
       drawLineFragmentUniforms: drawLineUniformStore.getManagedUniformBuffer(device, 'drawLineFragmentUniforms'),
       instances: lineInstanceBuffer,
     })
+    this.preparedLinkCount = linkCount
+    return true
+  }
+
+  public drawPrepared (renderPass: RenderPass, model: Model | undefined): boolean {
+    const linkCount = this.host.data.linksNumber ?? 0
+    if (!model || this.preparedLinkCount !== linkCount || linkCount === 0) return false
     model.setInstanceCount(linkCount)
     model.draw(renderPass)
     return true
@@ -122,6 +134,7 @@ export class LineInstancePrecomputePass {
     }
     this.lineInstanceBuffer = undefined
     this.lineInstanceCapacity = 0
+    this.preparedLinkCount = 0
     this.pipeline?.destroy()
     this.pipeline = undefined
     this.shader?.destroy()

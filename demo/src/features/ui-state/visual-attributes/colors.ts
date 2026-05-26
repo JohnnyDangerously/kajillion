@@ -42,6 +42,34 @@ export function talentColor (group: number): [number, number, number] {
   return colors[group % colors.length] ?? colors[0]!
 }
 
+const ATLAS_PALETTE: Array<[number, number, number]> = [
+  [0.05, 0.64, 1.00],
+  [0.00, 0.82, 0.66],
+  [0.98, 0.14, 0.06],
+  [0.98, 0.64, 0.00],
+  [0.90, 0.04, 0.54],
+  [0.45, 0.36, 1.00],
+  [0.64, 0.92, 0.00],
+  [0.08, 0.78, 0.95],
+  [0.98, 0.92, 0.30],
+  [0.12, 0.92, 0.36],
+  [0.88, 0.20, 0.82],
+]
+
+export function atlasWorkColor (identity: number, hash: number): [number, number, number] {
+  const safeIdentity = Number.isFinite(identity) ? Math.trunc(identity) : 0
+  const safeHash = Number.isFinite(hash) ? Math.max(0, Math.min(1, hash)) : 0.5
+  const primary = ATLAS_PALETTE[Math.abs(safeIdentity) % ATLAS_PALETTE.length] ?? ATLAS_PALETTE[0]!
+  const secondary = ATLAS_PALETTE[Math.abs(safeIdentity + 5) % ATLAS_PALETTE.length] ?? ATLAS_PALETTE[1]!
+  const mix = 0.018 + safeHash * 0.032
+  const lift = 1.06 + safeHash * 0.18
+  return [
+    Math.min(1, (primary[0] * (1 - mix) + secondary[0] * mix) * lift),
+    Math.min(1, (primary[1] * (1 - mix) + secondary[1] * mix) * lift),
+    Math.min(1, (primary[2] * (1 - mix) + secondary[2] * mix) * lift),
+  ]
+}
+
 export function analystWorkColor (
   group: number,
   kind: number | undefined,

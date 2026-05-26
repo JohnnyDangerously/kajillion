@@ -12,3 +12,5 @@ demo/replays/
 .claude/
 .agent-map/
 .code-review-graph/
+.visual-reviews/
+.worktrees/

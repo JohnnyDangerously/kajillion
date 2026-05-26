@@ -1,15 +1,9 @@
 export const cullVisiblePointsVisibilityWgsl = `
 fn priorityForPoint(i: u32, pointSize: f32, status: vec4<f32>, pixel: vec2<f32>) -> u32 {
-  let tileOrigin = vec2<f32>(
-    f32(tileIndexForPixel(pixel) % max(cullUniforms.tileBudgetColumns, 1u)),
-    f32(tileIndexForPixel(pixel) / max(cullUniforms.tileBudgetColumns, 1u)),
-  ) * max(cullUniforms.tileBudgetSize, 1.0);
-  let local = clamp((pixel - tileOrigin) / max(cullUniforms.tileBudgetSize, 1.0), vec2<f32>(0.0), vec2<f32>(1.0));
-  let centerDistance = distance(local, vec2<f32>(0.5));
+  let tileJitter = hashU32(i) & 511u;
   let statusScore = select(0u, 1024u, status.g > 0.0);
-  let sizeScore = u32(clamp(pointSize * 12.0, 0.0, 767.0));
-  let spreadScore = u32(clamp(centerDistance * 255.0, 0.0, 255.0));
-  let score = min(statusScore + sizeScore + spreadScore, 2047u);
+  let sizeScore = u32(clamp(pointSize * 1.4, 0.0, 130.0));
+  let score = min(statusScore + sizeScore + tileJitter, 2047u);
   let tie = hashU32(i) & priorityTieMask;
   return (score << priorityScoreShift) | tie;
 }

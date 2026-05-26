@@ -1,0 +1,43 @@
+{
+  "feature": "representations",
+  "owner": "demo/src/features/representations",
+  "purpose": "Isolate graph visual treatments so atlas, work-mode, and image-backed experiments can evolve independently.",
+  "entrypoints": {
+    "registry": "registry.ts",
+    "contract": "types.ts"
+  },
+  "representations": [
+    {
+      "id": "work-graph",
+      "urlParam": null,
+      "path": "experiments/work-graph",
+      "description": "Default clustered work/product graph. Selected by ?rep=work-graph and used when rep is absent."
+    },
+    {
+      "id": "atlas-reference",
+      "path": "experiments/atlas-reference",
+      "description": "Reference-style macro atlas with packed canvas overlay, black moats, and varied node ranks."
+    },
+    {
+      "id": "reference-cloud",
+      "path": "experiments/reference-cloud",
+      "description": "Dense 2.5D cloud reference mode with perspective projection, shaded particles, and bridge tissue."
+    },
+    {
+      "id": "neon-glass",
+      "path": "experiments/neon-glass",
+      "description": "Headshot/photo-wall representation using the /headshots atlas and bloom controls."
+    },
+    {
+      "id": "neon-network",
+      "path": "experiments/neon-network",
+      "description": "People-image network representation using the 2-hop binary network and /network image atlas."
+    }
+  ],
+  "guardrails": [
+    "Do not put experiment-only behavior in the core graph runtime.",
+    "Register new representations only through registry.ts.",
+    "Keep each representation teardown complete so styles, overlays, and event handlers do not leak.",
+    "Preserve asset-backed image representations separately from atlas-reference and native work mode."
+  ]
+}

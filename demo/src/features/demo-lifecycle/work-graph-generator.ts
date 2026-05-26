@@ -29,6 +29,7 @@ export { scaleGeneratedDataToDemoSpace } from './work-graph-scale'
 
 export function generateWorkGraph (count: number, seed: number): GeneratedGraph {
   const nodeCount = Math.max(64, count)
+  const useAtlas = nodeCount >= 10000
   const rand = seededUnit(seed)
   const center = DEMO_SPACE_SIZE / 2
   const builder = createWorkGraphBuilder(nodeCount)
@@ -48,7 +49,7 @@ export function generateWorkGraph (count: number, seed: number): GeneratedGraph 
   groupForNode[0] = -1
   nodeKind[0] = WORK_NODE_ROOT
   nodeScore[0] = 1
-  nodeLabels[0] = 'VIA'
+  nodeLabels[0] = useAtlas ? '' : 'VIA'
   nodeSubtitles[0] = 'CRM relationship graph'
 
   const hubIndices: number[] = []
@@ -66,7 +67,7 @@ export function generateWorkGraph (count: number, seed: number): GeneratedGraph 
     nodeLabels[cursor] = spec.label
     nodeSubtitles[cursor] = 'relationship segment'
     hubIndices.push(cursor)
-    addLink(0, cursor, 0, 3.4, 0.98)
+    if (!useAtlas) addLink(0, cursor, 0, 3.4, 0.98)
     cursor += 1
   }
 
@@ -74,7 +75,7 @@ export function generateWorkGraph (count: number, seed: number): GeneratedGraph 
   const companyMembers: number[][] = Array.from({ length: nodeCount }, () => [])
   const companyTarget = Math.min(
     Math.max(0, nodeCount - cursor),
-    Math.max(WORK_GROUPS.length * 3, Math.round(nodeCount * 0.035))
+    Math.max(WORK_GROUPS.length * 3, Math.round(nodeCount * (useAtlas ? 0.012 : 0.035)))
   )
   for (let ordinal = 0; ordinal < companyTarget && cursor < nodeCount; ordinal += 1) {
     const group = ordinal % WORK_GROUPS.length
@@ -99,9 +100,9 @@ export function generateWorkGraph (count: number, seed: number): GeneratedGraph 
     nodeLabels[cursor] = companyName
     nodeSubtitles[cursor] = `${spec.label} account`
     companyIndicesByGroup[group]!.push(cursor)
-    addLink(hub, cursor, 0, 2.4 + rand() * 0.7, 0.92)
+    if (!useAtlas) addLink(hub, cursor, 0, 2.4 + rand() * 0.7, 0.92)
     if (groupOrdinal > 0 && groupOrdinal % 3 === 0) addLink(companyIndicesByGroup[group]![groupOrdinal - 1]!, cursor, 1, 0.95, 0.42 + rand() * 0.24)
-    if (ordinal % 11 === 0) addLink(0, cursor, 0, 2.0, 0.84)
+    if (!useAtlas && ordinal % 11 === 0) addLink(0, cursor, 0, 2.0, 0.84)
     cursor += 1
   }
 
@@ -151,12 +152,13 @@ export function generateWorkGraph (count: number, seed: number): GeneratedGraph 
     companyIndicesByGroup,
     groupForNode,
     hubIndices,
+    includeHubs: !useAtlas,
     nodeCount,
     peopleByGroup,
     rand,
   })
 
-  if (nodeCount >= 50000) {
+  if (useAtlas) {
     atlasRelayoutWorkNodes(positions, nodeKind, nodeScore, groupForNode, nodeCompany, seed)
   } else {
     organicRelayoutWorkNodes(positions, nodeKind, nodeScore, groupForNode, seed)

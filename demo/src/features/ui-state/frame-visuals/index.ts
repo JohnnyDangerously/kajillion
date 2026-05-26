@@ -1,5 +1,6 @@
 import { type Graph } from '@kajillion/graph'
 import { isWorkMode } from '../../work-mode'
+import { resolveRepresentationFromUrl } from '../../representations'
 import type { DemoConfig } from '../../control-plane/types'
 import { attachWorkMetadata, renderDataFromFrame } from '../../demo-lifecycle/render-data'
 import { DEMO_SPACE_SIZE } from '../../demo-lifecycle/demo-space'
@@ -62,13 +63,18 @@ export function createFrameVisualsController (
   }
 
   const buildVisualAttributes = (data: GeneratedGraph | RenderableGraphData): VisualAttributes => {
-    return buildVisualAttributesForConfig(data, {
+    const attributes = buildVisualAttributesForConfig(data, {
       config: options.getCurrentConfig(),
       equalizationZoomDistance: options.equalizationZoomDistance(),
       overviewZoomDistance: options.overviewZoomDistance(),
       workFocusState: options.getWorkFocusState(),
       spaceSize: DEMO_SPACE_SIZE,
     })
+    const representation = resolveRepresentationFromUrl()
+    if (representation?.transformAttributes) {
+      representation.transformAttributes(data, attributes, options.getCurrentConfig())
+    }
+    return attributes
   }
 
   const applyCurrentVisualAttributes = (
@@ -82,8 +88,8 @@ export function createFrameVisualsController (
     if (
       applyOptions.pointSizesOnly &&
       updatePoints &&
-      currentConfig.palette === 'analyst' &&
-      currentConfig.theme === 'light' &&
+      ((currentConfig.palette === 'analyst' && currentConfig.theme === 'light') ||
+        (data.nodeCount >= 10000 && currentConfig.palette !== 'analyst')) &&
       isWorkMode(currentConfig)
     ) {
       graph.setPointSizes(buildAnalystPointSizes(data))

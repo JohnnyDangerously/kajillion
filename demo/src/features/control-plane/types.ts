@@ -25,6 +25,7 @@ export interface DemoConfig {
   pointDepthCueHighlight: number;
   pointDepthCueShadow: number;
   pointDepthCueSaturation: number;
+  pointBorderTreatment: PointBorderTreatment;
   pointTileBudget: number;
   pointTileBudgetSize: number;
   pointTileBudgetMaxScale: number;
@@ -37,3 +38,4 @@ export interface DemoConfig {
 }
 
 export type DepthPreset = 'off' | 'subtle' | 'standard' | 'vivid' | 'custom'
+export type PointBorderTreatment = 'off' | 'black' | 'darker' | 'shadow' | 'both'

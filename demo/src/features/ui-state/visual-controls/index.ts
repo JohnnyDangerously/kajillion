@@ -1,8 +1,6 @@
 import { type Graph, type GraphConfig } from '@kajillion/graph'
-import {
-  readControls,
-  syncTuningLabels,
-} from '../../control-plane/controls'
+import { readControls } from '../../control-plane/controls'
+import { syncTuningLabels } from '../../control-plane/depth-presets'
 import type { ControlElements } from '../../control-plane/dom'
 import type { DemoConfig } from '../../control-plane/types'
 import type { GeneratedGraph } from '../../../generate-graph'
@@ -107,6 +105,7 @@ export function createVisualControlsController (
       pointDepthCueHighlight: graphConfig.pointDepthCueHighlight,
       pointDepthCueShadow: graphConfig.pointDepthCueShadow,
       pointDepthCueSaturation: graphConfig.pointDepthCueSaturation,
+      pointBorderTreatment: graphConfig.pointBorderTreatment,
       linkLodStrength: graphConfig.linkLodStrength,
       linkLodZoomRange: graphConfig.linkLodZoomRange,
       linkLodMinSampleRate: graphConfig.linkLodMinSampleRate,

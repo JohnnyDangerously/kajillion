@@ -11,8 +11,10 @@ import {
   galleryParticleColor,
 } from '../../../gallery-presets'
 import { analystTierSize } from './analyst-sizing'
+import { atlasWorkSize } from './atlas-sizing'
 import {
   analystWorkColor,
+  atlasWorkColor,
   fintechColor,
   influenceColor,
   talentColor,
@@ -43,6 +45,7 @@ export function applyNodeVisualAttributes (
     isTalentPalette,
     isTokyoPalette,
     isWork,
+    atlasEqualize,
     nodeKindForNode,
     nodeScoreForNode,
     normalizeX,
@@ -62,6 +65,8 @@ export function applyNodeVisualAttributes (
     const degree = degrees[i] ?? 0
     const nodeKind = nodeKindForNode?.[i] as WorkNodeKind | undefined
     const workScore = nodeScoreForNode?.[i] ?? 0
+    const isAtlasWork = isWork && data.nodeCount >= 10000 && !isAnalystPalette
+    const atlasIdentity = hash > 0.955 ? bucket + 8 + Math.floor(hash * 4) : bucket
     const cosmicNearDepth = isCosmicPalette ? Math.max(0, Math.min(1, 1 - normalizeY(y))) : 0.5
     const [r, g, b] = isInfluencePalette && groupForNode
       ? influenceColor(Math.max(0, groupForNode[i] ?? 0))
@@ -69,6 +74,8 @@ export function applyNodeVisualAttributes (
         ? talentColor(Math.max(0, groupForNode[i] ?? 0))
         : isFintechPalette && groupForNode
           ? fintechColor(Math.max(0, groupForNode[i] ?? 0))
+      : isAtlasWork
+        ? atlasWorkColor(atlasIdentity, hash)
       : isAnalystPalette
         ? analystWorkColor(bucket, nodeKind, degree, workScore, hash)
         : isSubnetPalette
@@ -79,9 +86,8 @@ export function applyNodeVisualAttributes (
     const isHub = isWork
       ? nodeKind === WORK_NODE_ROOT || nodeKind === WORK_NODE_GROUP || nodeKind === WORK_NODE_COMPANY || degree >= 16
       : isCosmicPalette ? (degree >= 9 || hash > 0.982) : hash > 0.982
-    const isAtlasWork = isWork && data.nodeCount >= 50000 && !isAnalystPalette
     const isMicroDetail = false
-    const lightScale = useGalleryPalette ? 1.0 : isWork ? 1.04 : 1.14
+    const lightScale = useGalleryPalette ? 1.0 : isAtlasWork ? 1.30 : isWork ? 1.04 : 1.14
     pointColors[i * 4] = isLight ? Math.min(1, r * lightScale) : r
     pointColors[i * 4 + 1] = isLight ? Math.min(1, g * lightScale) : g
     pointColors[i * 4 + 2] = isLight ? Math.min(1, b * lightScale) : b
@@ -92,7 +98,7 @@ export function applyNodeVisualAttributes (
           ? 0.82
           : 0.96
       : isWork
-      ? (isHub ? 1 : (isLight ? 0.82 : 0.90))
+      ? (isAtlasWork && nodeKind === WORK_NODE_ROOT ? 0 : isHub ? 1 : (isLight ? 0.82 : 0.94))
           : isSubnetPalette
         ? 0.96
         : isTokyoPalette
@@ -113,16 +119,20 @@ export function applyNodeVisualAttributes (
     const baseSize = isWork
       ? isRankedWork
         ? nodeKind === WORK_NODE_ROOT
-          ? isAnalystPalette ? 0 : (isLargeWork ? 28 : 34)
-          : nodeKind === WORK_NODE_GROUP
-            ? (isAtlasWork ? 7.8 : isLargeWork ? 18.8 : 23.8) + Math.min(isAtlasWork ? 1.6 : 3.8, Math.sqrt(degree) * 0.40)
+          ? isAnalystPalette || isAtlasWork ? 0 : (isLargeWork ? 28 : 34)
+            : nodeKind === WORK_NODE_GROUP
+            ? (isAtlasWork ? 0 : isLargeWork ? 18.8 : 23.8) + Math.min(isAtlasWork ? 0 : 3.8, Math.sqrt(degree) * 0.40)
             : nodeKind === WORK_NODE_COMPANY
-              ? (isAtlasWork ? 4.8 : isLargeWork ? 12.4 : 16.8) + hash * (isAtlasWork ? 1.5 : 2.0) + Math.min(isAtlasWork ? 2.0 : 4.4, Math.sqrt(degree) * 0.78)
+              ? isAtlasWork
+                ? atlasWorkSize(nodeKind, degree, workScore, hash, atlasEqualize)
+                : (isLargeWork ? 12.4 : 16.8) + hash * 2.0 + Math.min(4.4, Math.sqrt(degree) * 0.72)
               : isAnalystPalette
                 ? analystTierSize(nodeKind, degree, workScore, hash, analystEqualize)
                 : isSubnetPalette
                 ? 8.2 + hash * 1.6 + Math.min(2.2, degree * 0.10)
-                : (isAtlasWork ? 2.25 : isLargeWork ? 6.2 : 10.6) + hash * (isAtlasWork ? 0.95 : isLargeWork ? 1.7 : 2.8) + Math.min(isAtlasWork ? 0.75 : isLargeWork ? 1.4 : 2.6, degree * 0.14) + workScore * (isAtlasWork ? 0.8 : isLargeWork ? 1.4 : 2.6)
+                : isAtlasWork
+                  ? atlasWorkSize(nodeKind, degree, workScore, hash, atlasEqualize)
+                  : (isLargeWork ? 6.2 : 10.6) + hash * (isLargeWork ? 1.7 : 2.8) + Math.min(isLargeWork ? 1.4 : 2.6, degree * 0.15) + workScore * (isLargeWork ? 1.4 : 2.6)
         : nodeKind === WORK_NODE_ROOT
           ? isAnalystPalette ? 0 : isSubnetPalette ? 22 : 24
           : nodeKind === WORK_NODE_GROUP
@@ -168,7 +178,7 @@ export function applyNodeVisualAttributes (
                     ? 3.8 + hash * 3.9
                     : 1.18 + hash * 1.18
     const cosmicDepthSize = isCosmicPalette ? 0.70 + cosmicNearDepth * 1.08 + (isHub ? 0.20 : 0) : 1
-    pointSizes[i] = baseSize * (isAtlasWork ? 0.92 : isWork ? (isAnalystPalette ? (isDense ? 1.02 : 0.92) : isDense ? 1.16 : 1.0) : (isCosmicPalette || isTokyoPalette || config.palette === 'signal' || config.palette === 'insight' || isFintechPalette || isInfluencePalette || isTalentPalette) ? 1 : isLight ? (isDense ? 1.10 : 0.54) : isDense ? 1 : 0.44) * (isMicroDetail ? 0.45 : 1) * cosmicDepthSize
+    pointSizes[i] = baseSize * (isAtlasWork ? 1.0 : isWork ? (isAnalystPalette ? (isDense ? 1.02 : 0.92) : isDense ? 1.16 : 1.0) : (isCosmicPalette || isTokyoPalette || config.palette === 'signal' || config.palette === 'insight' || isFintechPalette || isInfluencePalette || isTalentPalette) ? 1 : isLight ? (isDense ? 1.10 : 0.54) : isDense ? 1 : 0.44) * (isMicroDetail ? 0.45 : 1) * cosmicDepthSize
     if (isAnalystPalette) pointShapes[i] = PointShape.Circle
   }
 }

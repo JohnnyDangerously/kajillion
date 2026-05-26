@@ -12,6 +12,7 @@ export interface RenderCanvasScenePreparedState {
   msaaActive: boolean;
   shouldDrawLinks: boolean;
   lineCullingReady: boolean;
+  linePrecomputeReady: boolean;
   shouldRenderPointImpostors: boolean;
   pointImpostorsReady: boolean;
   pointCullingReady: boolean;
@@ -61,6 +62,10 @@ export function renderCanvasScene (
   if (shouldDrawLinks && renderPolicy.useLinkGpuCull) {
     lineCullingReady = lines?.prepareGpuCulledDraw(timerQueryPool, true) ?? false
   }
+  let linePrecomputeReady = false
+  if (shouldDrawLinks && !lineCullingReady) {
+    linePrecomputeReady = lines?.prepareDirectDraw() ?? false
+  }
   let pointImpostorsReady = false
   if (shouldRenderPointImpostors) {
     pointImpostorsReady = points?.renderImpostorDensity(timerQueryPool, positionEpoch) ?? false
@@ -75,6 +80,7 @@ export function renderCanvasScene (
     msaaActive,
     shouldDrawLinks,
     lineCullingReady,
+    linePrecomputeReady,
     shouldRenderPointImpostors,
     pointImpostorsReady,
     pointCullingReady,

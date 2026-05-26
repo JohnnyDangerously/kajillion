@@ -30,13 +30,14 @@ export function buildVisualAttributeContext (
   const degrees = graphDegrees(data)
   const workData = data as WorkGraphData
   const groupForNode = workData.groupForNode
+  const nodeCompanyForNode = workData.nodeCompany
   const nodeKindForNode = workData.nodeKind
   const nodeScoreForNode = workData.nodeScore
   const edgeKindForEdge = (data as RenderableGraphData).edgeKind
   const edgeWeightForEdge = (data as RenderableGraphData).edgeWeight
   const edgeConfidenceForEdge = (data as RenderableGraphData).edgeConfidence
   const isLargeWork = isWork && data.nodeCount >= 2000
-  const isAtlasWork = isWork && data.nodeCount >= 50000
+  const isAtlasWork = isWork && data.nodeCount >= 10000
   const cx = spaceSize / 2
   const cy = spaceSize / 2
   let minX = Infinity
@@ -57,6 +58,9 @@ export function buildVisualAttributeContext (
   const normalizeY = (y: number): number => useGalleryPalette && maxY > minY ? 1 - ((y - minY) / (maxY - minY)) : 0.5
   const analystEqualize = isAnalystPalette ? analystZoomEqualization(options.equalizationZoomDistance) : 0
   const analystOverview = isAnalystPalette ? smooth01((options.overviewZoomDistance - 38) / 52) : 0
+  const atlasEqualize = isWork && !isAnalystPalette
+    ? smooth01((68 - options.equalizationZoomDistance) / 54)
+    : 0
 
   return {
     config,
@@ -77,6 +81,7 @@ export function buildVisualAttributeContext (
     degrees,
     workData,
     groupForNode,
+    nodeCompanyForNode,
     nodeKindForNode,
     nodeScoreForNode,
     edgeKindForEdge,
@@ -90,5 +95,6 @@ export function buildVisualAttributeContext (
     normalizeY,
     analystEqualize,
     analystOverview,
+    atlasEqualize,
   }
 }
